@@ -1,0 +1,138 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 26,
+    "patch": 1
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "gcc",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_CXX_COMPILER": "g++"
+      }
+    },
+    {
+      "name": "clang",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_CXX_COMPILER": "clang++"
+      }
+    },
+    {
+      "name": "gcc-test",
+      "inherits": "gcc",
+      "cacheVariables": {
+        "BUILD_TESTING": "ON"
+      }
+    },
+    {
+      "name": "clang-test",
+      "inherits": "clang",
+      "cacheVariables": {
+        "BUILD_TESTING": "ON"
+      }
+    },
+    {
+      "name": "asan",
+      "inherits": "clang-test",
+      "cacheVariables": {
+        "PROJECT_DEVTOOLS": "asan;surrogate"
+      }
+    },
+    {
+      "name": "coverage",
+      "inherits": "clang-test",
+      "cacheVariables": {
+        "PROJECT_DEVTOOLS": "coverage"
+      }
+    },
+    {
+      "name": "qa",
+      "inherits": "clang-test",
+      "cacheVariables": {
+        "PROJECT_DEVTOOLS": "format;linting;surrogate"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "gcc", "configurePreset": "gcc" },
+    { "name": "clang", "configurePreset": "clang" },
+    { "name": "gcc-test", "configurePreset": "gcc-test" },
+    { "name": "clang-test", "configurePreset": "clang-test" },
+    { "name": "asan", "configurePreset": "asan" },
+    { "name": "coverage", "configurePreset": "coverage" },
+    { "name": "qa", "configurePreset": "qa" }
+  ],
+  "testPresets": [
+    {
+      "name": "gcc-test",
+      "configurePreset": "gcc-test",
+      "output": { "outputOnFailure": true },
+      "execution": { "noTestsAction": "error", "stopOnFailure": true }
+    },
+    {
+      "name": "clang-test",
+      "configurePreset": "clang-test",
+      "output": { "outputOnFailure": true },
+      "execution": { "noTestsAction": "error", "stopOnFailure": true }
+    },
+    {
+      "name": "asan",
+      "configurePreset": "asan",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "coverage",
+      "configurePreset": "coverage",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "qa",
+      "configurePreset": "qa",
+      "output": { "outputOnFailure": true }
+    }
+  ],
+  "workflowPresets": [
+    {
+      "name": "gcc",
+      "steps": [
+        { "type": "configure", "name": "gcc" },
+        { "type": "build", "name": "gcc" }
+      ]
+    },
+    {
+      "name": "clang",
+      "steps": [
+        { "type": "configure", "name": "clang" },
+        { "type": "build", "name": "clang" }
+      ]
+    },
+    {
+      "name": "gcc-test",
+      "steps": [
+        { "type": "configure", "name": "gcc-test" },
+        { "type": "build", "name": "gcc-test" },
+        { "type": "test", "name": "gcc-test" }
+      ]
+    },
+    {
+      "name": "clang-test",
+      "steps": [
+        { "type": "configure", "name": "clang-test" },
+        { "type": "build", "name": "clang-test" },
+        { "type": "test", "name": "clang-test" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+# --------------------------------------------------------------------------------------------------
+# SPDX-License-Identifier: Apache-2.0
+# --------------------------------------------------------------------------------------------------
+# The local dev-env bundle provides the tools needed to develop, test, and document this checkout.
+# The central Ambhora Spack repository supplies shared Ambhora development dependencies.
+spack:
+  repos:
+    amstack:
+      git: https://github.com/ambhora/amstack.git
+      branch: main
+    dev: spack/spack_repo/dev
+
+  specs:
+  - dev-env@1.1+coverage+docs+tests
+
+  concretizer:
+    unify: true
+
+  view: true

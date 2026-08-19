@@ -1,0 +1,56 @@
+# Create and build a C++ project
+
+This tutorial creates a C++ project, examines the generated build description, and builds it with two
+compilers.
+
+## Generate the project
+
+Install BESA in your Python environment and run:
+
+```console
+besa cpp generate --path ~/software --name example
+cd ~/software/example
+```
+
+The generator copies the C++ template, changes only the project-name token, and installs the current
+BESA CMake module under `cmake/besa`.
+
+## Build with GCC
+
+```console
+cmake --workflow --preset gcc --fresh
+```
+
+The default feature set contains `build-source` and `toolchain-cpp`. The project begins with
+`LANGUAGES NONE`; `besa_configure_complete()` resolves those features and enables `CXX` before the
+source tree is processed.
+
+## Build with Clang
+
+```console
+cmake --workflow --preset clang --fresh
+```
+
+The build description is unchanged. Only the preset selects a different compiler.
+
+## Disable a default feature
+
+Features passed through `PROJECT_FEATURES` are overrides. Prefix a feature with `~` to disable a
+default:
+
+```console
+cmake -S . -B build/no-source \
+  -DPROJECT_FEATURES='~build-source;~toolchain-cpp'
+```
+
+A feature may appear only once in the override list. `foo;~foo`, `foo;foo`, and `~foo;~foo` are all
+configuration errors.
+
+## Install the project
+
+```console
+cmake --install build/gcc --prefix ~/opt/example
+```
+
+BESA generates and installs `exampleConfig.cmake`, `exampleConfigVersion.cmake`, and exported targets.
+The installed package does not depend on the vendored BESA module.

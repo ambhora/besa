@@ -1,0 +1,104 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 26,
+    "patch": 1
+  },
+  "configurePresets": [
+    {
+      "name": "default",
+      "binaryDir": "$env{BESA_TEST_BUILD_DIR}",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "${sourceParentDir}/../cmake;$penv{BESA_TEST_CMAKE_PREFIX_PATH}",
+        "CMAKE_CXX_COMPILER": "$penv{BESA_TEST_CMAKE_CXX_COMPILER}",
+        "CMAKE_C_COMPILER": "$penv{BESA_TEST_CMAKE_C_COMPILER}",
+        "FEATURE": "nofeature"
+      }
+    },
+    {
+      "name": "fail",
+      "binaryDir": "$env{BESA_TEST_BUILD_DIR}",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "${sourceParentDir}/../cmake;$penv{BESA_TEST_CMAKE_PREFIX_PATH}",
+        "CMAKE_CXX_COMPILER": "$penv{BESA_TEST_CMAKE_CXX_COMPILER}",
+        "CMAKE_C_COMPILER": "$penv{BESA_TEST_CMAKE_C_COMPILER}",
+        "FEATURE": "failfeature"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "default",
+      "configurePreset": "default"
+    },
+    {
+      "name": "fail",
+      "configurePreset": "fail"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "default",
+      "configurePreset": "default",
+      "output": {
+        "outputOnFailure": true,
+        "outputLogFile": "$env{BESA_TEST_BUILD_DIR}/besa.test.log",
+        "verbosity": "verbose"
+      },
+      "execution": {
+        "noTestsAction": "error",
+        "stopOnFailure": true
+      }
+    },
+    {
+      "name": "fail",
+      "configurePreset": "fail",
+      "output": {
+        "outputOnFailure": true,
+        "outputLogFile": "$env{BESA_TEST_BUILD_DIR}/besa.test.log",
+        "verbosity": "verbose"
+      },
+      "execution": {
+        "noTestsAction": "error",
+        "stopOnFailure": true
+      }
+    }
+  ],
+  "workflowPresets": [
+    {
+      "name": "default",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "default"
+        },
+        {
+          "type": "build",
+          "name": "default"
+        },
+        {
+          "type": "test",
+          "name": "default"
+        }
+      ]
+    },
+    {
+      "name": "fail",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "fail"
+        },
+        {
+          "type": "build",
+          "name": "fail"
+        },
+        {
+          "type": "test",
+          "name": "fail"
+        }
+      ]
+    }
+  ]
+}

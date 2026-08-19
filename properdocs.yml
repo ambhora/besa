@@ -1,0 +1,54 @@
+site_name: BESA
+site_url: https://ambhora.github.io/besa/
+site_author: Jayesh Badwaik
+site_description: Declarative project development tooling for self-contained CMake and Python projects
+
+repo_name: ambhora/besa
+repo_url: https://github.com/ambhora/besa
+edit_uri: edit/main/docs/
+
+copyright: Copyright &copy; 2026 Jayesh Badwaik
+
+theme:
+  name: materialx
+  features:
+    - content.code.copy
+    - navigation.indexes
+    - navigation.sections
+    - navigation.tabs
+    - navigation.top
+    - search.highlight
+    - search.suggest
+    - toc.follow
+
+nav:
+  - Home: index.md
+  - Tutorials:
+      - First C++ project: tutorials/first-cpp-project.md
+      - First Python project: tutorials/first-python-project.md
+  - How-to guides:
+      - Update vendored CMake: how-to/update-cmake.md
+      - Configure features: how-to/features.md
+      - Use selectors: how-to/selectors.md
+      - Add configuration constraints: how-to/feature-constraints.md
+      - Enable instrumentation: how-to/instrumentation.md
+      - Build C++ user docs: how-to/cpp-user-docs.md
+      - Add dependencies: how-to/dependencies.md
+      - Run the BESA tests: how-to/run-tests.md
+      - Publish the documentation: how-to/publish-docs.md
+  - Reference:
+      - CLI: reference/cli.md
+      - CMake API: reference/cmake-api.md
+      - Selectors: reference/selectors.md
+      - Dependencies: reference/dependencies.md
+      - Instrumentation: reference/instrumentation.md
+      - Versioning: reference/versioning.md
+      - Release process: reference/release-process.md
+      - Configuration variables: reference/configuration.md
+      - Project layout: reference/project-layout.md
+      - Test conventions: reference/testing.md
+  - Explanation:
+      - Configuration lifecycle: explanation/configuration-lifecycle.md
+      - Self-contained C++ projects: explanation/self-contained-projects.md
+      - Feature and instrumentation model: explanation/features-and-instrumentation.md
+      - Dependency model: explanation/dependencies.md

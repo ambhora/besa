@@ -1,0 +1,108 @@
+/* BESA API presentation: keep large references spacious, readable, and structurally obvious. */
+
+.bd-page-width {
+  /* Roughly three quarters of a 1920 px desktop, but still fluid on smaller displays. */
+  max-width: 90rem;
+}
+
+.bd-main .bd-content .bd-article-container {
+  max-width: 100%;
+}
+
+/* Keep the API navigation readable rather than compressing all header actions together. */
+.besa-api-project-links {
+  align-items: center;
+  display: flex;
+  gap: 1.25rem;
+  margin-inline-start: 0.75rem;
+}
+
+.besa-api-project-links .nav-link {
+  padding-inline: 0.15rem;
+  white-space: nowrap;
+}
+
+@media (min-width: 960px) {
+  .navbar-header-items__end .search-button-field {
+    gap: 0.55rem;
+    justify-content: flex-start;
+    min-width: 13rem;
+    padding-inline: 0.9rem;
+  }
+
+  .navbar-header-items__end .search-button__kbd-shortcut {
+    margin-inline-start: auto;
+  }
+}
+
+html[data-theme="light"] {
+  --pst-color-primary: #235ea7;
+  --pst-color-secondary: #087f8c;
+}
+
+html[data-theme="dark"] {
+  --pst-color-primary: #7db7ff;
+  --pst-color-secondary: #66d3dc;
+}
+
+html {
+  --pst-font-family-base: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --pst-font-family-heading: var(--pst-font-family-base);
+  --pst-font-family-monospace: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+.bd-article h1 {
+  border-bottom: 3px solid var(--pst-color-primary);
+  padding-bottom: 0.35rem;
+}
+
+.bd-article h2 {
+  border-left: 0.3rem solid var(--pst-color-secondary);
+  padding-left: 0.65rem;
+  margin-top: 2.2rem;
+}
+
+.bd-article h3 {
+  margin-top: 1.7rem;
+}
+
+/* Breathe declarations should read as code, not prose or emphasis. */
+dl.cpp > dt,
+dl.c > dt,
+.sig,
+.sig-name,
+.sig-prename,
+.sig-param,
+.sig-return-type,
+code,
+pre {
+  font-family: var(--pst-font-family-monospace);
+  font-style: normal;
+}
+
+.sig {
+  border-left: 0.25rem solid var(--pst-color-primary);
+  border-radius: 0.25rem;
+  padding: 0.55rem 0.75rem;
+}
+
+.sig em,
+.highlight em,
+code em {
+  font-style: normal;
+}
+
+.breathe-sectiondef-title {
+  color: var(--pst-color-primary);
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin-top: 2rem;
+  text-transform: none;
+}
+
+/* Give large namespace/file pages a clearer local hierarchy. */
+.contents.local.topic {
+  border-left: 0.25rem solid var(--pst-color-secondary);
+  padding: 0.75rem 1rem;
+}

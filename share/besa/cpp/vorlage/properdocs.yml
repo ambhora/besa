@@ -1,0 +1,31 @@
+site_name: vorlage
+site_description: Documentation for vorlage
+
+# ProperDocs owns the public documentation site's information architecture. The versioned C/C++ API
+# reference is assembled by BESA below Reference -> API reference after ProperDocs has built this site.
+theme:
+  name: materialx
+  features:
+    - content.code.copy
+    - navigation.indexes
+    - navigation.sections
+    - navigation.tabs
+    - navigation.top
+    - search.highlight
+    - search.suggest
+    - toc.follow
+
+# During `properdocs serve`, changes to C/C++ sources or API-renderer inputs trigger the local hook.
+# The hook regenerates only the current API reference and mounts it below reference/api/main/.
+watch:
+  - src
+  - api-docs
+
+hooks:
+  - properdocs_hook.py
+
+nav:
+  - Home: index.md
+  - Reference:
+      - Overview: reference/index.md
+      - API reference: reference/api.md

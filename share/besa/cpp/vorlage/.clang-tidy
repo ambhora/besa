@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: Apache-2.0
+---
+Checks: >-
+  -*,
+  bugprone-*,
+  clang-analyzer-*,
+  performance-*
+WarningsAsErrors: ''
+HeaderFilterRegex: '^(src|tests)/'
+FormatStyle: none
+...

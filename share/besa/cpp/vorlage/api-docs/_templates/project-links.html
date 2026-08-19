@@ -1,0 +1,8 @@
+{# Persistent route from every API page back into the canonical ProperDocs information architecture. #}
+{% set page_depth = pagename.count('/') %}
+{% set docs_root = '../' * (besa_properdocs_root_depth + page_depth) %}
+{% set api_root = '../' * (1 + page_depth) %}
+<div class="navbar-item besa-api-project-links">
+  <a class="nav-link" href="{{ docs_root }}">{{ _('Main documentation') }}</a>
+  <a class="nav-link" href="{{ api_root }}">{{ _('API versions') }}</a>
+</div>

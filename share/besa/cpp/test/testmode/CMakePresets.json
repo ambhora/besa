@@ -1,0 +1,92 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 26,
+    "patch": 1
+  },
+  "configurePresets": [
+    {
+      "name": "default",
+      "binaryDir": "$env{BESA_TEST_BUILD_DIR}",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "${sourceParentDir}/../cmake;$penv{BESA_TEST_CMAKE_PREFIX_PATH}",
+        "TEST_MODES": "~ci-commit;ci-manual"
+      }
+    },
+    {
+      "name": "fail",
+      "binaryDir": "$env{BESA_TEST_BUILD_DIR}",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "${sourceParentDir}/../cmake;$penv{BESA_TEST_CMAKE_PREFIX_PATH}",
+        "TEST_MODES": "ci-unknown"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "default",
+      "configurePreset": "default"
+    },
+    {
+      "name": "fail",
+      "configurePreset": "fail"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "default",
+      "configurePreset": "default",
+      "output": {
+        "outputOnFailure": true,
+        "outputLogFile": "$env{BESA_TEST_BUILD_DIR}/besa.test.log",
+        "verbosity": "verbose"
+      },
+      "execution": {
+        "noTestsAction": "error",
+        "stopOnFailure": true
+      }
+    },
+    {
+      "name": "fail",
+      "configurePreset": "fail",
+      "output": {
+        "outputOnFailure": true,
+        "outputLogFile": "$env{BESA_TEST_BUILD_DIR}/besa.test.log",
+        "verbosity": "verbose"
+      },
+      "execution": {
+        "noTestsAction": "error",
+        "stopOnFailure": true
+      }
+    }
+  ],
+  "workflowPresets": [
+    {
+      "name": "default",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "default"
+        },
+        {
+          "type": "build",
+          "name": "default"
+        },
+        {
+          "type": "test",
+          "name": "default"
+        }
+      ]
+    },
+    {
+      "name": "fail",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "fail"
+        }
+      ]
+    }
+  ]
+}
