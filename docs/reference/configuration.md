@@ -113,7 +113,7 @@ verify what BESA actually detected and selected from a configure invocation.
 A typical summary is:
 
 ```text
--- BESA configuration:
+-- myproject configuration:
 --   Features      : build-source, toolchain-cpp, user-docs
 --   Devtools      : coverage
 --   Warning policy: essential
@@ -125,6 +125,8 @@ A typical summary is:
 --   Version       : dev.main.abc1234
 ```
 
-The summary intentionally reports resolved sets rather than the raw cache-variable text. For
+The banner uses the lowercase CMake `PROJECT_NAME`, so each generated project identifies its own
+configuration rather than BESA itself. The summary intentionally reports resolved sets rather than
+the raw cache-variable text. For
 example, default features remain visible even when `PROJECT_FEATURES` contains only an additional
 `user-docs` override.

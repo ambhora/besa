@@ -966,14 +966,14 @@ def test_generated_cpp_combined_docs_build_when_toolchain_is_available(tmp_path:
 
 
 @pytest.mark.cpp
-def test_configure_prints_resolved_besa_configuration(tmp_path: Path) -> None:
+def test_configure_prints_resolved_project_configuration(tmp_path: Path) -> None:
     project = tmp_path / "configuration_summary"
     project.mkdir()
     cpp_update(project)
     (project / "CMakeLists.txt").write_text(
         """\
 cmake_minimum_required(VERSION 3.26.1)
-project(configuration_summary VERSION 1.2.3 LANGUAGES NONE)
+project(Configuration_Summary VERSION 1.2.3 LANGUAGES NONE)
 list(PREPEND CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/besa")
 find_package(besa CONFIG REQUIRED)
 set(PROJECT_DEVTOOLS "none" CACHE STRING "")
@@ -990,7 +990,7 @@ besa_configure_complete()
     )
 
     result = _run(["cmake", "-S", ".", "-B", "build", "-DRELEASE_TYPE=release"], project)
-    assert "-- BESA configuration:" in result.stdout
+    assert "-- configuration_summary configuration:" in result.stdout
     assert "Features      : alpha" in result.stdout
     assert "Devtools      : none" in result.stdout
     assert "Warning policy: none" in result.stdout

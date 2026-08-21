@@ -237,7 +237,8 @@ function(_besa_configuration_summary LIST_FEATURES LIST_DEVTOOLS LIST_TEST_MODES
     set(_build_testing OFF)
   endif()
 
-  message(STATUS "BESA configuration:")
+  string(TOLOWER "${PROJECT_NAME}" _besa_project_name_lower)
+  message(STATUS "${_besa_project_name_lower} configuration:")
   message(STATUS "  Features      : ${_display_FEATURES}")
   message(STATUS "  Devtools      : ${_display_DEVTOOLS}")
   message(STATUS "  Warning policy: ${_display_WARNINGS}")
