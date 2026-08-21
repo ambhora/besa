@@ -40,6 +40,114 @@ def test_generated_cpp_project_builds_with_multiple_compilers(
 
 
 @pytest.mark.cpp
+def test_generated_cpp_project_vendors_and_builds_prova_support(tmp_path: Path) -> None:
+    if shutil.which("cmake") is None or shutil.which("g++") is None:
+        pytest.skip("CMake and g++ are required")
+
+    project = cpp_generate(tmp_path, "example_prova")
+    base = project / "test" / "base"
+    assert (base / "CMakeLists.txt").is_file()
+    catch_main = base / "cpp" / "include" / "testexample_prova" / "prova" / "catch_main.hpp"
+    assert catch_main.is_file()
+    catch_main_text = catch_main.read_text(encoding="utf-8")
+    assert "#define TESTVORLAGE_PROVA_CATCH_MAIN" in catch_main_text
+    assert "#define TESTVORLAGE_PROVA_CATCH_GROUP" in catch_main_text
+    assert "#define PROVA_CATCH_MAIN" not in catch_main_text
+    assert "#define PROVA_CATCH_GROUP" not in catch_main_text
+    assert "MOL_CATCH" not in catch_main_text
+
+    unit_main = project / "test" / "unit" / "cpp" / "main.cpp"
+    assert unit_main.is_file()
+    assert 'TESTVORLAGE_PROVA_CATCH_MAIN("unit")' in unit_main.read_text(encoding="utf-8")
+    assert "Catch2::Catch2WithMain" not in (project / "test" / "CMakeLists.txt").read_text(
+        encoding="utf-8"
+    )
+
+    # Configure against a minimal Catch2 package so this test checks that the vendored Prova target
+    # is structurally complete without requiring Catch2 to be installed in BESA's own test runner.
+    catch2_prefix = tmp_path / "catch2"
+    catch2_cmake = catch2_prefix / "lib" / "cmake" / "Catch2"
+    catch2_include = catch2_prefix / "include" / "catch2"
+    catch2_cmake.mkdir(parents=True)
+    catch2_include.mkdir(parents=True)
+    (catch2_cmake / "Catch2Config.cmake").write_text(
+        f'''\
+add_library(Catch2::Catch2 INTERFACE IMPORTED)
+set_target_properties(Catch2::Catch2 PROPERTIES
+  INTERFACE_INCLUDE_DIRECTORIES [[{catch2_prefix / "include"}]]
+)
+''',
+        encoding="utf-8",
+    )
+    (catch2_cmake / "Catch2ConfigVersion.cmake").write_text(
+        '''\
+set(PACKAGE_VERSION "3.0.0")
+set(PACKAGE_VERSION_COMPATIBLE TRUE)
+set(PACKAGE_VERSION_EXACT FALSE)
+''',
+        encoding="utf-8",
+    )
+    (catch2_include / "catch_session.hpp").write_text(
+        '''\
+#pragma once
+namespace Catch {
+class Session {
+public:
+  int applyCommandLine(int, char const* const*) { return 0; }
+  int run() { return 0; }
+};
+} // namespace Catch
+''',
+        encoding="utf-8",
+    )
+    (catch2_include / "catch_test_macros.hpp").write_text(
+        '''\
+#pragma once
+#define TEST_CASE(...) static void test_case()
+#define REQUIRE(...) do { } while (false)
+#define FAIL(...) do { } while (false)
+''',
+        encoding="utf-8",
+    )
+
+    prova_main = base / "prova_main.cpp"
+    prova_main.write_text(
+        "#include <testexample_prova/prova/catch_main.hpp>\nTESTVORLAGE_PROVA_CATCH_MAIN(\"smoke\")\n",
+        encoding="utf-8",
+    )
+    with (project / "test" / "CMakeLists.txt").open("a", encoding="utf-8") as cmake_file:
+        cmake_file.write(
+            "\nbesa_add_executable(\n"
+            "  NAME prova.runner.t\n"
+            "  INSTALL FALSE\n"
+            "  SOURCES base/prova_main.cpp\n"
+            "  LINK_LIBRARIES example_prova.test.runtime\n"
+            ")\n"
+        )
+
+    _run(
+        [
+            "cmake",
+            "-S",
+            ".",
+            "-B",
+            "build/prova",
+            "-DBUILD_TESTING=ON",
+            "-DPROJECT_WARNINGS=none",
+            f"-DCMAKE_PREFIX_PATH={catch2_prefix}",
+        ],
+        project,
+    )
+    _run(["cmake", "--build", "build/prova", "--target", "libtestexample_prova"], project)
+    _run(["cmake", "--build", "build/prova", "--target", "prova.runner.t"], project)
+    _run(["cmake", "--build", "build/prova", "--target", "unit.hello.t"], project)
+    _run(
+        ["ctest", "--test-dir", "build/prova", "-R", "^unit.hello.t$", "--output-on-failure"],
+        project,
+    )
+
+
+@pytest.mark.cpp
 def test_generated_cpp_project_installs_and_exports_package(tmp_path: Path) -> None:
     if shutil.which("cmake") is None or shutil.which("g++") is None:
         pytest.skip("CMake and g++ are required")
@@ -995,7 +1103,16 @@ def test_generated_cpp_spack_environment_uses_amstack_and_local_dev_bundle(
     assert "branch: main" in manifest
     assert "dev: spack/spack_repo/dev" in manifest
     assert "- example@main" not in manifest
-    assert "dev-env@1.1 +docs +tests" in manifest
+    dev_env_spec = next(
+        line.strip()[2:].replace(" ", "")
+        for line in manifest.splitlines()
+        if line.strip().startswith("- dev-env@")
+    )
+    assert dev_env_spec.startswith("dev-env@1.1")
+    assert sorted(filter(None, dev_env_spec.removeprefix("dev-env@1.1").split("+"))) == [
+        "docs",
+        "tests",
+    ]
     assert "develop:" not in manifest
     assert "spack/repos.yaml" not in manifest
     assert "BESA_FEATURES" not in manifest

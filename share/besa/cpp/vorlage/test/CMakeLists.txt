@@ -4,14 +4,18 @@
 # Tests have their own first-class dependency graph.  libtestvorlage is intentionally not part of
 # the installed product and may depend on libraries which the production library never sees.
 
-add_library(libtestvorlage INTERFACE)
-target_link_libraries(libtestvorlage INTERFACE vorlage::libvorlage)
+# The base library links Catch2 without its supplied main. Catch-based test groups provide their
+# entry point through the vendored Prova helper so every test uses the same runner.
+add_subdirectory(base)
 
 add_library(vorlage.test.runtime INTERFACE)
-target_link_libraries(vorlage.test.runtime INTERFACE libtestvorlage)
+target_link_libraries(
+  vorlage.test.runtime
+  INTERFACE libtestvorlage vorlage::libvorlage Catch2::Catch2
+)
 
 add_library(vorlage.test.unit INTERFACE)
-target_link_libraries(vorlage.test.unit INTERFACE vorlage.test.runtime Catch2::Catch2WithMain)
+target_link_libraries(vorlage.test.unit INTERFACE vorlage.test.runtime)
 
 # The starter project defines only `ci-commit`.  Runtime/compile discovery functions declare their
 # supported modes themselves.  Smoke tests are registered manually, so gate their subdirectory with

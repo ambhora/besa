@@ -12,7 +12,17 @@ def test_besa_spack_environment_uses_common_local_dev_env() -> None:
     assert "branch: main" in manifest
     assert "dev: spack/spack_repo/dev" in manifest
     assert "- besa@main" not in manifest
-    assert "dev-env@1.1 +docs +tests +coverage" in manifest
+    dev_env_spec = next(
+        line.strip()[2:].replace(" ", "")
+        for line in manifest.splitlines()
+        if line.strip().startswith("- dev-env@")
+    )
+    assert dev_env_spec.startswith("dev-env@1.1")
+    assert sorted(filter(None, dev_env_spec.removeprefix("dev-env@1.1").split("+"))) == [
+        "coverage",
+        "docs",
+        "tests",
+    ]
     assert "develop:" not in manifest
 
     repo = ROOT / "spack" / "spack_repo" / "dev"
