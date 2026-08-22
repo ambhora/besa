@@ -1,0 +1,112 @@
+" --------------------------------------------------------------------------------------------------
+" SPDX-License-Identifier: Apache-2.0
+" --------------------------------------------------------------------------------------------------
+
+function! s:insert_license_slash()
+  set formatoptions-=cro
+  execute "normal! i// -------------------------------------------------------------------------------------------------"
+  execute "normal! o// SPDX-License-Identifier: Apache-2.0"
+  execute "normal! o// -------------------------------------------------------------------------------------------------"
+  normal! o
+  set formatoptions+=cro
+endfunction
+
+function! s:insert_license_hash()
+  set formatoptions-=cro
+  execute "normal! i# --------------------------------------------------------------------------------------------------"
+  execute "normal! o# SPDX-License-Identifier: Apache-2.0"
+  execute "normal! o# --------------------------------------------------------------------------------------------------"
+  set formatoptions+=cro
+endfunction
+
+function! s:insert_license_percent()
+  set formatoptions-=cro
+  execute "normal! i% --------------------------------------------------------------------------------------------------"
+  execute "normal! o% SPDX-License-Identifier: Apache-2.0"
+  execute "normal! o% --------------------------------------------------------------------------------------------------"
+  set formatoptions+=cro
+endfunction
+
+function! s:insert_license_quote()
+  set formatoptions-=cro
+  execute "normal! i\" --------------------------------------------------------------------------------------------------"
+  execute "normal! o\" SPDX-License-Identifier: Apache-2.0"
+  execute "normal! o\" --------------------------------------------------------------------------------------------------"
+  set formatoptions+=cro
+endfunction
+
+function! s:insert_license_html()
+  set formatoptions-=cro
+  execute "normal! i<!--"
+  execute "normal! o- SPDX-License-Identifier: Apache-2.0"
+  execute "normal! o-->"
+  set formatoptions+=cro
+endfunction
+
+function! Insert_license_slash()
+  execute "normal! O"
+  call s:insert_license_slash()
+endfunction
+
+function! Insert_license_hash()
+  execute "normal! O"
+  call s:insert_license_hash()
+endfunction
+
+function! Insert_license_percent()
+  execute "normal! O"
+  call s:insert_license_percent()
+endfunction
+
+function! Insert_license_quote()
+  execute "normal! O"
+  call s:insert_license_quote()
+endfunction
+
+function! Insert_license_html()
+  execute "normal! O"
+  call s:insert_license_html()
+endfunction
+
+function! Insert_header_guard()
+  execute "normal! O"
+  call s:insert_header_guard()
+endfunction
+
+" Automatic C / C++ header guards.
+function! s:insert_header_guard()
+  set formatoptions-=cro
+  let gatename = substitute(substitute(toupper(@%), "\\.", "_", "g"), "/", "_", "g")
+  let gatename = substitute(gatename, "SRC_CPP_INCLUDE_", "", "g")
+  let gatename = substitute(gatename, "SRC_CUDA_INCLUDE_", "", "g")
+  let gatename = substitute(gatename, "SRC_HIP_INCLUDE_", "", "g")
+  let gatename = substitute(gatename, "TEST_COMMON_INCLUDE_", "", "g")
+  let gatename = substitute(gatename, "TEST_BASE_CPP_INCLUDE_", "", "g")
+  let gatename = substitute(gatename, "BENCH_COMMON_INCLUDE_", "", "g")
+  execute "normal! o#ifndef " . gatename
+  execute "normal! o#define " . gatename
+  normal! o
+  execute "normal! Go#endif // " . gatename
+  set formatoptions-=cro
+  normal! k
+endfunction
+
+augroup besa_local_templates
+  autocmd!
+
+  autocmd BufNewFile *.cuh,*.cuhpp,*.h,*.c,*.hpp,*.cpp,*.cu,*.ipp,*.rs call <SID>insert_license_slash()
+  autocmd BufNewFile CMakeLists.txt,*.cmake,*.sh,*.py,*.toml,*.yml call <SID>insert_license_hash()
+  autocmd BufNewFile *.md call <SID>insert_license_html()
+  autocmd BufNewFile *.tex,*.sty,*.cls call <SID>insert_license_percent()
+
+  autocmd BufNewFile *.cuh,*.cuhpp,*.h,*.hpp,*.hip call <SID>insert_header_guard()
+
+  " Remove trailing whitespace on save.
+  autocmd BufWritePre * %s/\s\+$//e
+
+  " Keep the highlight after colorscheme changes.
+  autocmd ColorScheme * highlight ExtraWhitespace ctermbg=red guibg=red
+augroup END
+
+highlight ExtraWhitespace ctermbg=red guibg=red
+match ExtraWhitespace /\s\+$/

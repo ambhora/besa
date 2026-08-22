@@ -14,7 +14,8 @@ cd ~/software/example/main
 
 The generator creates the default `main` checkout directory, copies the C++ template, substitutes the
 project name, and installs the current BESA CMake module under `cmake/besa`. Use `--directory` when a
-different checkout-directory name is desired.
+different checkout-directory name is desired. Add `--nvim-ycm` when local Neovim and YouCompleteMe
+configuration should also be provisioned; those two local files are gitignored.
 
 ## Build with GCC
 

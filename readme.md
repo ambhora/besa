@@ -10,7 +10,8 @@ cmake --workflow --preset gcc --fresh
 ```
 
 A generated C++ project vendors the BESA CMake implementation under `cmake/besa`; it does not require
-BESA to remain installed in order to build.
+BESA to remain installed in order to build. Pass `--nvim-ycm` to additionally provision gitignored
+project-local Neovim and YouCompleteMe configuration.
 
 Run the BESA regression suite with:
 

@@ -2,6 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import json
+import os
+import runpy
+
 import pytest
 
 import besa.cli as cli
@@ -34,7 +38,14 @@ def test_cpp_generate_vendors_cmake(tmp_path: Path) -> None:
     assert (project / "CMakeLists.txt").is_file()
     assert (project / "cmake" / "besa" / "besaConfig.cmake").is_file()
     assert (project / "cmake" / "besa" / ".besa-cmake-module").is_file()
-    assert (project / "src" / "cpp" / "include" / "example" / "example.hpp").is_file()
+    header = project / "src" / "cpp" / "include" / "example" / "example.hpp"
+    assert header.is_file()
+    header_text = header.read_text(encoding="utf-8")
+    assert "#ifndef EXAMPLE_EXAMPLE_HPP" in header_text
+    assert "#define EXAMPLE_EXAMPLE_HPP" in header_text
+    assert "#pragma once" not in header_text
+    assert not (project / ".nvimrc").exists()
+    assert not (project / ".ycm_extra_conf.py").exists()
 
 
 def test_cpp_generate_accepts_explicit_spdx_license(tmp_path: Path) -> None:
@@ -124,6 +135,165 @@ def test_cpp_generate_cli_accepts_custom_directory(tmp_path: Path) -> None:
         / "example_custom_directory"
         / "example_custom_directory.hpp"
     ).is_file()
+
+
+def test_cpp_generate_cli_can_install_gitignored_nvim_ycm_config(tmp_path: Path) -> None:
+    assert (
+        main(
+            [
+                "cpp",
+                "generate",
+                "--path",
+                str(tmp_path),
+                "--name",
+                "example_editor",
+                "--license",
+                "MIT",
+                "--nvim-ycm",
+            ]
+        )
+        == 0
+    )
+
+    project = tmp_path / "main"
+    nvimrc = project / ".nvimrc"
+    ycm = project / ".ycm_extra_conf.py"
+    gitignore = (project / ".gitignore").read_text(encoding="utf-8")
+
+    assert nvimrc.is_file()
+    assert ycm.is_file()
+    assert ".nvimrc" in gitignore.splitlines()
+    assert ".ycm_extra_conf.py" in gitignore.splitlines()
+    assert "SPDX-License-Identifier: MIT" in nvimrc.read_text(encoding="utf-8")
+    assert "SPDX-License-Identifier: MIT" in ycm.read_text(encoding="utf-8")
+    assert 'call s:insert_license_slash()' in nvimrc.read_text(encoding="utf-8")
+    assert 'call s:insert_license_cpp()' not in nvimrc.read_text(encoding="utf-8")
+    assert '"-std=c++26"' in ycm.read_text(encoding="utf-8")
+    assert '"src", "**", "include"' in ycm.read_text(encoding="utf-8")
+    assert 'compile_commands.json' in ycm.read_text(encoding="utf-8")
+
+
+def test_generated_ycm_uses_source_analogue_compile_commands_for_headers(tmp_path: Path) -> None:
+    project = cpp_generate(tmp_path, "example_ycm_analogue", nvim_ycm=True)
+    source = (
+        project
+        / "src"
+        / "cpp"
+        / "lib"
+        / "example_ycm_analogue"
+        / "example_ycm_analogue.cpp"
+    )
+    header = (
+        project
+        / "src"
+        / "cpp"
+        / "include"
+        / "example_ycm_analogue"
+        / "example_ycm_analogue.hpp"
+    )
+
+    source_include = project / "dependency" / "source"
+    unrelated_include = project / "dependency" / "unrelated"
+    source_include.mkdir(parents=True)
+    unrelated_include.mkdir(parents=True)
+
+    cuda_header = project / "src" / "cuda" / "include" / "example_ycm_analogue" / "kernel.hpp"
+    cuda_source = project / "src" / "cuda" / "lib" / "example_ycm_analogue" / "kernel.cu"
+    cuda_header.parent.mkdir(parents=True)
+    cuda_source.parent.mkdir(parents=True)
+    cuda_header.write_text("#pragma once\n", encoding="utf-8")
+    cuda_source.write_text("", encoding="utf-8")
+
+    build = tmp_path / "build"
+    build.mkdir()
+    (build / "compile_commands.json").write_text(
+        json.dumps(
+            [
+                {
+                    "directory": str(project),
+                    "file": str(source),
+                    "arguments": [
+                        "clang++",
+                        "-std=c++26",
+                        "-DEXACT_SOURCE=1",
+                        "-I",
+                        str(source_include.relative_to(project)),
+                        "-c",
+                        str(source),
+                        "-o",
+                        "source.o",
+                    ],
+                },
+                {
+                    "directory": str(project),
+                    "file": str(project / "other.cpp"),
+                    "arguments": [
+                        "clang++",
+                        "-DUNRELATED_SOURCE=1",
+                        "-I",
+                        str(unrelated_include.relative_to(project)),
+                        "-c",
+                        str(project / "other.cpp"),
+                        "-o",
+                        "other.o",
+                    ],
+                },
+                {
+                    "directory": str(project),
+                    "file": str(cuda_source),
+                    "arguments": [
+                        "clang++",
+                        "-x",
+                        "cuda",
+                        "-DCUDA_SOURCE=1",
+                        "-c",
+                        str(cuda_source),
+                        "-o",
+                        "kernel.o",
+                    ],
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    settings = runpy.run_path(str(project / ".ycm_extra_conf.py"))["Settings"]
+
+    source_flags = settings(str(source))["flags"]
+    assert "-Weverything" in source_flags
+    assert "-std=c++26" in source_flags
+    assert "-DEXACT_SOURCE=1" in source_flags
+    assert "-I" in source_flags
+    assert str(source_include) in source_flags
+    assert "-DUNRELATED_SOURCE=1" not in source_flags
+    assert str(unrelated_include) not in source_flags
+    assert "-c" not in source_flags
+    assert "source.o" not in source_flags
+
+    header_flags = settings(str(header))["flags"]
+    assert "-DEXACT_SOURCE=1" in header_flags
+    assert str(source_include) in header_flags
+    assert "-DUNRELATED_SOURCE=1" not in header_flags
+    assert str(unrelated_include) not in header_flags
+
+    cuda_header_flags = settings(str(cuda_header))["flags"]
+    assert "-DCUDA_SOURCE=1" in cuda_header_flags
+    assert "cuda" in cuda_header_flags
+
+
+def test_generated_ycm_uses_c17_baseline_for_c_headers_without_compile_entry(tmp_path: Path) -> None:
+    project = cpp_generate(tmp_path, "example_ycm_c", nvim_ycm=True)
+    header = project / "src" / "c" / "include" / "example_ycm_c" / "example_ycm_c.h"
+    header.parent.mkdir(parents=True)
+    header.write_text("#pragma once\n", encoding="utf-8")
+
+    settings = runpy.run_path(str(project / ".ycm_extra_conf.py"))["Settings"]
+    flags = settings(str(header))["flags"]
+
+    assert "-std=c17" in flags
+    assert "-x" in flags
+    assert "c" in flags
+    assert "-std=c++26" not in flags
 
 
 def test_cpp_generate_rejects_nested_directory_name(tmp_path: Path) -> None:

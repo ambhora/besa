@@ -51,6 +51,7 @@ def test_generated_cpp_project_groups_library_sources_by_library(tmp_path: Path)
     assert source_roots == {"cpp"}
 
     root_cmake = (project / "CMakeLists.txt").read_text(encoding="utf-8")
+    assert "set(CMAKE_EXPORT_COMPILE_COMMANDS ON)" in root_cmake
     for feature in ("toolchain-c", "toolchain-hip", "toolchain-asm", "toolchain-cuda"):
         assert f"    {feature}\n" not in root_cmake
 
@@ -387,6 +388,9 @@ def test_release_version_is_written_to_generated_header(tmp_path: Path) -> None:
     )
     version_header = project / "build" / "version" / "generated" / "include" / "example_version" / "version.hpp"
     version_text = version_header.read_text(encoding="utf-8")
+    assert "#ifndef EXAMPLE_VERSION_VERSION_HPP" in version_text
+    assert "#define EXAMPLE_VERSION_VERSION_HPP" in version_text
+    assert "#pragma once" not in version_text
     assert "namespace example_version::meta" in version_text
     assert "struct semantic_version" in version_text
     assert "struct release_info" in version_text
