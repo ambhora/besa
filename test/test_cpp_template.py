@@ -741,6 +741,8 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert 'fetch(new URL("versions.json", apiRoot))' in version_script_text
     assert "version.pages.includes(page)" in version_script_text
     assert "return root.href" in version_script_text
+    assert 'document.readyState === "loading"' in version_script_text
+    assert 'document.addEventListener("DOMContentLoaded", initializeAll' in version_script_text
     assert not (docs / "conf.py").exists()
 
     conf_text = (api_docs / "conf.py").read_text(encoding="utf-8")
@@ -903,7 +905,7 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert "  * :api-kind:`N` :doc:`meta <namespaceexample__docs_1_1meta>`\n\n    * :api-kind:`E`" in overview_text
     assert overview_text.count("to_string()") == 1
     assert ":api-kind:`F` :doc:`to_string() <namespaceexample__docs_1_1meta>`" in overview_text
-    assert ":cpp:func:" not in overview_text
+    assert ":api-kind:`F` :cpp:func:`version() <example_docs::meta::version>`" in overview_text
     assert ":api-kind:`S` :cpp:struct:`semantic_version <example_docs::meta::semantic_version>`" in overview_text
     assert ":api-kind:`E` :cpp:enum:`release_type <example_docs::meta::release_type>`" in overview_text
     root_text = (generated_api / "library_root.rst").read_text(encoding="utf-8")

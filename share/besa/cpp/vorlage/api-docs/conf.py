@@ -289,6 +289,7 @@ def _api_namespace_overview(index_xml: Path, generated: Path) -> str:
 
     children: dict[str, set[str]] = {name: set() for name in namespace_names}
     members: dict[str, set[tuple[str, str, str]]] = {name: set() for name in namespace_names}
+    function_counts: dict[tuple[str, str], int] = {}
     roots: set[str] = set()
 
     for namespace in namespace_names:
@@ -314,6 +315,9 @@ def _api_namespace_overview(index_xml: Path, generated: Path) -> str:
             member_name = member.findtext("name") or ""
             if member_name:
                 members[name].add((member_kind, member_name, f"{name}::{member_name}"))
+                if member_kind == "function":
+                    key = (name, member_name)
+                    function_counts[key] = function_counts.get(key, 0) + 1
 
     markers = {
         "class": "C",
@@ -358,9 +362,9 @@ def _api_namespace_overview(index_xml: Path, generated: Path) -> str:
         ):
             marker = markers[kind]
             display_name = f"{short_name}()" if kind == "function" else short_name
-            if kind == "function":
+            if kind == "function" and function_counts.get((namespace, short_name), 0) > 1:
                 # A name-only C++ cross-reference is ambiguous for overloaded functions.  The
-                # landing page intentionally collapses overloads, so send function names to the
+                # landing page intentionally collapses overloads, so send only those names to the
                 # owning namespace page where Exhale lists every overload and signature.
                 target = namespace_pages.get(namespace)
                 if target:

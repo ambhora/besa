@@ -47,9 +47,17 @@
     });
   }
 
-  for (const select of document.querySelectorAll(".besa-api-version-select")) {
-    initialize(select).catch(() => {
-      select.disabled = true;
-    });
+  function initializeAll() {
+    for (const select of document.querySelectorAll(".besa-api-version-select")) {
+      initialize(select).catch(() => {
+        select.disabled = true;
+      });
+    }
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initializeAll, { once: true });
+  } else {
+    initializeAll();
   }
 })();
