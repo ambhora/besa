@@ -19,12 +19,15 @@ checkout being rendered. Any checkout-specific path must therefore be derived fr
 from __future__ import annotations
 
 import hashlib
+import html
+import json
 import os
+import posixpath
 import re
 import shutil
 import subprocess
 import xml.etree.ElementTree as ET
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 CONFIG_DIRECTORY = Path(__file__).resolve().parent
 
@@ -92,6 +95,15 @@ except ValueError as error:
 html_context = {
     "besa_properdocs_root_depth": _besa_properdocs_root_depth,
 }
+
+# index.rst is rendered at <site>/<API path>/<version>/index.html. Keep the physical traversal out
+# of checked-in RST so repository prefixes, custom domains, and alternate API mount points remain
+# irrelevant to documentation authors.
+_projectdocs_root_from_api_index = "../" * _besa_properdocs_root_depth
+rst_prolog = (
+    f".. |projectdocs| replace:: "
+    f"`main project documentation <{_projectdocs_root_from_api_index}>`_\n"
+)
 
 # sphinx-multiversion defaults already select local branch heads and tags. Keep that explicit so the
 # generated project's publication model is visible in one place.
@@ -206,8 +218,9 @@ def _generated_include_directories(build_directory: Path) -> list[Path]:
 def _prepare_public_include_tree(project_root: Path, doxygen_output: Path) -> Path:
     """Stage the public header namespace Doxygen should expose.
 
-    The staging tree mirrors the installed include namespace. Checked-in public headers come from
-    ``src/*/include`` and generated public headers come from every registered generator's
+    The staging tree mirrors the installed include namespace and adds developer-facing test support.
+    Checked-in public headers come from ``src/*/include``, test support headers come from
+    ``test/base/*/include``, and generated public headers come from every registered generator's
     ``<binary>/generated/<generator>/include`` root. Doxygen therefore has no knowledge of ``meta``
     or any future generator name.
     """
@@ -219,6 +232,10 @@ def _prepare_public_include_tree(project_root: Path, doxygen_output: Path) -> Pa
     for source_include in sorted(project_root.glob("src/*/include")):
         if source_include.is_dir():
             shutil.copytree(source_include, public_include, dirs_exist_ok=True)
+
+    for test_include in sorted(project_root.glob("test/base/*/include")):
+        if test_include.is_dir():
+            shutil.copytree(test_include, public_include, dirs_exist_ok=True)
 
     configured_build = _configured_build_for(project_root, doxygen_output)
     for generated_include in _generated_include_directories(configured_build):
@@ -247,6 +264,18 @@ def _prepare_api(app) -> None:
     doxygen_output.mkdir(parents=True, exist_ok=True)
     public_include = _prepare_public_include_tree(project_root, doxygen_output)
     base_config = (api_docs_directory / "Doxyfile").read_text(encoding="utf-8")
+
+    # Exhale places detailed entity pages one level below the API-version root in generated/. The
+    # alias therefore needs one additional parent traversal compared with index.rst. Documentation
+    # comments use semantic commands such as @projectdocs{reference/testing,the testing reference}
+    # and never encode this physical site layout themselves.
+    projectdocs_root = "../" * (_besa_properdocs_root_depth + 1)
+    projectdocs_aliases = (
+        f'ALIASES += "projectdocs=<a href=\\"{projectdocs_root}\\">main project documentation</a>"\n'
+        f'ALIASES += "projectdocs{{1}}=<a href=\\"{projectdocs_root}\\1/\\">\\1</a>"\n'
+        f'ALIASES += "projectdocs{{2}}=<a href=\\"{projectdocs_root}\\1/\\">\\2</a>"\n'
+    )
+
     generated_config = doxygen_output / "Doxyfile"
     generated_config.write_text(
         base_config
@@ -255,7 +284,8 @@ def _prepare_api(app) -> None:
         + f"OUTPUT_DIRECTORY = {_doxygen_quote(doxygen_output)}\n"
         + f"INPUT = {_doxygen_quote(public_include)}\n"
         + f"STRIP_FROM_PATH = {_doxygen_quote(public_include)}\n"
-        + f"STRIP_FROM_INC_PATH = {_doxygen_quote(public_include)}\n",
+        + f"STRIP_FROM_INC_PATH = {_doxygen_quote(public_include)}\n"
+        + projectdocs_aliases,
         encoding="utf-8",
     )
 
@@ -284,6 +314,79 @@ def _prepare_api(app) -> None:
     checkout_exhale_args["doxygenStripFromPath"] = str(public_include)
     app.config.exhale_args = checkout_exhale_args
 
+
+_API_SIMPLE_SYMBOL = re.compile(r"[A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_][A-Za-z0-9_]*)*")
+
+
+def _cpp_domain_symbol_targets(app) -> dict[str, str]:
+    """Map unambiguous qualified C/C++ names to the HTML targets Sphinx generated."""
+
+    candidates: dict[str, set[str]] = {}
+    for name, _display_name, _kind, docname, anchor, _priority in (
+        app.env.get_domain("cpp").get_objects()
+    ):
+        # Sphinx includes function signatures in object names. The convenient @apidocs:: form is
+        # intentionally available only when the unqualified signature is unambiguous.
+        symbol = name.split("(", 1)[0].strip()
+        if _API_SIMPLE_SYMBOL.fullmatch(symbol) is None:
+            continue
+
+        target = app.builder.get_target_uri(docname)
+        if anchor:
+            target = f"{target}#{anchor}"
+        candidates.setdefault(symbol, set()).add(target)
+
+    return {
+        symbol: next(iter(targets))
+        for symbol, targets in sorted(candidates.items())
+        if len(targets) == 1
+    }
+
+
+def _write_api_symbol_aliases(app, exception) -> None:
+    """Publish stable semantic URLs for ProperDocs ``@apidocs::...`` references."""
+
+    if exception is not None:
+        return
+
+    output = Path(app.outdir).resolve()
+    symbols = _cpp_domain_symbol_targets(app)
+    for symbol, target in symbols.items():
+        alias_directory = PurePosixPath("_symbols", *symbol.split("::"))
+        alias = output.joinpath(*alias_directory.parts, "index.html")
+        alias.parent.mkdir(parents=True, exist_ok=True)
+
+        target_path, separator, fragment = target.partition("#")
+        relative_target = posixpath.relpath(target_path, alias_directory.as_posix())
+        if separator:
+            relative_target = f"{relative_target}#{fragment}"
+
+        escaped_target = html.escape(relative_target, quote=True)
+        escaped_symbol = html.escape(symbol)
+        alias.write_text(
+            "\n".join(
+                [
+                    "<!doctype html>",
+                    '<meta charset="utf-8">',
+                    f'<meta http-equiv="refresh" content="0; url={escaped_target}">',
+                    f'<link rel="canonical" href="{escaped_target}">',
+                    f"<title>{escaped_symbol}</title>",
+                    f'<p>Redirecting to <a href="{escaped_target}">{escaped_symbol}</a>.</p>',
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+    (output / "symbols.json").write_text(
+        json.dumps(
+            {"project": project, "version": app.config.release, "symbols": symbols},
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
 
 def _generated_namespace_pages(generated: Path) -> dict[str, str]:
@@ -673,3 +776,4 @@ def setup(app) -> None:
     # Run afterwards, but still before Sphinx discovers source documents.  In particular, overload
     # pages must exist at discovery time or Sphinx will report them as unknown/nonexistent docs.
     app.connect("builder-inited", _prepare_api_landing, priority=900)
+    app.connect("build-finished", _write_api_symbol_aliases)

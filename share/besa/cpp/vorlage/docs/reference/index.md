@@ -2,6 +2,8 @@
 
 Reference material for vorlage.
 
+For example, build provenance is exposed by @apidocs::vorlage::meta::build.
+
 ## Versioned API
 
 The C/C++ API is extracted with Doxygen, rendered through Breathe and Sphinx, and built for the Git

@@ -51,18 +51,21 @@ This separation lets `properdocs serve` remain a normal local authoring workflow
 can evolve independently. The build-tree Doxygen XML location is checkout-specific so simultaneous
 or historical API builds do not share extraction state.
 
-For each API build, `api-docs/conf.py` stages a synthetic public-header tree containing checked-in
-headers from every `src/*/include/` root plus public headers from every configured
-`generated/<generator>/include/` root. The version metadata generator is named `meta`, but the docs
-pipeline does not special-case it. Doxygen receives only the merged tree and strips its staging root,
-so Exhale's file hierarchy mirrors the contents of an installed `include/` directory:
+For each API build, `api-docs/conf.py` stages a synthetic header tree containing checked-in headers
+from every `src/*/include/` root, developer-facing headers from `test/base/*/include/`, and public
+headers from every configured `generated/<generator>/include/` root. The version metadata generator
+is named `meta`, but the docs pipeline does not special-case it. Doxygen receives only the merged
+tree and strips its staging roots, so repository layout details do not leak into the API file view.
+The public part still mirrors the installed `include/` namespace, while test support appears beside it:
 
 ```text
 Files
-└── <project>/
-    ├── <project>.hpp
-    └── version.hpp
+├── <project>/
+│   ├── <project>.hpp
+│   └── version.hpp
+└── test<project>/
+    └── ... developer test support ...
 ```
 
-Repository-only components such as `src/`, `cpp/`, `include/`, `lib/`, and `bin/` therefore do not
-become levels in the public API file hierarchy.
+Repository-only components such as `src/`, `test/base/`, `cpp/`, `include/`, `lib/`, and `bin/`
+therefore do not become levels in the API file hierarchy.

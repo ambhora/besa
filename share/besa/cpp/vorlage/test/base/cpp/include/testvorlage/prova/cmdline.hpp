@@ -28,6 +28,12 @@ private:
   std::vector<std::string> cmdline_;
 };
 
+/**
+ * Parse the Prova command line into project paths and residual Catch2 arguments.
+ *
+ * For project-level developer documentation, see @projectdocs. For the testing conventions used by
+ * this support library, see @projectdocs{reference/testing,the testing reference}.
+ */
 auto parse(int argc, char** argv) -> result;
 } // namespace testvorlage::prova::cmdline
 

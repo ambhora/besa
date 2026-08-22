@@ -6,6 +6,9 @@ copyright: Copyright &copy; vorlage developers &middot; BESA_PROJECT_LICENSE
 extra:
   # The project-specific copyright above replaces MaterialX's generator credit.
   generator: false
+  # @apidocs::... references resolve against this version. Pin a release/tag here when prose should
+  # deliberately target a released API rather than the live development API.
+  besa_api_version: main
 
 # ProperDocs owns the public documentation site's information architecture. The versioned C/C++ API
 # reference is mounted below reference/api/ after ProperDocs has built the main documentation site.
@@ -38,6 +41,7 @@ extra_css:
 watch:
   - src
   - api-docs
+  - test/base
   - .git/refs
 
 hooks:

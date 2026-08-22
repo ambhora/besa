@@ -60,6 +60,13 @@ ProperDocs owns the site root and the Reference page. Its **Versioned API** sect
 entry point into the Sphinx/Breathe trees mounted below `reference/api/`. Every generated API page
 contains a persistent link back to the ProperDocs site and an API-version selector.
 
+Cross-references between the two documentation surfaces use semantic targets rather than deployed hostnames:
+
+- C/C++ Doxygen comments use `@projectdocs`, `@projectdocs{path}`, or
+  `@projectdocs{path,link text}`.
+- ProperDocs Markdown uses `@apidocs::qualified::cpp::symbol`; `extra.besa_api_version` in
+  `properdocs.yml` selects the API version for those links.
+
 For API-only debugging, build the current checkout or all Git refs directly:
 
 ```bash
@@ -79,8 +86,8 @@ properdocs serve
 ```
 
 The default development server previews all selected branches and tags while retaining live
-working-tree API documentation under `main/`. ProperDocs watches `src/`, `api-docs/`, and Git refs.
-Historical versions are regenerated only when the refs change; ordinary source edits regenerate only
+working-tree API documentation under `main/`. ProperDocs watches `src/`, `test/base/`, `api-docs/`,
+and Git refs. Historical versions are regenerated only when the refs change; ordinary source edits regenerate only
 the working-tree `main/` API. Prose-only edits do not rerun Doxygen.
 
 All live documentation working state is kept outside the checkout below `../build/properdocs/`:

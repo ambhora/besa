@@ -11,9 +11,11 @@ source edits remain visible without losing the ability to browse older versions.
 from __future__ import annotations
 
 import json
+import posixpath
+import re
 import shutil
 import subprocess
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Iterable
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -22,6 +24,10 @@ BUILD_DIRECTORY = PROPERDOCS_WORK_DIRECTORY / "cmake"
 CURRENT_API_BUILD_DIRECTORY = BUILD_DIRECTORY / "doc" / "api" / "current"
 MULTIVERSION_API_BUILD_DIRECTORY = BUILD_DIRECTORY / "doc" / "api" / "multiversion"
 API_PUBLIC_PATH = Path("reference") / "api"
+
+_APIDOCS_REFERENCE = re.compile(
+    r"@apidocs::(?P<symbol>[A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_][A-Za-z0-9_]*)*)"
+)
 
 _serve_active = False
 _last_source_fingerprint: tuple[tuple[str, int, int], ...] | None = None
@@ -39,7 +45,11 @@ def _fingerprint(paths: Iterable[Path]) -> tuple[tuple[str, int, int], ...]:
 
 
 def _source_files() -> Iterable[Path]:
-    for root in (PROJECT_ROOT / "src", PROJECT_ROOT / "api-docs"):
+    for root in (
+        PROJECT_ROOT / "src",
+        PROJECT_ROOT / "api-docs",
+        PROJECT_ROOT / "test" / "base",
+    ):
         if root.is_dir():
             yield from (path for path in root.rglob("*") if path.is_file())
 
@@ -202,6 +212,50 @@ def on_startup(*, command: str, dirty: bool = False, **_kwargs) -> None:
 def on_pre_build(**_kwargs) -> None:
     if _serve_active:
         _ensure_multiversion_api()
+
+
+def _api_symbol_public_path(symbol: str, version: str) -> PurePosixPath:
+    return (
+        PurePosixPath(API_PUBLIC_PATH.as_posix())
+        / version
+        / "_symbols"
+        / PurePosixPath(*symbol.split("::"))
+    )
+
+
+def _api_symbol_build_path(symbol: str, version: str) -> Path:
+    root = (
+        CURRENT_API_BUILD_DIRECTORY
+        if version == "main"
+        else MULTIVERSION_API_BUILD_DIRECTORY / version
+    )
+    return root / "_symbols" / Path(*symbol.split("::")) / "index.html"
+
+
+def on_page_markdown(markdown, page, config, **_kwargs):
+    """Resolve ``@apidocs::qualified::name`` to one selected version of the generated API."""
+
+    if _APIDOCS_REFERENCE.search(markdown) is None:
+        return markdown
+
+    version = str(config.get("extra", {}).get("besa_api_version", "main"))
+    page_directory = PurePosixPath(page.file.dest_uri).parent
+
+    def replace_reference(match: re.Match[str]) -> str:
+        symbol = match.group("symbol")
+        # `properdocs serve` builds the API before Markdown rendering, so unresolved references are
+        # errors there. A standalone ProperDocs build may intentionally run before API generation;
+        # in that mode we still emit the stable semantic URL and let final site assembly provide it.
+        if _serve_active and not _api_symbol_build_path(symbol, version).is_file():
+            raise RuntimeError(
+                f"unresolved API documentation reference {symbol!r} for version {version!r}"
+            )
+
+        target = _api_symbol_public_path(symbol, version)
+        href = posixpath.relpath(target.as_posix(), page_directory.as_posix())
+        return f"[`{symbol}`]({href}/)"
+
+    return _APIDOCS_REFERENCE.sub(replace_reference, markdown)
 
 
 def on_post_build(config, **_kwargs) -> None:

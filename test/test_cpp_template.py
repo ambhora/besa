@@ -771,6 +771,8 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert "INHERIT: properdocs.yml" in multiversion_config_text
     config_text = (project / "properdocs.yml").read_text(encoding="utf-8")
     assert "site_dir: ../build/properdocs/site" in config_text
+    assert "besa_api_version: main" in config_text
+    assert "  - test/base" in config_text
     assert "  - .git/refs" in config_text
     assert "  - properdocs_multiversion_hook.py" in config_text
     assert (project / "properdocs_multiversion_hook.py").is_file()
@@ -849,7 +851,12 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert "BESA_PROPERDOCS_ROOT_DEPTH" in conf_text
     assert "BESA_API_PROJECT_SOURCE_DIRECTORY" in conf_text
     assert "Path(app.srcdir).resolve()" in conf_text
-    assert "doxygenindex" not in (api_docs / "index.rst").read_text(encoding="utf-8")
+    api_index_text = (api_docs / "index.rst").read_text(encoding="utf-8")
+    assert "doxygenindex" not in api_index_text
+    assert "|projectdocs|" in api_index_text
+    assert "_write_api_symbol_aliases" in conf_text
+    assert "projectdocs{{1}}" in conf_text
+    assert "projectdocs{{2}}" in conf_text
 
     userdocs_cmake = (project / "cmake" / "besa" / "userdocs.cmake").read_text(encoding="utf-8")
     assert 'set(_besa_current_sphinx_source "${PROJECT_BINARY_DIR}/doc/work/sphinx-current")' in userdocs_cmake
@@ -922,6 +929,7 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     builder_callbacks = events["builder-inited"]
     assert (module._prepare_api, 100) in builder_callbacks
     assert (module._prepare_api_landing, 900) in builder_callbacks
+    assert (module._write_api_symbol_aliases, 500) in events["build-finished"]
     assert "env-before-read-docs" not in events
 
     fake_doxygen = tmp_path / "fake-doxygen"
@@ -940,6 +948,15 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert str(current_public).replace("\\", "/") in generated_text
     assert str(project / "src").replace("\\", "/") not in generated_text
     assert (current_public / "example_docs" / "example_docs.hpp").is_file()
+    test_base_header = current_public / "testexample_docs" / "prova" / "cmdline.hpp"
+    assert test_base_header.is_file()
+    test_base_text = test_base_header.read_text(encoding="utf-8")
+    assert "@projectdocs" in test_base_text
+    assert "@projectdocs{reference/testing,the testing reference}" in test_base_text
+    assert 'ALIASES += "projectdocs=' in generated_text
+    assert 'ALIASES += "projectdocs{1}=' in generated_text
+    assert 'ALIASES += "projectdocs{2}=' in generated_text
+    assert '../../../../\\1/' in generated_text
     current_version = current_public / "example_docs" / "version.hpp"
     assert current_version.is_file()
     assert "namespace example_docs::meta" in current_version.read_text(encoding="utf-8")
@@ -1761,6 +1778,99 @@ def test_generated_properdocs_multiversion_hook_rebuilds_refs_and_current_indepe
     module._ensure_multiversion_api()
     assert configured == 3
     assert targets[-1] == "user.docs.multiversion"
+
+
+@pytest.mark.cpp
+def test_generated_documentation_cross_references_are_semantic(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import importlib.util
+    import json
+    from types import SimpleNamespace
+
+    project = cpp_generate(tmp_path, "example_xrefs")
+    api_docs = project / "api-docs"
+
+    spec = importlib.util.spec_from_file_location("example_xrefs_conf", api_docs / "conf.py")
+    assert spec is not None and spec.loader is not None
+    api_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(api_module)
+
+    class FakeCppDomain:
+        @staticmethod
+        def get_objects():
+            return [
+                (
+                    "example_xrefs::meta::build()",
+                    "example_xrefs::meta::build()",
+                    "function",
+                    "generated/function_build",
+                    "_CPPv4N13example_xrefs4meta5buildEv",
+                    1,
+                )
+            ]
+
+    class FakeEnv:
+        @staticmethod
+        def get_domain(name: str):
+            assert name == "cpp"
+            return FakeCppDomain()
+
+    class FakeBuilder:
+        @staticmethod
+        def get_target_uri(docname: str) -> str:
+            return f"{docname}.html"
+
+    output = tmp_path / "api-output"
+    output.mkdir()
+    app = SimpleNamespace(
+        env=FakeEnv(),
+        builder=FakeBuilder(),
+        outdir=str(output),
+        config=SimpleNamespace(release="0.1.0"),
+    )
+    api_module._write_api_symbol_aliases(app, None)
+
+    alias = output / "_symbols" / "example_xrefs" / "meta" / "build" / "index.html"
+    assert alias.is_file()
+    alias_text = alias.read_text(encoding="utf-8")
+    assert "../../../../generated/function_build.html#_CPPv4" in alias_text
+
+    symbols = json.loads((output / "symbols.json").read_text(encoding="utf-8"))
+    assert symbols["symbols"]["example_xrefs::meta::build"].startswith(
+        "generated/function_build.html#"
+    )
+
+    hook_path = project / "properdocs_multiversion_hook.py"
+    hook_spec = importlib.util.spec_from_file_location("example_xrefs_hook", hook_path)
+    assert hook_spec is not None and hook_spec.loader is not None
+    hook = importlib.util.module_from_spec(hook_spec)
+    hook_spec.loader.exec_module(hook)
+
+    page = SimpleNamespace(file=SimpleNamespace(dest_uri="reference/index.html"))
+    rendered = hook.on_page_markdown(
+        "Build metadata: @apidocs::example_xrefs::meta::build.",
+        page,
+        {"extra": {"besa_api_version": "main"}},
+    )
+    assert (
+        "[`example_xrefs::meta::build`]"
+        "(api/main/_symbols/example_xrefs/meta/build/)"
+    ) in rendered
+
+    hook.CURRENT_API_BUILD_DIRECTORY = output
+    monkeypatch.setattr(hook, "_serve_active", True)
+    hook.on_page_markdown(
+        "@apidocs::example_xrefs::meta::build",
+        page,
+        {"extra": {"besa_api_version": "main"}},
+    )
+    with pytest.raises(RuntimeError, match="unresolved API documentation reference"):
+        hook.on_page_markdown(
+            "@apidocs::example_xrefs::meta::missing",
+            page,
+            {"extra": {"besa_api_version": "main"}},
+        )
 
 
 @pytest.mark.cpp
