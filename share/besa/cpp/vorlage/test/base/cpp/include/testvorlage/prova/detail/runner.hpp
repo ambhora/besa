@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // -------------------------------------------------------------------------------------------------
 
-#ifndef TESTVORLAGE_PROVA_DETAIL_RUNNER_HPP
-#define TESTVORLAGE_PROVA_DETAIL_RUNNER_HPP
+#ifndef TESTBESA_PROJECT_UPPER_PROVA_DETAIL_RUNNER_HPP
+#define TESTBESA_PROJECT_UPPER_PROVA_DETAIL_RUNNER_HPP
 
 #include <string>
 #include <testvorlage/prova/data.hpp>
@@ -18,4 +18,4 @@ auto runner(
 
 } // namespace testvorlage::prova::detail
 
-#endif // TESTVORLAGE_PROVA_DETAIL_RUNNER_HPP
+#endif // TESTBESA_PROJECT_UPPER_PROVA_DETAIL_RUNNER_HPP

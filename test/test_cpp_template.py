@@ -73,15 +73,15 @@ def test_generated_cpp_project_vendors_and_builds_prova_support(tmp_path: Path) 
     catch_main = base / "cpp" / "include" / "testexample_prova" / "prova" / "catch_main.hpp"
     assert catch_main.is_file()
     catch_main_text = catch_main.read_text(encoding="utf-8")
-    assert "#define TESTVORLAGE_PROVA_CATCH_MAIN" in catch_main_text
-    assert "#define TESTVORLAGE_PROVA_CATCH_GROUP" in catch_main_text
+    assert "#define TESTEXAMPLE_PROVA_PROVA_CATCH_MAIN" in catch_main_text
+    assert "#define TESTEXAMPLE_PROVA_PROVA_CATCH_GROUP" in catch_main_text
     assert "#define PROVA_CATCH_MAIN" not in catch_main_text
     assert "#define PROVA_CATCH_GROUP" not in catch_main_text
     assert "MOL_CATCH" not in catch_main_text
 
     unit_main = project / "test" / "unit" / "cpp" / "main.cpp"
     assert unit_main.is_file()
-    assert 'TESTVORLAGE_PROVA_CATCH_MAIN("unit")' in unit_main.read_text(encoding="utf-8")
+    assert 'TESTEXAMPLE_PROVA_PROVA_CATCH_MAIN("unit")' in unit_main.read_text(encoding="utf-8")
     assert "Catch2::Catch2WithMain" not in (project / "test" / "CMakeLists.txt").read_text(
         encoding="utf-8"
     )
@@ -135,7 +135,7 @@ public:
 
     prova_main = base / "prova_main.cpp"
     prova_main.write_text(
-        "#include <testexample_prova/prova/catch_main.hpp>\nTESTVORLAGE_PROVA_CATCH_MAIN(\"smoke\")\n",
+        "#include <testexample_prova/prova/catch_main.hpp>\nTESTEXAMPLE_PROVA_PROVA_CATCH_MAIN(\"smoke\")\n",
         encoding="utf-8",
     )
     with (project / "test" / "CMakeLists.txt").open("a", encoding="utf-8") as cmake_file:

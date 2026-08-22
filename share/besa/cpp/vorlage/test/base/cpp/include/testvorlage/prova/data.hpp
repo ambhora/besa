@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // -------------------------------------------------------------------------------------------------
 
-#ifndef TESTVORLAGE_PROVA_DATA_HPP
-#define TESTVORLAGE_PROVA_DATA_HPP
+#ifndef TESTBESA_PROJECT_UPPER_PROVA_DATA_HPP
+#define TESTBESA_PROJECT_UPPER_PROVA_DATA_HPP
 
 #include <string>
 
@@ -25,4 +25,4 @@ private:
 auto path_from_prefix(path const& prefix, std::string const& suffix) -> path;
 } // namespace testvorlage::prova::data
 
-#endif // TESTVORLAGE_PROVA_DATA_HPP
+#endif // TESTBESA_PROJECT_UPPER_PROVA_DATA_HPP

@@ -4,4 +4,4 @@
 
 #include <testvorlage/prova/catch_main.hpp>
 
-TESTVORLAGE_PROVA_CATCH_MAIN("unit")
+TESTBESA_PROJECT_UPPER_PROVA_CATCH_MAIN("unit")
