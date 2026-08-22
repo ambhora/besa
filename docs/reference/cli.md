@@ -34,10 +34,14 @@ project source. The Neovim configuration inserts SPDX headers and `#ifndef`/`#de
 for new headers.
 
 The YCM configuration always starts with a small language baseline: C++26 for C++-family files and
-C17 for C files. For a source file present in `compile_commands.json`, YCM appends that source's
-normalised compilation flags. For a header in a conventional BESA include tree, YCM first maps the
-header to the implementation source that would correspond to it and uses that source's compilation
-entry. For example:
+C17 for C files. If a Spack environment with an active view is present, YCM resolves that view with
+`spack location -v` and adds its `include/` directory as a global `-isystem` path. This makes headers
+from development dependencies available even when the edited file has no compilation-database entry.
+
+For a source file present in `compile_commands.json`, YCM then appends that source's normalised
+compilation flags. For a header in a conventional BESA include tree, YCM first maps the header to the
+implementation source that would correspond to it and uses that source's compilation entry. For
+example:
 
 ```text
 src/cpp/include/dice/dice.hpp  -> src/cpp/lib/dice/dice.cpp

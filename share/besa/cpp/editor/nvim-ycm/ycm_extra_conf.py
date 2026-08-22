@@ -6,6 +6,8 @@ import glob
 import json
 import os
 import shlex
+import shutil
+import subprocess
 
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -82,6 +84,11 @@ _DATABASE_CACHE = {
     "entries": {},
 }
 
+_SPACK_SYSTEM_FLAGS_CACHE = {
+    "key": None,
+    "flags": [],
+}
+
 
 def _absolute_path(path, working_directory):
     if os.path.isabs(path):
@@ -100,6 +107,38 @@ def _include_directories():
     for pattern in patterns:
         directories.update(path for path in glob.glob(pattern, recursive=True) if os.path.isdir(path))
     return sorted(os.path.normpath(path) for path in directories)
+
+
+def _spack_system_flags():
+    environment = os.environ.get("SPACK_ENV")
+    view_name = os.environ.get("SPACK_ENV_VIEW")
+    spack = shutil.which("spack")
+    key = (environment, view_name, spack)
+
+    if _SPACK_SYSTEM_FLAGS_CACHE["key"] == key:
+        return list(_SPACK_SYSTEM_FLAGS_CACHE["flags"])
+
+    flags = []
+    if environment and spack:
+        try:
+            result = subprocess.run(
+                [spack, "location", "-v"],
+                cwd=ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        except OSError:
+            result = None
+
+        if result is not None and result.returncode == 0:
+            view = result.stdout.strip()
+            include = os.path.join(view, "include")
+            if view and os.path.isdir(include):
+                flags = ["-isystem", os.path.normpath(include)]
+
+    _SPACK_SYSTEM_FLAGS_CACHE.update({"key": key, "flags": flags})
+    return list(flags)
 
 
 def _compile_commands_path():
@@ -293,6 +332,7 @@ def _fallback_includes():
 def Settings(filename, **kwargs):
     filename = os.path.normpath(os.path.abspath(filename))
     flags = _baseline_flags(filename)
+    flags.extend(_spack_system_flags())
     entries = _load_compilation_database()
 
     compile_flags = entries.get(filename)

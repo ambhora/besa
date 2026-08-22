@@ -296,6 +296,53 @@ def test_generated_ycm_uses_c17_baseline_for_c_headers_without_compile_entry(tmp
     assert "-std=c++26" not in flags
 
 
+def test_generated_ycm_adds_active_spack_view_include_as_isystem(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = cpp_generate(tmp_path, "example_ycm_spack", nvim_ycm=True)
+    header = (
+        project
+        / "src"
+        / "cpp"
+        / "include"
+        / "example_ycm_spack"
+        / "example_ycm_spack.hpp"
+    )
+
+    view = tmp_path / "spack-view"
+    include = view / "include"
+    include.mkdir(parents=True)
+
+    bin_directory = tmp_path / "bin"
+    bin_directory.mkdir()
+    spack = bin_directory / "spack"
+    spack.write_text(
+        "#!/bin/sh\n"
+        'if [ "$1" = "location" ] && [ "$2" = "-v" ]; then\n'
+        '  printf "%s\\n" "$FAKE_SPACK_VIEW"\n'
+        "  exit 0\n"
+        "fi\n"
+        "exit 1\n",
+        encoding="utf-8",
+    )
+    spack.chmod(0o755)
+
+    monkeypatch.setenv("SPACK_ENV", str(project))
+    monkeypatch.setenv("SPACK_ENV_VIEW", "default")
+    monkeypatch.setenv("FAKE_SPACK_VIEW", str(view))
+    monkeypatch.setenv(
+        "PATH",
+        str(bin_directory) + os.pathsep + os.environ.get("PATH", ""),
+    )
+
+    settings = runpy.run_path(str(project / ".ycm_extra_conf.py"))["Settings"]
+    flags = settings(str(header))["flags"]
+
+    assert "-isystem" in flags
+    isystem_index = flags.index("-isystem")
+    assert flags[isystem_index + 1] == str(include)
+
+
 def test_cpp_generate_rejects_nested_directory_name(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="single relative path component"):
         cpp_generate(tmp_path, "example", directory="nested/main")
