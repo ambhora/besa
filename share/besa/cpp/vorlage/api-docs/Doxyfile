@@ -2,18 +2,17 @@
 # Base Doxygen configuration used by api-docs/conf.py.
 #
 # conf.py copies this file into the build tree and appends checkout-specific PROJECT_NUMBER,
-# OUTPUT_DIRECTORY, INPUT, and STRIP_FROM_PATH values before running Doxygen. Keep checkout paths out
-# of this checked-in file so it remains valid when sphinx-multiversion materializes historical refs.
+# OUTPUT_DIRECTORY, INPUT, STRIP_FROM_PATH, and STRIP_FROM_INC_PATH values before running Doxygen.
+# INPUT is a synthetic public-header tree mirroring the contents installed below include/, so
+# repository paths such as src/cpp/include never leak into the rendered file hierarchy.
 # --------------------------------------------------------------------------------------------------
 
 PROJECT_NAME           = "vorlage"
 RECURSIVE              = YES
 
-# Document the complete public API, including declarations which do not yet carry comments. The
-# implementation and executable trees are excluded so EXTRACT_ALL does not turn private source files
-# into part of the public API surface.
+# Document the complete public API, including declarations which do not yet carry comments. conf.py
+# stages only public headers into INPUT, so implementation and executable trees never enter Doxygen.
 EXTRACT_ALL            = YES
-EXCLUDE_PATTERNS       = */bin/* */lib/*
 
 # Sphinx/Breathe/Exhale is the presentation layer. Doxygen is used only as the C/C++ parser and XML
 # extractor, so standalone Doxygen HTML is deliberately disabled.

@@ -51,3 +51,18 @@ the resulting API trees below `reference/api/<version>/` when assembling `user.d
 This separation lets `properdocs serve` remain a normal local authoring workflow while API generation
 can evolve independently. The build-tree Doxygen XML location is checkout-specific so simultaneous
 or historical API builds do not share extraction state.
+
+For each API build, `api-docs/conf.py` stages a synthetic public-header tree containing the checked-in
+headers from `src/cpp/include/` plus BESA's generated `<project>/version.hpp`. Doxygen receives only
+that tree and strips its staging root, so Exhale's file hierarchy mirrors the contents of an installed
+`include/` directory:
+
+```text
+Files
+└── <project>/
+    ├── <project>.hpp
+    └── version.hpp
+```
+
+Repository-only components such as `src/`, `cpp/`, `include/`, `lib/`, and `bin/` therefore do not
+become levels in the public API file hierarchy.

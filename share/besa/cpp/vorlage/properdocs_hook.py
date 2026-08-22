@@ -78,6 +78,10 @@ def _ensure_current_api() -> None:
     _last_source_fingerprint = fingerprint
 
 
+def _html_pages(root: Path) -> list[str]:
+    return sorted(path.relative_to(root).as_posix() for path in root.rglob("*.html"))
+
+
 def _publish_current_api(site_directory: Path) -> None:
     if not API_BUILD_DIRECTORY.is_dir():
         return
@@ -90,7 +94,12 @@ def _publish_current_api(site_directory: Path) -> None:
 
     (destination.parent / "versions.json").write_text(
         json.dumps(
-            {"default": "main", "versions": [{"name": "main", "url": "main/"}]},
+            {
+                "default": "main",
+                "versions": [
+                    {"name": "main", "url": "main/", "pages": _html_pages(destination)}
+                ],
+            },
             indent=2,
         )
         + "\n",

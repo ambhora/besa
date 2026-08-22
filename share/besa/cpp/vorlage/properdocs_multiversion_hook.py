@@ -138,6 +138,12 @@ def _copy_entry(source: Path, destination: Path) -> None:
         shutil.copy2(source, destination)
 
 
+def _html_pages(root: Path) -> list[str]:
+    if not root.is_dir():
+        return []
+    return sorted(path.relative_to(root).as_posix() for path in root.rglob("*.html"))
+
+
 def _ensure_main_metadata(api_root: Path) -> None:
     metadata_path = api_root / "versions.json"
     if metadata_path.is_file():
@@ -146,8 +152,17 @@ def _ensure_main_metadata(api_root: Path) -> None:
         metadata = {"default": "main", "versions": []}
 
     versions = [item for item in metadata.get("versions", []) if item.get("name") != "main"]
+    enriched_versions = []
+    for item in versions:
+        enriched = dict(item)
+        enriched["pages"] = _html_pages(api_root / item.get("url", ""))
+        enriched_versions.append(enriched)
+
     metadata["default"] = "main"
-    metadata["versions"] = [{"name": "main", "url": "main/"}, *versions]
+    metadata["versions"] = [
+        {"name": "main", "url": "main/", "pages": _html_pages(api_root / "main")},
+        *enriched_versions,
+    ]
     metadata_path.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
 
 

@@ -106,3 +106,29 @@ code em {
   border-left: 0.25rem solid var(--pst-color-secondary);
   padding: 0.75rem 1rem;
 }
+
+/* Keep version switching compact in the top navigation. The native select supplies the dropdown
+ * arrow and remains keyboard-accessible without custom menu behavior. */
+.besa-api-version-picker {
+  margin: 0;
+}
+
+.besa-api-version-select {
+  min-width: 7rem;
+  padding-block: 0.25rem;
+  width: auto;
+}
+
+/* Compact type markers used by the namespace-oriented API landing page. */
+.api-kind {
+  border: 1px solid var(--pst-color-border);
+  border-radius: 0.25rem;
+  display: inline-block;
+  font-family: var(--pst-font-family-monospace);
+  font-size: 0.72em;
+  font-weight: 700;
+  line-height: 1.2;
+  min-width: 1.5em;
+  padding: 0.08em 0.28em;
+  text-align: center;
+}

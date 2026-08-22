@@ -67,6 +67,21 @@ cmake --build build --target user.docs
    build runs Doxygen at `builder-inited`, and Breathe consumes that checkout's Doxygen XML.
 3. BESA assembles the API tree below the ProperDocs API landing page.
 
+Before Doxygen runs for each checkout, `api-docs/conf.py` constructs a temporary public-header tree.
+It copies the checkout's `src/cpp/include/` contents and generates that checkout's `version.hpp` by
+invoking its vendored `cmake/besa/version.cmake`. Doxygen sees only this staged tree. As a result, the
+Sphinx/Exhale **Files** section starts directly at the public header namespace, for example:
+
+```text
+Files
+└── myproject/
+    ├── myproject.hpp
+    └── version.hpp
+```
+
+This intentionally mirrors the contents below an installed `include/` directory rather than the
+repository's `src/cpp/include/` path.
+
 The final deployable directory is:
 
 ```text

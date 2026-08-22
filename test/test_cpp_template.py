@@ -727,13 +727,20 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert (api_docs / "Doxyfile").is_file()
     assert (api_docs / "index.rst").is_file()
     assert (api_docs / "_static" / "css" / "besa-api.css").is_file()
-    versioning = api_docs / "_templates" / "versioning.html"
     project_links = api_docs / "_templates" / "project-links.html"
-    assert versioning.is_file()
+    version_script = api_docs / "_static" / "js" / "besa-api-version.js"
     assert project_links.is_file()
-    assert "Main documentation" in versioning.read_text(encoding="utf-8")
-    assert "API versions" in versioning.read_text(encoding="utf-8")
-    assert "Main documentation" in project_links.read_text(encoding="utf-8")
+    assert not (api_docs / "_templates" / "versioning.html").exists()
+    assert version_script.is_file()
+    project_links_text = project_links.read_text(encoding="utf-8")
+    assert "Main documentation" in project_links_text
+    assert "API version" in project_links_text
+    assert "data-besa-api-root" in project_links_text
+    assert "data-besa-api-page" in project_links_text
+    version_script_text = version_script.read_text(encoding="utf-8")
+    assert 'fetch(new URL("versions.json", apiRoot))' in version_script_text
+    assert "version.pages.includes(page)" in version_script_text
+    assert "return root.href" in version_script_text
     assert not (docs / "conf.py").exists()
 
     conf_text = (api_docs / "conf.py").read_text(encoding="utf-8")
@@ -741,6 +748,8 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert '"exhale"' in conf_text
     assert '"sphinx_multiversion"' in conf_text
     assert 'html_theme = "pydata_sphinx_theme"' in conf_text
+    assert 'html_js_files = ["js/besa-api-version.js"]' in conf_text
+    assert '"primary_sidebar_end"' not in conf_text
     assert '"containmentFolder": "./generated"' in conf_text
     assert '"rootFileName": "library_root.rst"' in conf_text
     assert 'smv_branch_whitelist = r"^.*$"' in conf_text
@@ -752,7 +761,8 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
 
     doxyfile_text = (api_docs / "Doxyfile").read_text(encoding="utf-8")
     assert "EXTRACT_ALL            = YES" in doxyfile_text
-    assert "EXCLUDE_PATTERNS       = */bin/* */lib/*" in doxyfile_text
+    assert "synthetic public-header tree" in doxyfile_text
+    assert "EXCLUDE_PATTERNS" not in doxyfile_text
 
     css = (api_docs / "_static" / "css" / "besa-api.css").read_text(encoding="utf-8")
     assert ".bd-page-width" in css
@@ -760,7 +770,9 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert "min-width: 13rem" in css
     assert ".besa-api-project-links" in css
     assert "gap: 1.25rem" in css
+    assert ".besa-api-version-select" in css
     assert ".breathe-sectiondef-title" in css
+    assert ".api-kind" in css
     assert "font-style: normal" in css
 
     project_links = (api_docs / "_templates" / "project-links.html").read_text(
@@ -804,6 +816,9 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     callback, priority = events["builder-inited"]
     assert callback is module._prepare_api
     assert priority < 500
+    landing_callback, landing_priority = events["env-before-read-docs"]
+    assert landing_callback is module._prepare_api_landing
+    assert landing_priority == 500
 
     fake_doxygen = tmp_path / "fake-doxygen"
     fake_doxygen.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
@@ -817,20 +832,95 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert 'GENERATE_XML           = YES' in generated_text
     assert 'GENERATE_HTML          = NO' in generated_text
     assert 'PROJECT_NUMBER = "0.1.0"' in generated_text
-    assert str(project / "src").replace("\\", "/") in generated_text
+    current_public = current_output / "public-include"
+    assert str(current_public).replace("\\", "/") in generated_text
+    assert str(project / "src").replace("\\", "/") not in generated_text
+    assert (current_public / "example_docs" / "example_docs.hpp").is_file()
+    current_version = current_public / "example_docs" / "version.hpp"
+    assert current_version.is_file()
+    assert "namespace example_docs::meta" in current_version.read_text(encoding="utf-8")
     assert current_app.config.release == "0.1.0"
     assert current_app.config.breathe_projects == {
         "example_docs": str(current_output / "xml")
     }
     assert current_app.config.exhale_args["containmentFolder"] == str(api_docs / "generated")
-    assert current_app.config.exhale_args["doxygenStripFromPath"] == str(project)
+    assert current_app.config.exhale_args["doxygenStripFromPath"] == str(current_public)
+
+    # Exhale generates all detailed pages, then BESA replaces only its root document with a compact
+    # namespace-oriented synopsis.  Overloads are intentionally collapsed by name on this page.
+    xml_dir = current_output / "xml"
+    xml_dir.mkdir(parents=True, exist_ok=True)
+    (xml_dir / "index.xml").write_text(
+        """\
+<doxygenindex>
+  <compound kind="namespace" refid="namespaceexample__docs">
+    <name>example_docs</name>
+  </compound>
+  <compound kind="namespace" refid="namespaceexample__docs_1_1meta">
+    <name>example_docs::meta</name>
+    <member kind="function" refid="function1"><name>to_string</name></member>
+    <member kind="function" refid="function2"><name>to_string</name></member>
+    <member kind="function" refid="function3"><name>version</name></member>
+    <member kind="enum" refid="enum1"><name>release_type</name></member>
+  </compound>
+  <compound kind="struct" refid="struct1">
+    <name>example_docs::meta::semantic_version</name>
+  </compound>
+</doxygenindex>
+""",
+        encoding="utf-8",
+    )
+    generated_api = api_docs / "generated"
+    generated_api.mkdir(parents=True, exist_ok=True)
+    (generated_api / "library_root.rst").write_text("old noisy root\n", encoding="utf-8")
+    (generated_api / "namespaceexample__docs.rst").write_text(
+        ".. doxygennamespace:: example_docs\n", encoding="utf-8"
+    )
+    (generated_api / "namespaceexample__docs_1_1meta.rst").write_text(
+        ".. doxygennamespace:: example_docs::meta\n", encoding="utf-8"
+    )
+    (generated_api / "file_view_hierarchy.rst.include").write_text(
+        "* Directory example_docs\n", encoding="utf-8"
+    )
+    (generated_api / "unabridged_api.rst.include").write_text(
+        """\
+.. toctree::
+   :maxdepth: 1
+
+   namespaceexample__docs.rst
+   namespaceexample__docs_1_1meta.rst
+   struct1.rst
+""",
+        encoding="utf-8",
+    )
+    module._prepare_api_landing(current_app, None, [])
+    overview_text = (generated_api / "api_namespace_overview.rst.include").read_text(
+        encoding="utf-8"
+    )
+    assert ":api-kind:`N` :doc:`example_docs <namespaceexample__docs>`" in overview_text
+    assert ":api-kind:`N` :doc:`meta <namespaceexample__docs_1_1meta>`" in overview_text
+    assert overview_text.count("to_string()") == 1
+    assert ":api-kind:`F` :doc:`to_string() <namespaceexample__docs_1_1meta>`" in overview_text
+    assert ":cpp:func:" not in overview_text
+    assert ":api-kind:`S` :cpp:struct:`semantic_version <example_docs::meta::semantic_version>`" in overview_text
+    assert ":api-kind:`E` :cpp:enum:`release_type <example_docs::meta::release_type>`" in overview_text
+    root_text = (generated_api / "library_root.rst").read_text(encoding="utf-8")
+    assert "Namespace hierarchy" in root_text
+    assert "Class Hierarchy" not in root_text
+    assert "Full API" not in root_text
+    assert root_text.index("Namespace hierarchy") < root_text.index("File hierarchy")
+    assert "   :hidden:" in root_text
+    assert "   namespaceexample__docs.rst" in root_text
 
     # Reproduce sphinx-multiversion's important shape: conf.py remains in the current checkout while
     # app.srcdir points at a different checkout. The generated Doxyfile must use only that checkout.
     historical = tmp_path / "historical"
     historical_api = historical / "api-docs"
     historical_api.mkdir(parents=True)
-    (historical / "src").mkdir()
+    historical_header = historical / "src" / "cpp" / "include" / "example_docs" / "historical.hpp"
+    historical_header.parent.mkdir(parents=True)
+    historical_header.write_text("#ifndef EXAMPLE_DOCS_HISTORICAL_HPP\n#define EXAMPLE_DOCS_HISTORICAL_HPP\n#endif\n", encoding="utf-8")
+    shutil.copytree(project / "cmake" / "besa", historical / "cmake" / "besa")
     (historical / "CMakeLists.txt").write_text(
         "project(example_docs VERSION 9.8.7 LANGUAGES NONE)\n", encoding="utf-8"
     )
@@ -843,8 +933,14 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     historical_output = module._doxygen_output_for(historical)
     historical_text = (historical_output / "Doxyfile").read_text(encoding="utf-8")
     assert 'PROJECT_NUMBER = "9.8.7"' in historical_text
-    assert str(historical / "src").replace("\\", "/") in historical_text
+    historical_public = historical_output / "public-include"
+    assert str(historical_public).replace("\\", "/") in historical_text
+    assert str(historical / "src").replace("\\", "/") not in historical_text
     assert str(project / "src").replace("\\", "/") not in historical_text
+    assert (historical_public / "example_docs" / "historical.hpp").is_file()
+    historical_version = historical_public / "example_docs" / "version.hpp"
+    assert historical_version.is_file()
+    assert 'return "9.8.7";' in historical_version.read_text(encoding="utf-8")
     assert historical_app.config.release == "9.8.7"
     assert historical_app.config.breathe_projects == {
         "example_docs": str(historical_output / "xml")
@@ -852,7 +948,7 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert historical_app.config.exhale_args["containmentFolder"] == str(
         historical_api / "generated"
     )
-    assert historical_app.config.exhale_args["doxygenStripFromPath"] == str(historical)
+    assert historical_app.config.exhale_args["doxygenStripFromPath"] == str(historical_public)
     assert str(project / "api-docs" / "generated") not in historical_app.config.exhale_args.values()
 
 
@@ -953,6 +1049,13 @@ def test_generated_cpp_combined_docs_build_when_toolchain_is_available(tmp_path:
     assert "future_api" in html_text(raw_api / "v0.2.0")
     assert "future_api" in html_text(raw_api / "main")
 
+    # The file-oriented API mirrors the installed include namespace. Generated version.hpp is part
+    # of that public tree, while repository-only src/cpp/include path components stay hidden.
+    main_api_text = html_text(raw_api / "main")
+    assert "version.hpp" in main_api_text
+    assert "example_multidocs/example_multidocs.hpp" in main_api_text
+    assert "src/cpp/include" not in main_api_text
+
     # Exhale should produce a structured API tree rather than one monolithic doxygenindex page.
     assert (raw_api / "main" / "generated" / "library_root.html").is_file()
     assert any((raw_api / "main" / "generated").glob("namespace_*.html")) or any(
@@ -1027,6 +1130,10 @@ def test_multiversion_api_metadata_is_generated(tmp_path: Path) -> None:
         (output / version / "_static").mkdir(parents=True)
         (output / version / "index.html").write_text(version, encoding="utf-8")
 
+    # Nested pages belong to a version's page manifest; they must not be mistaken for refs.
+    (output / "main" / "detail").mkdir()
+    (output / "main" / "detail" / "index.html").write_text("detail", encoding="utf-8")
+
     script = (
         Path(__file__).resolve().parents[1]
         / "share"
@@ -1047,15 +1154,15 @@ def test_multiversion_api_metadata_is_generated(tmp_path: Path) -> None:
         tmp_path,
     )
 
-    # A nested API page named index.html must not be mistaken for another ref.
-    (output / "main" / "detail").mkdir()
-    (output / "main" / "detail" / "index.html").write_text("detail", encoding="utf-8")
-
     import json
 
     metadata = json.loads((output / "versions.json").read_text(encoding="utf-8"))
     assert metadata["default"] == "main"
-    assert metadata["versions"][0] == {"name": "main", "url": "main/"}
+    assert metadata["versions"][0] == {
+        "name": "main",
+        "url": "main/",
+        "pages": ["detail/index.html", "index.html"],
+    }
     assert {item["name"] for item in metadata["versions"]} == {
         "main",
         "1.0.0",
@@ -1222,7 +1329,7 @@ def test_generated_properdocs_serve_hook_rebuilds_current_api_without_env_config
     )
     assert metadata == {
         "default": "main",
-        "versions": [{"name": "main", "url": "main/"}],
+        "versions": [{"name": "main", "url": "main/", "pages": ["index.html"]}],
     }
 
     module.on_startup(command="build")
@@ -1330,7 +1437,16 @@ def test_generated_properdocs_multiversion_serve_hook_overlays_live_main(
     assert not (api_root / "stale-version").exists()
     metadata = json.loads((api_root / "versions.json").read_text(encoding="utf-8"))
     assert metadata["default"] == "main"
-    assert metadata["versions"][0] == {"name": "main", "url": "main/"}
+    assert metadata["versions"][0] == {
+        "name": "main",
+        "url": "main/",
+        "pages": ["index.html"],
+    }
+    assert metadata["versions"][1] == {
+        "name": "1.0.0",
+        "url": "1.0.0/",
+        "pages": ["index.html"],
+    }
     assert (site / ".nojekyll").is_file()
 
     module.on_startup(command="build")

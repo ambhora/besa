@@ -4,7 +4,9 @@ The C/C++ API is extracted with Doxygen, rendered through Breathe and Sphinx, an
 branch heads and tags selected by sphinx-multiversion.
 
 The complete `user.docs` build publishes each available API version below this page. The list is
-loaded from the `versions.json` generated alongside the multiversion API tree.
+loaded from the `versions.json` generated alongside the multiversion API tree. Every Sphinx API page
+also exposes a version selector. Selecting another version keeps the current page when that page exists
+in the target version and otherwise opens that version's API root.
 
 <div id="besa-api-versions">
   <p><a href="main/">Development API (`main`)</a></p>

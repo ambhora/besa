@@ -24,7 +24,7 @@ file(
 )
 set(_besa_versions "")
 foreach(_besa_static IN LISTS _besa_static_directories)
-  if(IS_DIRECTORY "${OUTPUT_DIRECTORY}/${_besa_static}")
+  if(_besa_static MATCHES "(^|/)_static$" AND IS_DIRECTORY "${OUTPUT_DIRECTORY}/${_besa_static}")
     string(REGEX REPLACE "/_static$" "" _besa_version "${_besa_static}")
     if(EXISTS "${OUTPUT_DIRECTORY}/${_besa_version}/index.html")
       list(APPEND _besa_versions "${_besa_version}")
@@ -56,9 +56,26 @@ set(_besa_separator "")
 foreach(_besa_version IN LISTS _besa_versions)
   _besa_json_escape("${_besa_version}" _besa_name_json)
   _besa_json_escape("${_besa_version}/" _besa_url_json)
+
+  file(
+    GLOB_RECURSE _besa_html_pages
+    LIST_DIRECTORIES FALSE
+    RELATIVE "${OUTPUT_DIRECTORY}/${_besa_version}"
+    "${OUTPUT_DIRECTORY}/${_besa_version}/*.html"
+  )
+  list(SORT _besa_html_pages)
+  set(_besa_pages_json "[")
+  set(_besa_page_separator "")
+  foreach(_besa_page IN LISTS _besa_html_pages)
+    _besa_json_escape("${_besa_page}" _besa_page_json)
+    string(APPEND _besa_pages_json "${_besa_page_separator}\"${_besa_page_json}\"")
+    set(_besa_page_separator ", ")
+  endforeach()
+  string(APPEND _besa_pages_json "]")
+
   string(
     APPEND _besa_json
-    "${_besa_separator}\n    {\"name\": \"${_besa_name_json}\", \"url\": \"${_besa_url_json}\"}"
+    "${_besa_separator}\n    {\"name\": \"${_besa_name_json}\", \"url\": \"${_besa_url_json}\", \"pages\": ${_besa_pages_json}}"
   )
   set(_besa_separator ",")
 endforeach()
