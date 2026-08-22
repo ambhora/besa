@@ -1,4 +1,4 @@
-/* BESA API presentation: keep large references spacious, readable, and structurally obvious. */
+/* BESA API presentation: compact, reference-oriented, and structurally obvious. */
 
 .bd-page-width {
   /* Roughly three quarters of a 1920 px desktop, but still fluid on smaller displays. */
@@ -131,4 +131,103 @@ code em {
   min-width: 1.5em;
   padding: 0.08em 0.28em;
   text-align: center;
+}
+
+
+/* Dense reference presentation.  API pages should optimize for scanning declarations rather than
+ * prose-sized typography; wrapping should be exceptional on normal desktop widths. */
+.bd-article {
+  font-size: 0.9rem;
+  line-height: 1.42;
+}
+
+.bd-article h1 {
+  font-size: 2rem;
+  margin-bottom: 0.8rem;
+  padding-bottom: 0.22rem;
+}
+
+.bd-article h2 {
+  font-size: 1.45rem;
+  margin-bottom: 0.55rem;
+  margin-top: 1.2rem;
+  padding-left: 0.5rem;
+}
+
+.bd-article h3 {
+  font-size: 1.12rem;
+  margin-bottom: 0.4rem;
+  margin-top: 0.9rem;
+}
+
+.bd-article p,
+.bd-article ul,
+.bd-article ol {
+  margin-bottom: 0.55rem;
+}
+
+/* Declarations are deliberately smaller than prose headings and use tight internal spacing. */
+dl.cpp > dt,
+dl.c > dt,
+.sig {
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.sig {
+  padding: 0.34rem 0.55rem;
+}
+
+.bd-article dl.cpp,
+.bd-article dl.c {
+  margin-bottom: 0.7rem;
+  margin-top: 0.25rem;
+}
+
+.bd-article dl.cpp > dd,
+.bd-article dl.c > dd {
+  margin-left: 0.8rem;
+  margin-top: 0.3rem;
+}
+
+.breathe-sectiondef-title {
+  font-size: 1rem;
+  margin-bottom: 0.35rem;
+  margin-top: 0.85rem;
+}
+
+.breathe-sectiondef > dl,
+.breathe-sectiondef > dl.cpp,
+.breathe-sectiondef > dl.c {
+  margin-bottom: 0.45rem;
+  margin-top: 0.2rem;
+}
+
+.contents.local.topic {
+  margin-bottom: 0.8rem;
+  padding: 0.45rem 0.7rem;
+}
+
+/* Function qualifiers are surfaced as compact metadata above the declaration.  These are labels,
+ * not interactive controls, but the pill shape makes them easy to scan independently of the type
+ * and parameter list. */
+.besa-api-qualifiers {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.28rem;
+  margin: 0.18rem 0 0.28rem;
+}
+
+.besa-api-qualifier {
+  background: color-mix(in srgb, var(--pst-color-primary) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pst-color-primary) 38%, transparent);
+  border-radius: 999px;
+  color: var(--pst-color-text-muted);
+  font-family: var(--pst-font-family-monospace);
+  font-size: 0.68rem;
+  font-weight: 650;
+  line-height: 1.2;
+  padding: 0.12rem 0.42rem;
+  white-space: nowrap;
 }

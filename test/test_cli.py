@@ -54,6 +54,9 @@ def test_cpp_generate_accepts_explicit_spdx_license(tmp_path: Path) -> None:
     text = header.read_text(encoding="utf-8")
     assert "SPDX-License-Identifier: MIT" in text
     assert "SPDX-License-Identifier: Apache-2.0" not in text
+    properdocs = (project / "properdocs.yml").read_text(encoding="utf-8")
+    assert "Copyright &copy; example_mit developers &middot; MIT" in properdocs
+    assert "BESA_PROJECT_LICENSE" not in properdocs
 
 
 def test_cpp_generate_cli_accepts_license_option(tmp_path: Path) -> None:

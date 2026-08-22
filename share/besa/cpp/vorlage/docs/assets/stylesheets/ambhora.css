@@ -1,0 +1,73 @@
+/* -------------------------------------------------------------------------------------------------
+ * SPDX-License-Identifier: Apache-2.0
+ * -------------------------------------------------------------------------------------------------
+ * Ambhora documentation palette. Keep the generated Sphinx API on its own technical palette so the
+ * transition between project documentation and versioned API documentation remains visually clear.
+ */
+
+:root,
+[data-md-color-scheme="default"],
+[data-md-color-scheme="slate"] {
+  --ambhora-blue: #3B97C4;
+  --ambhora-green: #97C43B;
+  --ambhora-pink: #C43B97;
+
+  --md-primary-fg-color: var(--ambhora-blue);
+  --md-primary-fg-color--light: var(--ambhora-blue);
+  --md-primary-fg-color--dark: var(--ambhora-blue);
+  --md-accent-fg-color: var(--ambhora-green);
+  --md-accent-fg-color--transparent: rgba(151, 196, 59, 0.14);
+}
+
+/* Use the third brand colour sparingly as a location cue rather than recolouring the whole site. */
+.md-tabs__link--active,
+.md-nav__link--active,
+.md-typeset a:hover {
+  color: var(--ambhora-pink);
+}
+
+.md-typeset a {
+  text-decoration-color: rgba(59, 151, 196, 0.45);
+}
+
+
+/* Make the canonical project documentation visibly Ambhora-owned.  The generated Sphinx API keeps
+ * its separate blue/teal technical palette so crossing between the two surfaces is obvious. */
+.md-header {
+  background: var(--ambhora-blue);
+  border-bottom: 0.2rem solid var(--ambhora-green);
+  color: #fff;
+}
+
+.md-header__title,
+.md-header__button,
+.md-header__topic,
+.md-header .md-icon {
+  color: #fff;
+}
+
+.md-header .md-search__form {
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.md-tabs {
+  background: var(--ambhora-blue);
+  color: #fff;
+}
+
+.md-tabs__link {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.md-tabs__link--active,
+.md-tabs__link:hover {
+  color: #fff;
+}
+
+.md-tabs__item--active {
+  border-bottom: 0.18rem solid var(--ambhora-green);
+}
+
+.md-footer-meta {
+  border-top: 0.16rem solid var(--ambhora-green);
+}

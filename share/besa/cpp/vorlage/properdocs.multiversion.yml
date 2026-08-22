@@ -1,14 +1,2 @@
-# Multiversion development preview.
-#
-# This inherits the canonical ProperDocs information architecture from properdocs.yml and swaps only
-# the live API hook. Historical refs are generated with sphinx-multiversion, while main/ is replaced
-# with the current working-tree API so uncommitted edits remain visible during development.
+# Compatibility alias. Multiversion serving is the default in properdocs.yml.
 INHERIT: properdocs.yml
-
-watch:
-  - src
-  - api-docs
-  - .git/refs
-
-hooks:
-  - properdocs_multiversion_hook.py

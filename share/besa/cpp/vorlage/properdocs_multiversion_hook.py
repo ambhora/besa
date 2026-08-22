@@ -3,9 +3,9 @@
 # --------------------------------------------------------------------------------------------------
 """Live ProperDocs integration for the complete versioned C/C++ API reference.
 
-This hook is used only by ``properdocs.multiversion.yml``. It keeps historical branch/tag API
-outputs from sphinx-multiversion and overlays ``main/`` with the current working-tree API. Therefore
-uncommitted source edits remain visible without losing the ability to browse older versions.
+This is the default ``properdocs serve`` hook. It keeps historical branch/tag API outputs from
+sphinx-multiversion and overlays ``main/`` with the current working-tree API. Therefore uncommitted
+source edits remain visible without losing the ability to browse older versions.
 """
 
 from __future__ import annotations
@@ -173,11 +173,10 @@ def _publish_multiversion_api(site_directory: Path) -> None:
     api_root = site_directory / API_PUBLIC_PATH
     api_root.mkdir(parents=True, exist_ok=True)
 
-    # ProperDocs owns the API landing page. Everything else below reference/api/ is generated API
-    # content and may be refreshed from the multiversion build.
+    # Everything below reference/api/ belongs to the generated versioned API. The canonical
+    # ProperDocs entry point is the Versioned API section on reference/index.html.
     for child in tuple(api_root.iterdir()):
-        if child.name != "index.html":
-            _remove_path(child)
+        _remove_path(child)
 
     for source in MULTIVERSION_API_BUILD_DIRECTORY.iterdir():
         _copy_entry(source, api_root / source.name)

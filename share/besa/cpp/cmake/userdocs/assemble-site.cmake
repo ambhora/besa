@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # --------------------------------------------------------------------------------------------------
 # Assemble the canonical publication tree. ProperDocs owns the root; the Sphinx/Breathe API output
-# is copied below API_PATH without replacing ProperDocs' API landing page.
+# is mounted below API_PATH as a separate versioned documentation surface.
 
 foreach(_required PROPERDOCS_DIRECTORY API_DIRECTORY OUTPUT_DIRECTORY API_PATH)
   if(NOT DEFINED ${_required} OR "${${_required}}" STREQUAL "")

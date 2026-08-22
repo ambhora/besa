@@ -70,8 +70,9 @@ def _render_tree(
 
     Templates use the literal tokens ``vorlage`` and ``Vorlage`` for the project name and its
     class-name form, ``BESA_PROJECT_UPPER`` where an uppercase project token is required, the default
-    SPDX identifier for generated-file license headers, and the suffix
-    ``.in`` to mark files which become active manifests after generation. Keeping the rendering
+    SPDX identifier for generated-file license headers, ``BESA_PROJECT_LICENSE`` for places where
+    the project license is displayed as content, and the suffix ``.in`` to mark files which become
+    active manifests after generation. Keeping the rendering
     model this small is intentional: BESA must never need to understand CMake, TOML, or
     source-language syntax merely to create a project.
     """
@@ -93,6 +94,7 @@ def _render_tree(
             f"SPDX-License-Identifier: {_DEFAULT_SPDX_LICENSE}",
             f"SPDX-License-Identifier: {spdx_license_identifier}",
         )
+        rendered = rendered.replace("BESA_PROJECT_LICENSE", spdx_license_identifier)
         path.write_text(rendered, encoding="utf-8")
 
     # Rename deepest paths first so include/package directories are safely renamed before parents.

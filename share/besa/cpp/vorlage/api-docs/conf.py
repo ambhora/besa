@@ -57,7 +57,7 @@ extensions = [
 templates_path = ["_templates"]
 html_static_path = ["_static"]
 html_css_files = ["css/besa-api.css"]
-html_js_files = ["js/besa-api-version.js"]
+html_js_files = ["js/besa-api-version.js", "js/besa-api-presentation.js"]
 exclude_patterns: list[str] = []
 
 html_theme = "pydata_sphinx_theme"
@@ -95,7 +95,7 @@ exhale_args = {
     "doxygenStripFromPath": "..",
     "fullToctreeMaxDepth": 3,
     "contentsDirectives": True,
-    "kindsWithContentsDirectives": ["namespace", "class", "struct", "file"],
+    "kindsWithContentsDirectives": ["namespace", "file"],
 }
 
 
@@ -269,6 +269,185 @@ def _generated_namespace_pages(generated: Path) -> dict[str, str]:
     return result
 
 
+def _xml_text(element: ET.Element | None) -> str:
+    """Return all textual content below one Doxygen XML element."""
+
+    if element is None:
+        return ""
+    return "".join(element.itertext()).strip()
+
+
+def _namespace_function_signatures(
+    index_xml: Path,
+) -> dict[tuple[str, str], list[tuple[str, str]]]:
+    """Collect display signatures and exact C++ cross-reference targets for namespace functions."""
+
+    result: dict[tuple[str, str], list[tuple[str, str]]] = {}
+    root = ET.parse(index_xml).getroot()
+    for compound in root.findall("compound"):
+        if compound.get("kind") != "namespace":
+            continue
+        namespace = compound.findtext("name") or ""
+        refid = compound.get("refid", "")
+        compound_xml = index_xml.parent / f"{refid}.xml"
+        if not namespace or not refid or not compound_xml.is_file():
+            continue
+
+        compound_root = ET.parse(compound_xml).getroot()
+        for member in compound_root.findall(".//memberdef[@kind='function']"):
+            name = member.findtext("name") or ""
+            if not name:
+                continue
+            qualified_name = member.findtext("qualifiedname") or f"{namespace}::{name}"
+            return_type = _xml_text(member.find("type"))
+            parameters: list[str] = []
+            for parameter in member.findall("param"):
+                parameter_type = _xml_text(parameter.find("type"))
+                array = _xml_text(parameter.find("array"))
+                if parameter_type:
+                    parameters.append(f"{parameter_type}{array}")
+            parameter_list = ", ".join(parameters)
+            display = f"{name}({parameter_list})"
+            declaration = f"{qualified_name}({parameter_list})"
+            if return_type:
+                declaration = f"{return_type} {declaration}"
+            result.setdefault((namespace, name), []).append((display, declaration))
+
+    for signatures in result.values():
+        signatures[:] = sorted(set(signatures))
+    return result
+
+def _overload_document_name(namespace: str, function: str) -> str:
+    """Return a stable Sphinx document name for one overload set."""
+
+    slug = re.sub(r"[^A-Za-z0-9]+", "_", f"{namespace}_{function}").strip("_").lower()
+    return f"api_overload_{slug}"
+
+
+def _write_overload_pages(
+    index_xml: Path, generated: Path
+) -> dict[tuple[str, str], str]:
+    """Write one compact document for each genuinely overloaded namespace function."""
+
+    for stale in generated.glob("api_overload_*.rst"):
+        stale.unlink()
+
+    result: dict[tuple[str, str], str] = {}
+    for (namespace, function), signatures in _namespace_function_signatures(index_xml).items():
+        if len(signatures) < 2:
+            continue
+
+        document_name = _overload_document_name(namespace, function)
+        title = function
+        lines = [title, "=" * len(title), "", "Overloads", "---------", ""]
+        for display, declaration in signatures:
+            # Sphinx's C++ domain resolves a complete function declaration to one exact overload.
+            # This keeps the overload-set page compact while every entry still reaches its own
+            # detailed Breathe documentation.
+            lines.append(f"* :cpp:func:`{display} <{declaration}>`")
+        lines.append("")
+        (generated / f"{document_name}.rst").write_text("\n".join(lines), encoding="utf-8")
+        result[(namespace, function)] = document_name
+    return result
+
+
+def _replace_rst_heading(lines: list[str], index: int, title: str) -> None:
+    """Replace one RST heading while preserving its adornment character."""
+
+    if index + 1 >= len(lines) or not lines[index + 1]:
+        return
+    adornment = lines[index + 1][0]
+    if any(character != adornment for character in lines[index + 1]):
+        return
+    lines[index] = title
+    lines[index + 1] = adornment * len(title)
+
+
+def _simplified_entity_title(title: str) -> str | None:
+    """Return the compact display title for one Exhale entity title."""
+
+    for prefix, kind in (
+        ("Class ", "class"),
+        ("Struct ", "struct"),
+        ("Enum ", "enum"),
+        ("Function ", "function"),
+    ):
+        if not title.startswith(prefix):
+            continue
+        value = title[len(prefix) :]
+        if kind == "function" and "(" in value:
+            name, parameters = value.split("(", 1)
+            return f"{name.rsplit('::', 1)[-1]}({parameters}"
+        return value.rsplit("::", 1)[-1]
+    return None
+
+
+def _simplify_generated_entity_pages(generated: Path) -> None:
+    """Remove redundant kind prefixes and empty structural headings from Exhale entity pages.
+
+    Detailed entity pages already identify the entity in their title and the declaration itself.
+    A second ``Function Documentation`` / ``Struct Documentation`` heading adds no information and
+    consumes substantial vertical space, so entity pages go directly from their provenance to the
+    Breathe declaration.  Namespace pages retain their useful Classes / Enums / Functions sections.
+    """
+
+    documentation_headings = {
+        "Class Documentation",
+        "Struct Documentation",
+        "Enum Documentation",
+        "Function Documentation",
+        "Documentation",
+    }
+    explicit_reference = re.compile(
+        r":ref:`(?P<title>(?:Class|Struct|Enum|Function) .+?) <(?P<target>[^<>]+)>`"
+    )
+
+    for path in generated.glob("*.rst"):
+        lines = path.read_text(encoding="utf-8").splitlines()
+        changed = False
+        is_entity_page = any(_simplified_entity_title(line) is not None for line in lines[:12])
+
+        index = 0
+        while index < len(lines):
+            line = lines[index]
+            if is_entity_page and line in documentation_headings:
+                # Remove this before compacting entity-kind prefixes: ``Struct Documentation``
+                # would otherwise be mistaken for an entity titled simply ``Documentation``.
+                remove_count = 1
+                if index + 1 < len(lines) and lines[index + 1]:
+                    adornment = lines[index + 1][0]
+                    if all(character == adornment for character in lines[index + 1]):
+                        remove_count = 2
+                del lines[index : index + remove_count]
+                while index < len(lines) and lines[index] == "" and index > 0 and lines[index - 1] == "":
+                    del lines[index]
+                changed = True
+                continue
+
+            compact_title = _simplified_entity_title(line)
+            if compact_title is not None:
+                _replace_rst_heading(lines, index, compact_title)
+                changed = True
+                index += 2
+                continue
+
+            index += 1
+
+        for index, line in enumerate(lines):
+            def replace_reference(match: re.Match[str]) -> str:
+                nonlocal changed
+                compact = _simplified_entity_title(match.group("title"))
+                if compact is None:
+                    return match.group(0)
+                changed = True
+                return f":ref:`{compact} <{match.group('target')}>`"
+
+            lines[index] = explicit_reference.sub(replace_reference, line)
+
+        if changed:
+            path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def _api_namespace_overview(index_xml: Path, generated: Path) -> str:
     """Build a compact namespace-oriented API index from Doxygen's index XML.
 
@@ -286,6 +465,7 @@ def _api_namespace_overview(index_xml: Path, generated: Path) -> str:
         if (name := compound.findtext("name"))
     }
     namespace_pages = _generated_namespace_pages(generated)
+    overload_pages = _write_overload_pages(index_xml, generated)
 
     children: dict[str, set[str]] = {name: set() for name in namespace_names}
     members: dict[str, set[tuple[str, str, str]]] = {name: set() for name in namespace_names}
@@ -344,7 +524,9 @@ def _api_namespace_overview(index_xml: Path, generated: Path) -> str:
         short_name = namespace.rsplit("::", 1)[-1]
         target = namespace_pages.get(namespace)
         if target:
-            return f":doc:`{short_name} <{target}>`"
+            # Use an absolute Sphinx document path so namespace links remain valid when this
+            # overview is included from Exhale's generated root and in sphinx-multiversion refs.
+            return f":doc:`{short_name} </generated/{target}>`"
         return f"``{short_name}``"
 
     def emit_item(text: str, depth: int) -> None:
@@ -363,12 +545,9 @@ def _api_namespace_overview(index_xml: Path, generated: Path) -> str:
             marker = markers[kind]
             display_name = f"{short_name}()" if kind == "function" else short_name
             if kind == "function" and function_counts.get((namespace, short_name), 0) > 1:
-                # A name-only C++ cross-reference is ambiguous for overloaded functions.  The
-                # landing page intentionally collapses overloads, so send only those names to the
-                # owning namespace page where Exhale lists every overload and signature.
-                target = namespace_pages.get(namespace)
+                target = overload_pages.get((namespace, short_name))
                 if target:
-                    link = f":doc:`{display_name} <{target}>`"
+                    link = f":doc:`{display_name} </generated/{target}>`"
                 else:
                     link = f"``{display_name}``"
             else:
@@ -384,7 +563,6 @@ def _api_namespace_overview(index_xml: Path, generated: Path) -> str:
 
     return "\n".join(lines) + "\n"
 
-
 def _unabridged_documents(unabridged: Path) -> list[str]:
     """Extract Exhale's generated document list for one invisible root toctree."""
 
@@ -398,7 +576,7 @@ def _unabridged_documents(unabridged: Path) -> list[str]:
     return documents
 
 
-def _prepare_api_landing(app, _env, _docnames) -> None:
+def _prepare_api_landing(app) -> None:
     """Replace Exhale's noisy root page with a compact namespace synopsis."""
 
     api_docs_directory = Path(app.srcdir).resolve()
@@ -411,6 +589,8 @@ def _prepare_api_landing(app, _env, _docnames) -> None:
 
     if not index_xml.is_file() or not root_file.is_file():
         return
+
+    _simplify_generated_entity_pages(generated)
 
     overview = generated / "api_namespace_overview.rst.include"
     overview.write_text(_api_namespace_overview(index_xml, generated), encoding="utf-8")
@@ -429,15 +609,15 @@ def _prepare_api_landing(app, _env, _docnames) -> None:
     if file_hierarchy.is_file():
         lines.extend(
             [
-                "File hierarchy",
-                "--------------",
-                "",
                 ".. include:: file_view_hierarchy.rst.include",
                 "",
             ]
         )
 
     documents = _unabridged_documents(unabridged)
+    documents.extend(
+        path.name for path in sorted(generated.glob("api_overload_*.rst")) if path.name not in documents
+    )
     if documents:
         lines.extend(
             [
@@ -458,6 +638,7 @@ def setup(app) -> None:
     # Sphinx invokes event listeners in ascending priority. Exhale uses builder-inited too, so run
     # before the normal extension priority (500).
     app.connect("builder-inited", _prepare_api, priority=100)
-    # Exhale writes its generated RST during builder-inited. Rewrite only the root synopsis after
-    # document discovery starts, leaving every detailed generated page unchanged.
-    app.connect("env-before-read-docs", _prepare_api_landing)
+    # Exhale writes its generated RST during builder-inited at the normal extension priority.
+    # Run afterwards, but still before Sphinx discovers source documents.  In particular, overload
+    # pages must exist at discovery time or Sphinx will report them as unknown/nonexistent docs.
+    app.connect("builder-inited", _prepare_api_landing, priority=900)

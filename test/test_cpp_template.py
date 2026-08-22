@@ -712,14 +712,33 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert multiversion_config.is_file()
     multiversion_config_text = multiversion_config.read_text(encoding="utf-8")
     assert "INHERIT: properdocs.yml" in multiversion_config_text
-    assert "  - .git/refs" in multiversion_config_text
-    assert "  - properdocs_multiversion_hook.py" in multiversion_config_text
+    config_text = (project / "properdocs.yml").read_text(encoding="utf-8")
+    assert "  - .git/refs" in config_text
+    assert "  - properdocs_multiversion_hook.py" in config_text
     assert (project / "properdocs_multiversion_hook.py").is_file()
     assert (docs / "index.md").is_file()
-    assert (docs / "reference" / "index.md").is_file()
-    api_landing = docs / "reference" / "api.md"
-    assert api_landing.is_file()
-    assert 'fetch("versions.json")' in api_landing.read_text(encoding="utf-8")
+    reference_landing = docs / "reference" / "index.md"
+    assert reference_landing.is_file()
+    assert not (docs / "reference" / "api.md").exists()
+    reference_text = reference_landing.read_text(encoding="utf-8")
+    assert "## Versioned API" in reference_text
+    assert 'new URL("api/", window.location.href)' in reference_text
+    assert 'new URL("versions.json", apiRoot)' in reference_text
+    assert 'href="api/main/"' in reference_text
+    assert "API reference: reference/api.md" not in config_text
+    assert "  - Reference: reference/index.md" in config_text
+    assert "  - assets/stylesheets/ambhora.css" in config_text
+    assert "copyright: Copyright &copy; example_docs developers &middot; Apache-2.0" in config_text
+    assert "generator: false" in config_text
+    brand_css = docs / "assets" / "stylesheets" / "ambhora.css"
+    assert brand_css.is_file()
+    brand_text = brand_css.read_text(encoding="utf-8")
+    assert "#3B97C4" in brand_text
+    assert "#97C43B" in brand_text
+    assert "#C43B97" in brand_text
+    assert ".md-header {" in brand_text
+    assert "background: var(--ambhora-blue)" in brand_text
+    assert "border-bottom: 0.2rem solid var(--ambhora-green)" in brand_text
 
     # Sphinx/Breathe/Exhale/Doxygen is a separate API-only source tree. Exhale owns the generated
     # entity pages; the project does not maintain a hand-selected doxygenindex list.
@@ -729,11 +748,13 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert (api_docs / "_static" / "css" / "besa-api.css").is_file()
     project_links = api_docs / "_templates" / "project-links.html"
     version_script = api_docs / "_static" / "js" / "besa-api-version.js"
+    presentation_script = api_docs / "_static" / "js" / "besa-api-presentation.js"
     assert project_links.is_file()
     assert not (api_docs / "_templates" / "versioning.html").exists()
     assert version_script.is_file()
+    assert presentation_script.is_file()
     project_links_text = project_links.read_text(encoding="utf-8")
-    assert "Main documentation" in project_links_text
+    assert "← Project documentation" in project_links_text
     assert "API version" in project_links_text
     assert "data-besa-api-root" in project_links_text
     assert "data-besa-api-page" in project_links_text
@@ -743,6 +764,12 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert "return root.href" in version_script_text
     assert 'document.readyState === "loading"' in version_script_text
     assert 'document.addEventListener("DOMContentLoaded", initializeAll' in version_script_text
+    presentation_script_text = presentation_script.read_text(encoding="utf-8")
+    assert '"inline"' in presentation_script_text
+    assert '"constexpr"' in presentation_script_text
+    assert "noexcept" in presentation_script_text
+    assert 'className = "besa-api-qualifiers"' in presentation_script_text
+    assert 'document.addEventListener("DOMContentLoaded", initialize' in presentation_script_text
     assert not (docs / "conf.py").exists()
 
     conf_text = (api_docs / "conf.py").read_text(encoding="utf-8")
@@ -750,7 +777,8 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert '"exhale"' in conf_text
     assert '"sphinx_multiversion"' in conf_text
     assert 'html_theme = "pydata_sphinx_theme"' in conf_text
-    assert 'html_js_files = ["js/besa-api-version.js"]' in conf_text
+    assert 'html_js_files = ["js/besa-api-version.js", "js/besa-api-presentation.js"]' in conf_text
+    assert '"kindsWithContentsDirectives": ["namespace", "file"]' in conf_text
     assert '"primary_sidebar_end"' not in conf_text
     assert '"containmentFolder": "./generated"' in conf_text
     assert '"rootFileName": "library_root.rst"' in conf_text
@@ -775,6 +803,10 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert ".besa-api-version-select" in css
     assert ".breathe-sectiondef-title" in css
     assert ".api-kind" in css
+    assert ".besa-api-qualifiers" in css
+    assert ".besa-api-qualifier" in css
+    assert "font-size: 0.84rem" in css
+    assert "font-size: 0.68rem" in css
     assert "font-style: normal" in css
 
     project_links = (api_docs / "_templates" / "project-links.html").read_text(
@@ -797,7 +829,7 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert module.breathe_default_project == "example_docs"
     assert module.html_context["besa_properdocs_root_depth"] == 3
 
-    events: dict[str, tuple[object, int]] = {}
+    events: dict[str, list[tuple[object, int]]] = {}
 
     class FakeApp:
         def __init__(self, srcdir: Path) -> None:
@@ -811,16 +843,14 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
             )
 
         def connect(self, event: str, callback: object, priority: int = 500) -> None:
-            events[event] = (callback, priority)
+            events.setdefault(event, []).append((callback, priority))
 
     current_app = FakeApp(api_docs)
     module.setup(current_app)
-    callback, priority = events["builder-inited"]
-    assert callback is module._prepare_api
-    assert priority < 500
-    landing_callback, landing_priority = events["env-before-read-docs"]
-    assert landing_callback is module._prepare_api_landing
-    assert landing_priority == 500
+    builder_callbacks = events["builder-inited"]
+    assert (module._prepare_api, 100) in builder_callbacks
+    assert (module._prepare_api_landing, 900) in builder_callbacks
+    assert "env-before-read-docs" not in events
 
     fake_doxygen = tmp_path / "fake-doxygen"
     fake_doxygen.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
@@ -872,6 +902,34 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
 """,
         encoding="utf-8",
     )
+    (xml_dir / "namespaceexample__docs_1_1meta.xml").write_text(
+        """\
+<doxygen>
+  <compounddef id="namespaceexample__docs_1_1meta" kind="namespace">
+    <sectiondef kind="func">
+      <memberdef kind="function" id="function1">
+        <type>std::string_view</type>
+        <name>to_string</name>
+        <qualifiedname>example_docs::meta::to_string</qualifiedname>
+        <param><type>semantic_version</type><declname>value</declname></param>
+      </memberdef>
+      <memberdef kind="function" id="function2">
+        <type>std::string_view</type>
+        <name>to_string</name>
+        <qualifiedname>example_docs::meta::to_string</qualifiedname>
+        <param><type>release_type</type><declname>value</declname></param>
+      </memberdef>
+      <memberdef kind="function" id="function3">
+        <type>semantic_version</type>
+        <name>version</name>
+        <qualifiedname>example_docs::meta::version</qualifiedname>
+      </memberdef>
+    </sectiondef>
+  </compounddef>
+</doxygen>
+""",
+        encoding="utf-8",
+    )
     generated_api = api_docs / "generated"
     generated_api.mkdir(parents=True, exist_ok=True)
     (generated_api / "library_root.rst").write_text("old noisy root\n", encoding="utf-8")
@@ -879,7 +937,25 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
         ".. doxygennamespace:: example_docs\n", encoding="utf-8"
     )
     (generated_api / "namespaceexample__docs_1_1meta.rst").write_text(
-        ".. doxygennamespace:: example_docs::meta\n", encoding="utf-8"
+        """\
+.. doxygennamespace:: example_docs::meta
+
+Classes
+-------
+
+- :ref:`Struct semantic_version <exhale_struct_struct1>`
+
+Enums
+-----
+
+- :ref:`Enum release_type <exhale_enum_enum1>`
+
+Functions
+---------
+
+- :ref:`Function example_docs::meta::version <exhale_function_function1>`
+""",
+        encoding="utf-8",
     )
     (generated_api / "file_view_hierarchy.rst.include").write_text(
         "* Directory example_docs\n", encoding="utf-8"
@@ -892,19 +968,70 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
    namespaceexample__docs.rst
    namespaceexample__docs_1_1meta.rst
    struct1.rst
+   enum1.rst
+   function1.rst
 """,
         encoding="utf-8",
     )
-    module._prepare_api_landing(current_app, None, [])
+    (generated_api / "struct1.rst").write_text(
+        """\
+.. _exhale_struct_struct1:
+
+Struct example_docs::meta::semantic_version
+===========================================
+
+Struct Documentation
+--------------------
+
+.. doxygenstruct:: example_docs::meta::semantic_version
+""",
+        encoding="utf-8",
+    )
+    (generated_api / "enum1.rst").write_text(
+        """\
+.. _exhale_enum_enum1:
+
+Enum example_docs::meta::release_type
+=====================================
+
+Enum Documentation
+------------------
+
+.. doxygenenum:: example_docs::meta::release_type
+""",
+        encoding="utf-8",
+    )
+    (generated_api / "function1.rst").write_text(
+        """\
+.. _exhale_function_function1:
+
+Function example_docs::meta::version
+====================================
+
+Function Documentation
+----------------------
+
+.. doxygenfunction:: example_docs::meta::version
+""",
+        encoding="utf-8",
+    )
+    module._prepare_api_landing(current_app)
     overview_text = (generated_api / "api_namespace_overview.rst.include").read_text(
         encoding="utf-8"
     )
-    assert ":api-kind:`N` :doc:`example_docs <namespaceexample__docs>`" in overview_text
-    assert ":api-kind:`N` :doc:`meta <namespaceexample__docs_1_1meta>`" in overview_text
-    assert "* :api-kind:`N` :doc:`example_docs <namespaceexample__docs>`\n\n  * :api-kind:`N`" in overview_text
-    assert "  * :api-kind:`N` :doc:`meta <namespaceexample__docs_1_1meta>`\n\n    * :api-kind:`E`" in overview_text
+    assert ":api-kind:`N` :doc:`example_docs </generated/namespaceexample__docs>`" in overview_text
+    assert ":api-kind:`N` :doc:`meta </generated/namespaceexample__docs_1_1meta>`" in overview_text
+    assert "* :api-kind:`N` :doc:`example_docs </generated/namespaceexample__docs>`\n\n  * :api-kind:`N`" in overview_text
+    assert "  * :api-kind:`N` :doc:`meta </generated/namespaceexample__docs_1_1meta>`\n\n    * :api-kind:`E`" in overview_text
     assert overview_text.count("to_string()") == 1
-    assert ":api-kind:`F` :doc:`to_string() <namespaceexample__docs_1_1meta>`" in overview_text
+    assert ":api-kind:`F` :doc:`to_string() </generated/api_overload_example_docs_meta_to_string>`" in overview_text
+    overload_text = (generated_api / "api_overload_example_docs_meta_to_string.rst").read_text(
+        encoding="utf-8"
+    )
+    assert overload_text.startswith("to_string\n=========\n")
+    assert "Function example_docs::meta::to_string" not in overload_text
+    assert ":cpp:func:`to_string(semantic_version) <std::string_view example_docs::meta::to_string(semantic_version)>`" in overload_text
+    assert ":cpp:func:`to_string(release_type) <std::string_view example_docs::meta::to_string(release_type)>`" in overload_text
     assert ":api-kind:`F` :cpp:func:`version() <example_docs::meta::version>`" in overview_text
     assert ":api-kind:`S` :cpp:struct:`semantic_version <example_docs::meta::semantic_version>`" in overview_text
     assert ":api-kind:`E` :cpp:enum:`release_type <example_docs::meta::release_type>`" in overview_text
@@ -912,9 +1039,31 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert "Namespace hierarchy" in root_text
     assert "Class Hierarchy" not in root_text
     assert "Full API" not in root_text
-    assert root_text.index("Namespace hierarchy") < root_text.index("File hierarchy")
+    assert "File hierarchy\n--------------" not in root_text
+    assert root_text.count("file_view_hierarchy.rst.include") == 1
     assert "   :hidden:" in root_text
     assert "   namespaceexample__docs.rst" in root_text
+    struct_page = (generated_api / "struct1.rst").read_text(encoding="utf-8")
+    enum_page = (generated_api / "enum1.rst").read_text(encoding="utf-8")
+    function_page = (generated_api / "function1.rst").read_text(encoding="utf-8")
+    assert struct_page.startswith(".. _exhale_struct_struct1:\n\nsemantic_version\n================")
+    assert enum_page.startswith(".. _exhale_enum_enum1:\n\nrelease_type\n============")
+    assert function_page.startswith(".. _exhale_function_function1:\n\nversion\n=======")
+    assert "Documentation\n" not in struct_page
+    assert "Documentation\n" not in enum_page
+    assert "Documentation\n" not in function_page
+    assert ".. doxygenstruct:: example_docs::meta::semantic_version" in struct_page
+    assert ".. doxygenenum:: example_docs::meta::release_type" in enum_page
+    assert ".. doxygenfunction:: example_docs::meta::version" in function_page
+    namespace_page = (generated_api / "namespaceexample__docs_1_1meta.rst").read_text(
+        encoding="utf-8"
+    )
+    assert ":ref:`semantic_version <exhale_struct_struct1>`" in namespace_page
+    assert ":ref:`release_type <exhale_enum_enum1>`" in namespace_page
+    assert ":ref:`version <exhale_function_function1>`" in namespace_page
+    assert "Struct semantic_version" not in namespace_page
+    assert "Enum release_type" not in namespace_page
+    assert "Function example_docs::meta::version" not in namespace_page
 
     # Reproduce sphinx-multiversion's important shape: conf.py remains in the current checkout while
     # app.srcdir points at a different checkout. The generated Doxyfile must use only that checkout.
@@ -1178,15 +1327,15 @@ def test_multiversion_api_metadata_is_generated(tmp_path: Path) -> None:
 
 
 @pytest.mark.cpp
-def test_user_docs_assembly_keeps_properdocs_root_and_api_landing(tmp_path: Path) -> None:
+def test_user_docs_assembly_mounts_versioned_api_below_reference(tmp_path: Path) -> None:
     properdocs = tmp_path / "properdocs"
     api = tmp_path / "api"
     output = tmp_path / "site"
 
-    (properdocs / "reference" / "api").mkdir(parents=True)
+    (properdocs / "reference").mkdir(parents=True)
     (properdocs / "index.html").write_text("properdocs-home", encoding="utf-8")
-    (properdocs / "reference" / "api" / "index.html").write_text(
-        "properdocs-api-landing", encoding="utf-8"
+    (properdocs / "reference" / "index.html").write_text(
+        "properdocs-reference-with-versioned-api", encoding="utf-8"
     )
     (api / "main").mkdir(parents=True)
     (api / "main" / "index.html").write_text("api-main", encoding="utf-8")
@@ -1215,9 +1364,10 @@ def test_user_docs_assembly_keeps_properdocs_root_and_api_landing(tmp_path: Path
     )
 
     assert (output / "index.html").read_text(encoding="utf-8") == "properdocs-home"
-    assert (
-        output / "reference" / "api" / "index.html"
-    ).read_text(encoding="utf-8") == "properdocs-api-landing"
+    assert (output / "reference" / "index.html").read_text(
+        encoding="utf-8"
+    ) == "properdocs-reference-with-versioned-api"
+    assert not (output / "reference" / "api" / "index.html").exists()
     assert (output / "reference" / "api" / "main" / "index.html").is_file()
     assert (output / "reference" / "api" / "versions.json").is_file()
     assert (output / ".nojekyll").is_file()
@@ -1291,8 +1441,9 @@ def test_generated_properdocs_serve_hook_rebuilds_current_api_without_env_config
     assert "watch:" in config_text
     assert "  - src" in config_text
     assert "  - api-docs" in config_text
+    assert "  - .git/refs" in config_text
     assert "hooks:" in config_text
-    assert "  - properdocs_hook.py" in config_text
+    assert "  - properdocs_multiversion_hook.py" in config_text
 
     spec = importlib.util.spec_from_file_location("example_serve_docs_hook", hook_path)
     assert spec is not None and spec.loader is not None
@@ -1430,12 +1581,12 @@ def test_generated_properdocs_multiversion_serve_hook_overlays_live_main(
     site = tmp_path / "site"
     api_root = site / "reference" / "api"
     api_root.mkdir(parents=True)
-    (api_root / "index.html").write_text("properdocs-api-landing", encoding="utf-8")
+    (api_root / "index.html").write_text("stale-api-landing", encoding="utf-8")
     (api_root / "stale-version").mkdir()
 
     module._publish_multiversion_api(site)
 
-    assert (api_root / "index.html").read_text(encoding="utf-8") == "properdocs-api-landing"
+    assert not (api_root / "index.html").exists()
     assert (api_root / "main" / "index.html").read_text(encoding="utf-8") == "working-tree-main"
     assert (api_root / "1.0.0" / "index.html").read_text(encoding="utf-8") == "one"
     assert not (api_root / "stale-version").exists()

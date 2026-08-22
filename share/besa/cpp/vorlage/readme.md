@@ -48,18 +48,17 @@ The deployable artifact is:
 build/doc/site/
 ├── index.html
 ├── reference/
+│   ├── index.html
 │   └── api/
-│       ├── index.html
 │       ├── versions.json
 │       ├── main/
 │       └── <tag-or-branch>/
 └── .nojekyll
 ```
 
-ProperDocs always owns `index.html` at the site root and the API landing page at
-`reference/api/index.html`. The versioned Sphinx/Breathe trees are mounted below that landing page.
-Every generated API page contains persistent links back to the main ProperDocs site and the API
-version landing page.
+ProperDocs owns the site root and the Reference page. Its **Versioned API** section is the canonical
+entry point into the Sphinx/Breathe trees mounted below `reference/api/`. Every generated API page
+contains a persistent link back to the ProperDocs site and an API-version selector.
 
 For API-only debugging, build the current checkout or all Git refs directly:
 
@@ -79,21 +78,14 @@ development is just:
 properdocs serve
 ```
 
-ProperDocs watches the prose tree normally and also watches `src/` and `api-docs/`. On startup and
-when those API inputs change, `properdocs_hook.py` rebuilds the current Doxygen/Breathe/Sphinx API in
-`build/properdocs` and mounts it at `reference/api/main/` in the served site. Prose-only edits do not
-rerun Doxygen. A normal `properdocs build` does not run the live API hook.
+The default development server previews all selected branches and tags while retaining live
+working-tree API documentation under `main/`. ProperDocs watches `src/`, `api-docs/`, and Git refs.
+Historical versions are regenerated only when the refs change; ordinary source edits regenerate only
+the working-tree `main/` API. Prose-only edits do not rerun Doxygen. A normal `properdocs build` does
+not run the live API hook. `properdocs.multiversion.yml` remains only as a compatibility alias for
+older commands that selected the multiversion configuration explicitly.
 
-To preview all selected branches and tags while retaining live working-tree API documentation under
-`main/`, run:
-
-```bash
-properdocs serve --config-file properdocs.multiversion.yml
-```
-
-This mode watches Git refs in addition to the API inputs. Historical versions are regenerated only
-when the refs change; ordinary source edits regenerate only the working-tree `main/` API. The
-complete `user.docs` CMake build remains the canonical multiversion publication build.
+The complete `user.docs` CMake build remains the canonical multiversion publication build.
 
 ## Installing documentation
 

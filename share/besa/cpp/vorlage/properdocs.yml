@@ -1,10 +1,22 @@
 site_name: vorlage
 site_description: Documentation for vorlage
+copyright: Copyright &copy; vorlage developers &middot; BESA_PROJECT_LICENSE
+
+extra:
+  # The project-specific copyright above replaces MaterialX's generator credit.
+  generator: false
 
 # ProperDocs owns the public documentation site's information architecture. The versioned C/C++ API
-# reference is assembled by BESA below Reference -> API reference after ProperDocs has built this site.
+# reference is mounted below reference/api/ after ProperDocs has built the main documentation site.
 theme:
   name: materialx
+  palette:
+    - scheme: default
+      primary: custom
+      accent: custom
+    - scheme: slate
+      primary: custom
+      accent: custom
   features:
     - content.code.copy
     - navigation.indexes
@@ -15,17 +27,21 @@ theme:
     - search.suggest
     - toc.follow
 
-# During `properdocs serve`, changes to C/C++ sources or API-renderer inputs trigger the local hook.
-# The hook regenerates only the current API reference and mounts it below reference/api/main/.
+extra_css:
+  - assets/stylesheets/ambhora.css
+
+# `properdocs serve` previews the complete versioned API by default. Historical branch/tag API
+# sites come from sphinx-multiversion, while main/ is overlaid with the current working tree so
+# uncommitted edits remain visible. Source changes rebuild only main; Git-ref changes rebuild the
+# historical version set.
 watch:
   - src
   - api-docs
+  - .git/refs
 
 hooks:
-  - properdocs_hook.py
+  - properdocs_multiversion_hook.py
 
 nav:
   - Home: index.md
-  - Reference:
-      - Overview: reference/index.md
-      - API reference: reference/api.md
+  - Reference: reference/index.md
