@@ -81,9 +81,20 @@ properdocs serve
 The default development server previews all selected branches and tags while retaining live
 working-tree API documentation under `main/`. ProperDocs watches `src/`, `api-docs/`, and Git refs.
 Historical versions are regenerated only when the refs change; ordinary source edits regenerate only
-the working-tree `main/` API. Prose-only edits do not rerun Doxygen. A normal `properdocs build` does
-not run the live API hook. `properdocs.multiversion.yml` remains only as a compatibility alias for
-older commands that selected the multiversion configuration explicitly.
+the working-tree `main/` API. Prose-only edits do not rerun Doxygen.
+
+All live documentation working state is kept outside the checkout below `../build/properdocs/`:
+
+```text
+../build/properdocs/
+├── cmake/       # CMake, Doxygen, Sphinx, Exhale, and multiversion working state
+└── site/        # ProperDocs live site
+```
+
+In particular, Exhale works from a staged copy of `api-docs/` below the CMake build tree rather than
+writing `api-docs/generated/` into the repository. A normal `properdocs build` does not run the live
+API hook. `properdocs.multiversion.yml` remains only as a compatibility alias for older commands that
+selected the multiversion configuration explicitly.
 
 The complete `user.docs` CMake build remains the canonical multiversion publication build.
 

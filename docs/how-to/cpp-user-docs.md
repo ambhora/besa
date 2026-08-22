@@ -190,6 +190,8 @@ properdocs serve
 ```
 
 The generated ProperDocs hook is active only for `serve`. It watches `src/` and `api-docs/`, builds
-`user.docs.api` in `build/properdocs` when those inputs change, and mounts the current API beneath
-`reference/api/main/`. A normal `properdocs build` remains a plain ProperDocs build; the CMake
-`user.docs` target continues to own the full multiversion publication assembly.
+the documentation CMake tree in `../build/properdocs/cmake`, and mounts the current API beneath
+`reference/api/main/`. ProperDocs writes its live site to `../build/properdocs/site`. Sphinx works
+from a staged copy of `api-docs/` below that external CMake tree, so Exhale does not create
+`api-docs/generated/` in the checkout. A normal `properdocs build` remains a plain ProperDocs build;
+the CMake `user.docs` target continues to own the full multiversion publication assembly.

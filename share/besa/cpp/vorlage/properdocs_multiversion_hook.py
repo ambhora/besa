@@ -17,7 +17,8 @@ from pathlib import Path
 from typing import Iterable
 
 PROJECT_ROOT = Path(__file__).resolve().parent
-BUILD_DIRECTORY = PROJECT_ROOT / "build" / "properdocs-multiversion"
+PROPERDOCS_WORK_DIRECTORY = PROJECT_ROOT.parent / "build" / "properdocs"
+BUILD_DIRECTORY = PROPERDOCS_WORK_DIRECTORY / "cmake"
 CURRENT_API_BUILD_DIRECTORY = BUILD_DIRECTORY / "doc" / "api" / "current"
 MULTIVERSION_API_BUILD_DIRECTORY = BUILD_DIRECTORY / "doc" / "api" / "multiversion"
 API_PUBLIC_PATH = Path("reference") / "api"

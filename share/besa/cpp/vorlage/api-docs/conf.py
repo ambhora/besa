@@ -32,6 +32,20 @@ project = "vorlage"
 author = ""
 
 
+def _api_project_root(api_docs_directory: Path) -> Path:
+    """Return the source checkout represented by one Sphinx source tree.
+
+    Ordinary current-checkout builds stage ``api-docs/`` in the CMake build tree so Exhale can
+    generate RST there without touching the source checkout.  sphinx-multiversion instead supplies
+    checkout-specific source trees itself, so no override is set for those builds.
+    """
+
+    override = os.environ.get("BESA_API_PROJECT_SOURCE_DIRECTORY")
+    if override:
+        return Path(override).resolve()
+    return api_docs_directory.parent.resolve()
+
+
 def _cmake_project_version(project_root: Path) -> str:
     """Read ``project(... VERSION ...)`` from one concrete Git checkout."""
 
@@ -46,7 +60,7 @@ def _cmake_project_version(project_root: Path) -> str:
 
 # These import-time values make direct ``sphinx-build`` configuration introspection useful. They are
 # replaced from ``app.srcdir`` before an actual builder starts, which is essential for multiversion.
-version = release = _cmake_project_version(CONFIG_DIRECTORY.parent)
+version = release = _cmake_project_version(_api_project_root(CONFIG_DIRECTORY))
 
 extensions = [
     "breathe",
@@ -86,8 +100,9 @@ smv_tag_whitelist = r"^.*$"
 smv_outputdir_format = r"{ref.name}"
 
 # Exhale automatically emits the complete API model represented by Doxygen XML. No class/function
-# selection list is maintained by the project. Generated RST lives below api-docs/generated and is
-# ignored by Git; individual namespace/class/file pages remain separate for large APIs.
+# selection list is maintained by the project. Current-checkout builds stage this Sphinx source tree
+# under the external documentation build directory before Exhale runs, so ``./generated`` is working
+# state rather than source-tree output. Individual namespace/class/file pages remain separate.
 exhale_args = {
     "containmentFolder": "./generated",
     "rootFileName": "library_root.rst",
@@ -220,12 +235,13 @@ def _prepare_api(app) -> None:
     """
 
     api_docs_directory = Path(app.srcdir).resolve()
-    project_root = api_docs_directory.parent
+    project_root = _api_project_root(api_docs_directory)
     checkout_version = _cmake_project_version(project_root)
     doxygen_output = _doxygen_output_for(project_root)
 
-    # Exhale generates files into the active checkout's Sphinx source directory. Remove stale output
-    # first so deleted/renamed API entities cannot survive an incremental current-checkout build.
+    # Exhale generates files into the active Sphinx source directory. For current-checkout builds
+    # this is an external staged copy; for multiversion builds it is sphinx-multiversion's checkout.
+    # Remove stale output first so deleted/renamed API entities cannot survive an incremental build.
     shutil.rmtree(api_docs_directory / "generated", ignore_errors=True)
 
     doxygen_output.mkdir(parents=True, exist_ok=True)

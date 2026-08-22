@@ -37,6 +37,7 @@ def test_cpp_generate_vendors_cmake(tmp_path: Path) -> None:
     assert project == tmp_path / "main"
     assert (project / "CMakeLists.txt").is_file()
     assert (project / "cmake" / "besa" / "besaConfig.cmake").is_file()
+    assert (project / "cmake" / "besa" / "generated.cmake").is_file()
     assert (project / "cmake" / "besa" / ".besa-cmake-module").is_file()
     header = project / "src" / "cpp" / "include" / "example" / "example.hpp"
     assert header.is_file()

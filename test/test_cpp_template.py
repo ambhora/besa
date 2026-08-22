@@ -770,6 +770,7 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     multiversion_config_text = multiversion_config.read_text(encoding="utf-8")
     assert "INHERIT: properdocs.yml" in multiversion_config_text
     config_text = (project / "properdocs.yml").read_text(encoding="utf-8")
+    assert "site_dir: ../build/properdocs/site" in config_text
     assert "  - .git/refs" in config_text
     assert "  - properdocs_multiversion_hook.py" in config_text
     assert (project / "properdocs_multiversion_hook.py").is_file()
@@ -795,7 +796,10 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert "#C43B97" in brand_text
     assert ".md-header {" in brand_text
     assert "background: var(--ambhora-blue)" in brand_text
-    assert "border-bottom: 0.2rem solid var(--ambhora-green)" in brand_text
+    assert "border-bottom: 0.2rem solid var(--ambhora-green)" not in brand_text
+    assert "min-height: 2.1rem" in brand_text
+    assert "height: 1.8rem" in brand_text
+    assert "border-bottom: 0.12rem solid var(--ambhora-green)" in brand_text
 
     # Sphinx/Breathe/Exhale/Doxygen is a separate API-only source tree. Exhale owns the generated
     # entity pages; the project does not maintain a hand-selected doxygenindex list.
@@ -843,8 +847,14 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert 'smv_tag_whitelist = r"^.*$"' in conf_text
     assert 'smv_outputdir_format = r"{ref.name}"' in conf_text
     assert "BESA_PROPERDOCS_ROOT_DEPTH" in conf_text
+    assert "BESA_API_PROJECT_SOURCE_DIRECTORY" in conf_text
     assert "Path(app.srcdir).resolve()" in conf_text
     assert "doxygenindex" not in (api_docs / "index.rst").read_text(encoding="utf-8")
+
+    userdocs_cmake = (project / "cmake" / "besa" / "userdocs.cmake").read_text(encoding="utf-8")
+    assert 'set(_besa_current_sphinx_source "${PROJECT_BINARY_DIR}/doc/work/sphinx-current")' in userdocs_cmake
+    assert '"BESA_API_PROJECT_SOURCE_DIRECTORY=${PROJECT_SOURCE_DIR}"' in userdocs_cmake
+    assert '"${_besa_current_sphinx_source}" "${ARG_OUTPUT_DIRECTORY}"' in userdocs_cmake
 
     doxyfile_text = (api_docs / "Doxyfile").read_text(encoding="utf-8")
     assert "EXTRACT_ALL            = YES" in doxyfile_text
@@ -885,6 +895,11 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert module.release == "0.1.0"
     assert module.breathe_default_project == "example_docs"
     assert module.html_context["besa_properdocs_root_depth"] == 3
+
+    staged_api = tmp_path / "external-work" / "api-docs"
+    monkeypatch.setenv("BESA_API_PROJECT_SOURCE_DIRECTORY", str(project))
+    assert module._api_project_root(staged_api) == project.resolve()
+    monkeypatch.delenv("BESA_API_PROJECT_SOURCE_DIRECTORY")
 
     events: dict[str, list[tuple[object, int]]] = {}
 
@@ -1526,6 +1541,9 @@ def test_generated_properdocs_serve_hook_rebuilds_current_api_without_env_config
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
 
+    assert module.PROPERDOCS_WORK_DIRECTORY == project.parent / "build" / "properdocs"
+    assert module.BUILD_DIRECTORY == project.parent / "build" / "properdocs" / "cmake"
+
     commands: list[list[str]] = []
 
     def fake_run(command, **kwargs):
@@ -1580,6 +1598,9 @@ def test_generated_properdocs_hook_fingerprints_api_inputs(tmp_path: Path, monke
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
 
+    assert module.PROPERDOCS_WORK_DIRECTORY == project.parent / "build" / "properdocs"
+    assert module.BUILD_DIRECTORY == project.parent / "build" / "properdocs" / "cmake"
+
     fake_api = tmp_path / "current-api"
     fake_api.mkdir()
     module.API_BUILD_DIRECTORY = fake_api
@@ -1615,6 +1636,9 @@ def test_generated_properdocs_multiversion_serve_hook_overlays_live_main(
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+
+    assert module.PROPERDOCS_WORK_DIRECTORY == project.parent / "build" / "properdocs"
+    assert module.BUILD_DIRECTORY == project.parent / "build" / "properdocs" / "cmake"
 
     commands: list[list[str]] = []
 
@@ -1771,7 +1795,8 @@ def test_generated_cpp_project_ignores_spack_work_state_and_python_caches(tmp_pa
     assert ".spack-env/" in gitignore
     assert "__pycache__/" in gitignore
     assert "*.py[cod]" in gitignore
-    assert "/api-docs/generated/" in gitignore
+    assert "/api-docs/generated/" not in gitignore
+    assert "/site/" not in gitignore
     ignored_entries = {line.strip() for line in gitignore.splitlines() if line.strip() and not line.startswith("#")}
     assert "spack.yaml" not in ignored_entries
     assert "spack.lock" not in ignored_entries

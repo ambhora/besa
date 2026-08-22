@@ -35,8 +35,34 @@
  * its separate blue/teal technical palette so crossing between the two surfaces is obvious. */
 .md-header {
   background: var(--ambhora-blue);
-  border-bottom: 0.2rem solid var(--ambhora-green);
   color: #fff;
+}
+
+/* Keep the branded chrome compact.  The active-tab underline is the only green separator; a
+ * full-width rule makes the two-row header read like a banner instead of lightweight navigation. */
+.md-header,
+.md-header__inner {
+  min-height: 2.1rem;
+  height: 2.1rem;
+}
+
+.md-header__inner {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.md-header__button {
+  margin: 0.15rem;
+  padding: 0.3rem;
+}
+
+.md-header__title {
+  margin-left: 0.3rem;
+}
+
+.md-header .md-search__form,
+.md-header .md-search__input {
+  height: 1.65rem;
 }
 
 .md-header__title,
@@ -53,6 +79,16 @@
 .md-tabs {
   background: var(--ambhora-blue);
   color: #fff;
+  height: 1.8rem;
+}
+
+.md-tabs__list,
+.md-tabs__item {
+  height: 1.8rem;
+}
+
+.md-tabs__link {
+  margin-top: 0.5rem;
 }
 
 .md-tabs__link {
@@ -65,7 +101,7 @@
 }
 
 .md-tabs__item--active {
-  border-bottom: 0.18rem solid var(--ambhora-green);
+  border-bottom: 0.12rem solid var(--ambhora-green);
 }
 
 .md-footer-meta {
