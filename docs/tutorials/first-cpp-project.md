@@ -8,12 +8,13 @@ compilers.
 Install BESA in your Python environment and run:
 
 ```console
-besa cpp generate --path ~/software --name example
-cd ~/software/example
+besa cpp generate --path ~/software/example --name example
+cd ~/software/example/main
 ```
 
-The generator copies the C++ template, changes only the project-name token, and installs the current
-BESA CMake module under `cmake/besa`.
+The generator creates the default `main` checkout directory, copies the C++ template, substitutes the
+project name, and installs the current BESA CMake module under `cmake/besa`. Use `--directory` when a
+different checkout-directory name is desired.
 
 ## Build with GCC
 

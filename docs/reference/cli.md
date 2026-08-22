@@ -3,16 +3,30 @@
 ## `besa cpp generate`
 
 ```text
-besa cpp generate --path PATH --name NAME [--license SPDX-ID]
+besa cpp generate --path PATH --name NAME [--directory DIRECTORY] [--license SPDX-ID]
 ```
 
-Creates `PATH/NAME` from `share/besa/cpp/vorlage`, substitutes the project name, and installs the
-current BESA CMake module into `PATH/NAME/cmake/besa`.
+Creates `PATH/DIRECTORY` from `share/besa/cpp/vorlage`, substitutes `NAME` as the project name, and
+installs the current BESA CMake module into `PATH/DIRECTORY/cmake/besa`.
 
-When `--license` is omitted in an interactive terminal, BESA asks for the SPDX license identifier and
-defaults to `Apache-2.0` when the prompt is left empty. In a non-interactive invocation, the omitted
-option defaults directly to `Apache-2.0`. BESA accepts the supplied identifier verbatim rather than
-maintaining its own SPDX identifier list.
+`--directory` controls only the directory created below `--path`; it is independent of the project
+name and defaults to `main`. For example:
+
+```console
+besa cpp generate --path ~/software/dice --name dice
+```
+
+creates `~/software/dice/main`, while:
+
+```console
+besa cpp generate --path ~/software/dice --name dice --directory code
+```
+
+creates `~/software/dice/code`. `DIRECTORY` must be a single relative path component.
+
+`--license` supplies the SPDX license identifier written into generated project files. It defaults to
+`Apache-2.0`. License selection is entirely command-line driven; BESA never prompts on stdin. BESA
+accepts the supplied identifier verbatim rather than maintaining its own SPDX identifier list.
 
 `NAME` currently matches `[a-z][a-z0-9_]*`.
 

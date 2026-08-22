@@ -4,8 +4,8 @@ BESA is project-development tooling for declarative, self-contained build descri
 focus is C++/CMake plus a minimal Python project generator.
 
 ```console
-uv run besa cpp generate --path /tmp --name example
-cd /tmp/example
+uv run besa cpp generate --path /tmp/example --name example
+cd /tmp/example/main
 cmake --workflow --preset gcc --fresh
 ```
 

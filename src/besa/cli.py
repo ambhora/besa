@@ -25,6 +25,7 @@ _PROJECT_NAME = re.compile(r"^[a-z][a-z0-9_]*$")
 _DEFAULT_CPP_MODULE_PATH = Path("cmake/besa")
 _MANAGED_MARKER = ".besa-cmake-module"
 _DEFAULT_SPDX_LICENSE = "Apache-2.0"
+_DEFAULT_CPP_DIRECTORY = "main"
 
 
 def share_directory() -> Path:
@@ -147,19 +148,34 @@ def cpp_update(project: Path | str, module_path: Path | str = _DEFAULT_CPP_MODUL
     return destination
 
 
+def _validate_directory_name(directory: str) -> None:
+    path = Path(directory)
+    if (
+        not directory
+        or path.is_absolute()
+        or len(path.parts) != 1
+        or path.parts[0] in {".", ".."}
+    ):
+        raise ValueError("Directory name must be a single relative path component")
+
+
 def cpp_generate(
-    path: Path | str, name: str, license_identifier: str = _DEFAULT_SPDX_LICENSE
+    path: Path | str,
+    name: str,
+    license_identifier: str = _DEFAULT_SPDX_LICENSE,
+    directory: str = _DEFAULT_CPP_DIRECTORY,
 ) -> Path:
-    """Create a self-contained C++ project under ``path/name``."""
+    """Create a self-contained C++ project under ``path/directory``."""
 
     license_identifier = license_identifier.strip()
     if not license_identifier:
         raise ValueError("SPDX license identifier must not be empty")
 
     _validate_project_name(name)
+    _validate_directory_name(directory)
     parent = Path(path).expanduser().resolve()
     parent.mkdir(parents=True, exist_ok=True)
-    destination = parent / name
+    destination = parent / directory
     if destination.exists():
         raise FileExistsError(f"Destination already exists: {destination}")
 
@@ -209,26 +225,6 @@ def python_generate() -> Path:
     return destination
 
 
-def _cpp_generate_license_identifier(value: str | None) -> str:
-    """Resolve the SPDX identifier for a CLI C++ generation request."""
-
-    if value is not None:
-        value = value.strip()
-        if not value:
-            raise ValueError("--license must not be empty")
-        return value
-
-    if sys.stdin.isatty():
-        try:
-            value = input(f"SPDX license identifier [{_DEFAULT_SPDX_LICENSE}]: ").strip()
-        except EOFError:
-            value = ""
-        if value:
-            return value
-
-    return _DEFAULT_SPDX_LICENSE
-
-
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="besa", description="BESA project development tooling")
     commands = parser.add_subparsers(dest="command")
@@ -239,11 +235,19 @@ def _build_parser() -> argparse.ArgumentParser:
     cpp_generate_parser = cpp_commands.add_parser(
         "generate", help="Generate a self-contained C++ project"
     )
-    cpp_generate_parser.add_argument("--path", required=True, help="Parent directory for the project")
+    cpp_generate_parser.add_argument(
+        "--path", required=True, help="Directory under which the generated checkout is created"
+    )
     cpp_generate_parser.add_argument("--name", required=True, help="Project name")
+    cpp_generate_parser.add_argument(
+        "--directory",
+        default=_DEFAULT_CPP_DIRECTORY,
+        help=f"Directory created below --path (default: {_DEFAULT_CPP_DIRECTORY})",
+    )
     cpp_generate_parser.add_argument(
         "--license",
         dest="license_identifier",
+        default=_DEFAULT_SPDX_LICENSE,
         help=f"SPDX license identifier for generated project files (default: {_DEFAULT_SPDX_LICENSE})",
     )
 
@@ -288,8 +292,12 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         if args.command == "cpp" and args.cpp_command == "generate":
-            license_identifier = _cpp_generate_license_identifier(args.license_identifier)
-            destination = cpp_generate(args.path, args.name, license_identifier)
+            destination = cpp_generate(
+                args.path,
+                args.name,
+                license_identifier=args.license_identifier,
+                directory=args.directory,
+            )
             print(f"Created C++ project '{args.name}' at {destination}")
             return 0
 

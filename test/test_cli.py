@@ -30,6 +30,7 @@ def test_share_directory_prefers_source_tree_over_installed_data(
 
 def test_cpp_generate_vendors_cmake(tmp_path: Path) -> None:
     project = cpp_generate(tmp_path, "example")
+    assert project == tmp_path / "main"
     assert (project / "CMakeLists.txt").is_file()
     assert (project / "cmake" / "besa" / "besaConfig.cmake").is_file()
     assert (project / "cmake" / "besa" / ".besa-cmake-module").is_file()
@@ -44,17 +45,7 @@ def test_cpp_generate_accepts_explicit_spdx_license(tmp_path: Path) -> None:
     assert "SPDX-License-Identifier: Apache-2.0" not in text
 
 
-def test_cpp_generate_cli_prompts_for_spdx_license_when_interactive(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    class InteractiveInput:
-        @staticmethod
-        def isatty() -> bool:
-            return True
-
-    monkeypatch.setattr(cli.sys, "stdin", InteractiveInput())
-    monkeypatch.setattr("builtins.input", lambda prompt: "BSD-3-Clause")
-
+def test_cpp_generate_cli_accepts_license_option(tmp_path: Path) -> None:
     assert (
         main(
             [
@@ -64,23 +55,23 @@ def test_cpp_generate_cli_prompts_for_spdx_license_when_interactive(
                 str(tmp_path),
                 "--name",
                 "example_bsd",
+                "--license",
+                "BSD-3-Clause",
             ]
         )
         == 0
     )
-    header = tmp_path / "example_bsd" / "src" / "cpp" / "include" / "example_bsd" / "example_bsd.hpp"
+    header = tmp_path / "main" / "src" / "cpp" / "include" / "example_bsd" / "example_bsd.hpp"
     assert "SPDX-License-Identifier: BSD-3-Clause" in header.read_text(encoding="utf-8")
 
 
-def test_cpp_generate_cli_uses_apache_default_noninteractively(
+def test_cpp_generate_cli_defaults_to_main_and_apache_without_stdin(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    class NonInteractiveInput:
-        @staticmethod
-        def isatty() -> bool:
-            return False
+    def fail_input(prompt: str) -> str:
+        raise AssertionError(f"unexpected stdin prompt: {prompt}")
 
-    monkeypatch.setattr(cli.sys, "stdin", NonInteractiveInput())
+    monkeypatch.setattr("builtins.input", fail_input)
 
     assert (
         main(
@@ -97,7 +88,7 @@ def test_cpp_generate_cli_uses_apache_default_noninteractively(
     )
     header = (
         tmp_path
-        / "example_default_license"
+        / "main"
         / "src"
         / "cpp"
         / "include"
@@ -105,6 +96,39 @@ def test_cpp_generate_cli_uses_apache_default_noninteractively(
         / "example_default_license.hpp"
     )
     assert "SPDX-License-Identifier: Apache-2.0" in header.read_text(encoding="utf-8")
+
+
+def test_cpp_generate_cli_accepts_custom_directory(tmp_path: Path) -> None:
+    assert (
+        main(
+            [
+                "cpp",
+                "generate",
+                "--path",
+                str(tmp_path),
+                "--name",
+                "example_custom_directory",
+                "--directory",
+                "code",
+            ]
+        )
+        == 0
+    )
+    assert (tmp_path / "code" / "CMakeLists.txt").is_file()
+    assert (
+        tmp_path
+        / "code"
+        / "src"
+        / "cpp"
+        / "include"
+        / "example_custom_directory"
+        / "example_custom_directory.hpp"
+    ).is_file()
+
+
+def test_cpp_generate_rejects_nested_directory_name(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="single relative path component"):
+        cpp_generate(tmp_path, "example", directory="nested/main")
 
 
 def test_cpp_update_replaces_only_managed_directory(tmp_path: Path) -> None:

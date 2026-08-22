@@ -8,7 +8,7 @@ their BESA CMake module and build independently afterwards.
 The current command surface is deliberately small:
 
 ```console
-besa cpp generate --path <parent-directory> --name <project-name>
+besa cpp generate --path <project-root> --name <project-name> [--directory main] [--license Apache-2.0]
 besa cpp update --project <project-root> [--module-path cmake/besa]
 besa python generate
 ```
