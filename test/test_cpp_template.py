@@ -899,6 +899,8 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     )
     assert ":api-kind:`N` :doc:`example_docs <namespaceexample__docs>`" in overview_text
     assert ":api-kind:`N` :doc:`meta <namespaceexample__docs_1_1meta>`" in overview_text
+    assert "* :api-kind:`N` :doc:`example_docs <namespaceexample__docs>`\n\n  * :api-kind:`N`" in overview_text
+    assert "  * :api-kind:`N` :doc:`meta <namespaceexample__docs_1_1meta>`\n\n    * :api-kind:`E`" in overview_text
     assert overview_text.count("to_string()") == 1
     assert ":api-kind:`F` :doc:`to_string() <namespaceexample__docs_1_1meta>`" in overview_text
     assert ":cpp:func:" not in overview_text

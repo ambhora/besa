@@ -343,9 +343,14 @@ def _api_namespace_overview(index_xml: Path, generated: Path) -> str:
             return f":doc:`{short_name} <{target}>`"
         return f"``{short_name}``"
 
+    def emit_item(text: str, depth: int) -> None:
+        # reStructuredText requires a blank line before a nested bullet list.  Emitting every
+        # tree item as a small paragraph keeps arbitrary namespace depths valid and readable.
+        lines.append(f"{'  ' * depth}* {text}")
+        lines.append("")
+
     def emit_namespace(namespace: str, depth: int) -> None:
-        indent = "  " * depth
-        lines.append(f"{indent}* :api-kind:`N` {namespace_link(namespace)}")
+        emit_item(f":api-kind:`N` {namespace_link(namespace)}", depth)
         for child in sorted(children[namespace]):
             emit_namespace(child, depth + 1)
         for kind, short_name, qualified_name in sorted(
@@ -365,7 +370,7 @@ def _api_namespace_overview(index_xml: Path, generated: Path) -> str:
             else:
                 role = roles[kind]
                 link = f":{role}:`{display_name} <{qualified_name}>`"
-            lines.append(f"{'  ' * (depth + 1)}* :api-kind:`{marker}` {link}")
+            emit_item(f":api-kind:`{marker}` {link}", depth + 1)
 
     for namespace in sorted(roots):
         emit_namespace(namespace, 0)
