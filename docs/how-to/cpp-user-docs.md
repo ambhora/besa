@@ -30,16 +30,14 @@ properdocs.yml
 docs/                       # ProperDocs Markdown
 ├── index.md
 └── reference/
-    ├── index.md
-    └── api.md
+    └── index.md
 
 api-docs/                   # API renderer only
 ├── conf.py
 ├── Doxyfile
 ├── index.rst
-├── api.rst
 └── _templates/
-    └── versioning.html
+    └── project-links.html
 ```
 
 Because `properdocs.yml` is checked in at the project root, normal ProperDocs authoring works without
@@ -49,8 +47,8 @@ CMake:
 properdocs serve
 ```
 
-The API landing page contains a static `main` fallback for this mode. The complete CMake publication
-build loads the full version list from the generated `versions.json`.
+The Reference page contains the Versioned API entry point. During serving/building, BESA publishes
+the available API refs below `reference/api/` and records them in generated `versions.json`.
 
 ## Build the complete publication site
 
@@ -65,11 +63,13 @@ cmake --build build --target user.docs
 1. ProperDocs builds the main site.
 2. sphinx-multiversion builds the API reference for selected local branch heads and tags; each Sphinx
    build runs Doxygen at `builder-inited`, and Breathe consumes that checkout's Doxygen XML.
-3. BESA assembles the API tree below the ProperDocs API landing page.
+3. BESA assembles the API trees below the Versioned API section of the ProperDocs Reference page.
 
 Before Doxygen runs for each checkout, `api-docs/conf.py` constructs a temporary public-header tree.
-It copies the checkout's `src/cpp/include/` contents and generates that checkout's `version.hpp` by
-invoking its vendored `cmake/besa/version.cmake`. Doxygen sees only this staged tree. As a result, the
+It configures that checkout when necessary, then merges checked-in `src/*/include/` trees with every
+configured `generated/<generator>/include/` tree. The `meta` generator therefore contributes
+`version.hpp` automatically, and future generators are discovered by the same convention. Doxygen
+sees only this staged tree. As a result, the
 Sphinx/Exhale **Files** section starts directly at the public header namespace, for example:
 
 ```text

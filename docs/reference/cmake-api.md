@@ -135,6 +135,32 @@ tests are created only when at least one supported mode is enabled.
 ### `besa_surrogate_check(TARGET target [EXPECT PASS|FAIL] [LABELS ...])`
 Registers public-header self-containment checks.
 
+
+## Generated public includes
+
+### `besa_generated_include_add(NAME name [TARGET target] [OUTPUT_VARIABLE variable])`
+
+Registers one generator-owned public include tree. BESA assigns the conventional path:
+
+```text
+<binary>/generated/<name>/include
+```
+
+When `OUTPUT_VARIABLE` is supplied, it receives that absolute path so the generator can write its
+headers beneath the normal installed include namespace. Registered generated include roots are
+attached to the main `lib<project>` target during project finalization and installed below
+`include/`.
+
+`TARGET` optionally names a build target that materializes the generated headers. BESA adds such
+targets beneath the common `besa.generated` target and makes the main library depend on them. This
+allows documentation and normal builds to materialize build-time generated headers without knowing
+which generators exist.
+
+The generator name must be one path component. The built-in version/build-metadata generator uses
+`meta`, producing `<binary>/generated/meta/include/<project>/version.hpp`. Documentation and editor
+discovery consume the `generated/*/include` convention rather than knowing individual generator
+names.
+
 ## Documentation and QA
 
 ### `besa_add_doxygen(NAME name DOXYFILE file [OUTPUT_DIRECTORY directory])`

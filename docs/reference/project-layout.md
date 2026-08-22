@@ -11,8 +11,7 @@ project/
 │   ├── CMakeLists.txt
 │   ├── index.md
 │   └── reference/
-│       ├── index.md
-│       └── api.md
+│       └── index.md
 ├── api-docs/                   # Doxygen/Breathe/Sphinx API source
 │   ├── conf.py
 │   ├── Doxyfile
@@ -52,10 +51,11 @@ This separation lets `properdocs serve` remain a normal local authoring workflow
 can evolve independently. The build-tree Doxygen XML location is checkout-specific so simultaneous
 or historical API builds do not share extraction state.
 
-For each API build, `api-docs/conf.py` stages a synthetic public-header tree containing the checked-in
-headers from `src/cpp/include/` plus BESA's generated `<project>/version.hpp`. Doxygen receives only
-that tree and strips its staging root, so Exhale's file hierarchy mirrors the contents of an installed
-`include/` directory:
+For each API build, `api-docs/conf.py` stages a synthetic public-header tree containing checked-in
+headers from every `src/*/include/` root plus public headers from every configured
+`generated/<generator>/include/` root. The version metadata generator is named `meta`, but the docs
+pipeline does not special-case it. Doxygen receives only the merged tree and strips its staging root,
+so Exhale's file hierarchy mirrors the contents of an installed `include/` directory:
 
 ```text
 Files

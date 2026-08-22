@@ -299,6 +299,24 @@ def test_generated_ycm_uses_c17_baseline_for_c_headers_without_compile_entry(tmp
     assert "-std=c++26" not in flags
 
 
+def test_generated_ycm_fallback_discovers_all_generator_include_roots(tmp_path: Path) -> None:
+    project = cpp_generate(tmp_path, "example_ycm_generated", nvim_ycm=True)
+    header = project / "scratch" / "unmatched.hpp"
+    header.parent.mkdir(parents=True)
+    header.write_text("#ifndef UNMATCHED_HPP\n#define UNMATCHED_HPP\n#endif\n", encoding="utf-8")
+
+    meta = project / "build" / "debug" / "generated" / "meta" / "include"
+    schema = project / "build" / "debug" / "generated" / "schema" / "include"
+    meta.mkdir(parents=True)
+    schema.mkdir(parents=True)
+
+    settings = runpy.run_path(str(project / ".ycm_extra_conf.py"))["Settings"]
+    flags = settings(str(header))["flags"]
+
+    assert "-I" + str(meta) in flags
+    assert "-I" + str(schema) in flags
+
+
 def test_generated_ycm_adds_active_spack_view_include_as_isystem(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

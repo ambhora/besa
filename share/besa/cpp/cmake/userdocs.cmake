@@ -37,6 +37,9 @@ function(besa_add_doxygen)
     COMMENT "Generating Doxygen documentation"
     VERBATIM
   )
+  if(TARGET besa.generated)
+    add_dependencies("${ARG_NAME}" besa.generated)
+  endif()
 endfunction()
 
 # Register single-checkout and multiversion Sphinx API-reference targets backed by Doxygen XML,
@@ -164,6 +167,9 @@ function(besa_add_sphinx_breathe_docs)
       "${CMAKE_COMMAND}" -E env
       "BESA_DOXYGEN_EXECUTABLE=$<TARGET_FILE:Doxygen::doxygen>"
       "BESA_DOXYGEN_BASE_DIRECTORY=${ARG_DOXYGEN_OUTPUT_DIRECTORY}"
+      "BESA_PROJECT_SOURCE_DIRECTORY=${PROJECT_SOURCE_DIR}"
+      "BESA_PROJECT_BINARY_DIRECTORY=${PROJECT_BINARY_DIR}"
+      "BESA_CMAKE_EXECUTABLE=${CMAKE_COMMAND}"
       "BESA_PROPERDOCS_ROOT_DEPTH=${ARG_SITE_ROOT_DEPTH}"
       "${_besa_sphinx_build}" -W --keep-going -b html
       "${_besa_docs_source_absolute}" "${ARG_OUTPUT_DIRECTORY}"
@@ -171,6 +177,9 @@ function(besa_add_sphinx_breathe_docs)
     COMMENT "Generating structured Sphinx API documentation with Doxygen, Breathe, and Exhale"
     VERBATIM
   )
+  if(TARGET besa.generated)
+    add_dependencies("${ARG_NAME}" besa.generated)
+  endif()
 
   add_custom_target(
     "${ARG_MULTIVERSION_NAME}"
@@ -178,6 +187,9 @@ function(besa_add_sphinx_breathe_docs)
       "${CMAKE_COMMAND}" -E env
       "BESA_DOXYGEN_EXECUTABLE=$<TARGET_FILE:Doxygen::doxygen>"
       "BESA_DOXYGEN_BASE_DIRECTORY=${ARG_DOXYGEN_OUTPUT_DIRECTORY}"
+      "BESA_PROJECT_SOURCE_DIRECTORY=${PROJECT_SOURCE_DIR}"
+      "BESA_PROJECT_BINARY_DIRECTORY=${PROJECT_BINARY_DIR}"
+      "BESA_CMAKE_EXECUTABLE=${CMAKE_COMMAND}"
       "BESA_PROPERDOCS_ROOT_DEPTH=${ARG_SITE_ROOT_DEPTH}"
       "${_besa_sphinx_multiversion}" -W --keep-going
       "${_besa_docs_source_relative}" "${ARG_MULTIVERSION_OUTPUT_DIRECTORY}"
@@ -190,6 +202,9 @@ function(besa_add_sphinx_breathe_docs)
     COMMENT "Generating multiversion Sphinx API documentation from Git branches and tags"
     VERBATIM
   )
+  if(TARGET besa.generated)
+    add_dependencies("${ARG_MULTIVERSION_NAME}" besa.generated)
+  endif()
 
   if(NOT ARG_NO_INSTALL)
     install(

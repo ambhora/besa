@@ -28,11 +28,11 @@ PROJECT_SEMVER
 contains the resolved string. BESA also writes:
 
 ```text
-<binary-dir>/generated/include/<project>/version.hpp
+<binary-dir>/generated/meta/include/<project>/version.hpp
 ```
 
-and attaches that generated header to the main `lib<project>` file set when the conventional source
-layout creates the library. The header exposes compile-time metadata in `<project>::meta`:
+The `meta` generator registers that include root with BESA; project finalization attaches registered
+generated include roots to the main `lib<project>` target and installation. The header exposes compile-time metadata in `<project>::meta`:
 
 ```cpp
 auto constexpr version = project::meta::version();

@@ -100,6 +100,9 @@ def _include_directories():
     patterns = [
         os.path.join(ROOT, "src", "**", "include"),
         os.path.join(ROOT, "test", "**", "include"),
+        os.path.join(ROOT, "build", "**", "generated", "*", "include"),
+        os.path.join(ROOT, "..", "build", "**", "generated", "*", "include"),
+        # Compatibility with build trees from pre-registry BESA versions.
         os.path.join(ROOT, "build", "**", "generated", "include"),
         os.path.join(ROOT, "..", "build", "**", "generated", "include"),
     ]

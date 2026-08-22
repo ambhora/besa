@@ -128,71 +128,86 @@ def _doxygen_quote(path: Path) -> str:
     return '"' + str(path).replace("\\", "/").replace('"', '\\"') + '"'
 
 
-def _cmake_quote(value: str | Path) -> str:
-    """Return one value quoted safely for the small generated CMake script."""
+def _configured_build_for(project_root: Path, doxygen_output: Path) -> Path:
+    """Return a configured build tree whose generators belong to ``project_root``.
 
-    return '"' + str(value).replace("\\", "\\\\").replace('"', '\\"') + '"'
+    For the current checkout, the surrounding BESA CMake build is already configured and is the
+    authoritative source of generated public headers.  sphinx-multiversion renders historical Git
+    checkouts independently, so those refs receive a small private configure tree.  The docs layer
+    does not invoke or know individual generators; configuring the project is what causes every
+    registered generator to populate ``generated/<generator>/include``.
+    """
+
+    configured_source = os.environ.get("BESA_PROJECT_SOURCE_DIRECTORY")
+    configured_binary = os.environ.get("BESA_PROJECT_BINARY_DIRECTORY")
+    if configured_source and configured_binary:
+        if Path(configured_source).resolve() == project_root.resolve():
+            return Path(configured_binary).resolve()
+
+    generated_build = doxygen_output / "project-build"
+    shutil.rmtree(generated_build, ignore_errors=True)
+    cmake = os.environ.get("BESA_CMAKE_EXECUTABLE", "cmake")
+    subprocess.run(
+        [
+            cmake,
+            "-S",
+            str(project_root),
+            "-B",
+            str(generated_build),
+            "-DPROJECT_FEATURES=~user-docs",
+            "-DBUILD_TESTING=OFF",
+            "-DRELEASE_TYPE=release",
+        ],
+        cwd=project_root,
+        check=True,
+    )
+    if (project_root / "cmake" / "besa" / "generated.cmake").is_file():
+        subprocess.run(
+            [cmake, "--build", str(generated_build), "--target", "besa.generated"],
+            cwd=project_root,
+            check=True,
+        )
+    return generated_build
+
+
+def _generated_include_directories(build_directory: Path) -> list[Path]:
+    """Return all generator-owned public include roots in one configured build tree."""
+
+    generated = build_directory / "generated"
+    if not generated.is_dir():
+        return []
+    directories = [
+        path.resolve()
+        for path in generated.glob("*/include")
+        if path.is_dir()
+    ]
+    # Compatibility for historical refs created before generator names became part of the path.
+    legacy = generated / "include"
+    if legacy.is_dir():
+        directories.append(legacy.resolve())
+    return sorted(set(directories))
 
 
 def _prepare_public_include_tree(project_root: Path, doxygen_output: Path) -> Path:
     """Stage the public header namespace Doxygen should expose.
 
-    Doxygen should describe the installed public include tree, not the repository's physical source
-    layout.  Copy checked-in public headers into a synthetic root and generate ``version.hpp`` with
-    this checkout's own vendored BESA version module.  Stripping this synthetic root later makes
-    Exhale present ``Files -> <project>/...`` rather than ``Files -> src/cpp/include/...``.
+    The staging tree mirrors the installed include namespace. Checked-in public headers come from
+    ``src/*/include`` and generated public headers come from every registered generator's
+    ``<binary>/generated/<generator>/include`` root. Doxygen therefore has no knowledge of ``meta``
+    or any future generator name.
     """
 
     public_include = doxygen_output / "public-include"
     shutil.rmtree(public_include, ignore_errors=True)
     public_include.mkdir(parents=True)
 
-    source_include = project_root / "src" / "cpp" / "include"
-    if source_include.is_dir():
-        shutil.copytree(source_include, public_include, dirs_exist_ok=True)
+    for source_include in sorted(project_root.glob("src/*/include")):
+        if source_include.is_dir():
+            shutil.copytree(source_include, public_include, dirs_exist_ok=True)
 
-    version_module = project_root / "cmake" / "besa" / "version.cmake"
-    if not version_module.is_file():
-        raise RuntimeError(f"BESA version module was not found: {version_module}")
-
-    version = _cmake_project_version(project_root)
-    components = [int(component) for component in version.split(".")]
-    components.extend([0] * (4 - len(components)))
-
-    version_build = doxygen_output / "version-header"
-    shutil.rmtree(version_build, ignore_errors=True)
-    version_build.mkdir(parents=True)
-    version_script = version_build / "generate-version.cmake"
-    version_script.write_text(
-        "\n".join(
-            [
-                f"set(PROJECT_NAME {_cmake_quote(project)})",
-                f"set(PROJECT_VERSION {_cmake_quote(version)})",
-                f"set(PROJECT_VERSION_MAJOR {components[0]})",
-                f"set(PROJECT_VERSION_MINOR {components[1]})",
-                f"set(PROJECT_VERSION_PATCH {components[2]})",
-                f"set(PROJECT_VERSION_TWEAK {components[3]})",
-                f"set(PROJECT_SOURCE_DIR {_cmake_quote(project_root)})",
-                f"set(PROJECT_BINARY_DIR {_cmake_quote(version_build)})",
-                'set(RELEASE_TYPE "release")',
-                'set(RELEASE_REVISION "1")',
-                f"include({_cmake_quote(version_module)})",
-                "_besa_version_resolve()",
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-
-    cmake = os.environ.get("BESA_CMAKE_EXECUTABLE", "cmake")
-    subprocess.run([cmake, "-P", str(version_script)], cwd=project_root, check=True)
-
-    generated_version = version_build / "generated" / "include" / project / "version.hpp"
-    if not generated_version.is_file():
-        raise RuntimeError(f"BESA did not generate the expected version header: {generated_version}")
-    public_version = public_include / project / "version.hpp"
-    public_version.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(generated_version, public_version)
+    configured_build = _configured_build_for(project_root, doxygen_output)
+    for generated_include in _generated_include_directories(configured_build):
+        shutil.copytree(generated_include, public_include, dirs_exist_ok=True)
 
     return public_include
 

@@ -74,19 +74,6 @@ function(besa_add_source_directory)
   if(_library_sources OR _headers)
     if(NOT TARGET "${_library}")
       besa_add_library(NAME "${_library}")
-      if(DEFINED BESA_VERSION_INCLUDE_DIR)
-        target_include_directories(
-          "${_library}" PUBLIC
-          $<BUILD_INTERFACE:${BESA_VERSION_INCLUDE_DIR}>
-          $<INSTALL_INTERFACE:include>
-        )
-        target_sources(
-          "${_library}" PUBLIC
-          FILE_SET HEADERS
-          BASE_DIRS "${BESA_VERSION_INCLUDE_DIR}"
-          FILES "${BESA_VERSION_INCLUDE_DIR}/${PROJECT_NAME}/version.hpp"
-        )
-      endif()
     endif()
     if(_library_sources)
       target_sources("${_library}" PRIVATE ${_library_sources})

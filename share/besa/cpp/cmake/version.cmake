@@ -76,7 +76,7 @@ function(_besa_version_resolve)
   set(PROJECT_SEMVER "${_semver}" PARENT_SCOPE)
 
   string(REGEX REPLACE "[^A-Za-z0-9_]" "_" _namespace "${PROJECT_NAME}")
-  set(_include_dir "${PROJECT_BINARY_DIR}/generated/include")
+  besa_generated_include_add(NAME meta OUTPUT_VARIABLE _include_dir)
   set(_header_dir "${_include_dir}/${PROJECT_NAME}")
   file(MAKE_DIRECTORY "${_header_dir}")
   foreach(_component MAJOR MINOR PATCH TWEAK)
@@ -239,6 +239,4 @@ struct build_info {
   string(CONFIGURE "${_header_template}" _header_text @ONLY)
 
   file(WRITE "${_header_dir}/version.hpp" "${_header_text}")
-  set(BESA_VERSION_INCLUDE_DIR "${_include_dir}" CACHE INTERNAL "BESA generated version include")
-  set(BESA_VERSION_INCLUDE_DIR "${_include_dir}" PARENT_SCOPE)
 endfunction()

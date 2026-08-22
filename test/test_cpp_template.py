@@ -386,7 +386,7 @@ def test_release_version_is_written_to_generated_header(tmp_path: Path) -> None:
         ],
         project,
     )
-    version_header = project / "build" / "version" / "generated" / "include" / "example_version" / "version.hpp"
+    version_header = project / "build" / "version" / "generated" / "meta" / "include" / "example_version" / "version.hpp"
     version_text = version_header.read_text(encoding="utf-8")
     assert "#ifndef EXAMPLE_VERSION_VERSION_HPP" in version_text
     assert "#define EXAMPLE_VERSION_VERSION_HPP" in version_text
@@ -399,6 +399,63 @@ def test_release_version_is_written_to_generated_header(tmp_path: Path) -> None:
     assert 'return {release_type::release_candidate, 3};' in version_text
     assert 'return "0.1.0";' in version_text
     assert 'return "rc.3";' in version_text
+
+
+@pytest.mark.cpp
+def test_generated_include_registry_attaches_and_installs_all_generators(tmp_path: Path) -> None:
+    if shutil.which("cmake") is None or shutil.which("g++") is None:
+        pytest.skip("CMake and g++ are required")
+
+    project = cpp_generate(tmp_path, "example_generated")
+    cmake = project / "CMakeLists.txt"
+    text = cmake.read_text(encoding="utf-8")
+    generator_script = project / "generate-schema.cmake"
+    generator_script.write_text(
+        "get_filename_component(OUTPUT_DIRECTORY \"${OUTPUT}\" DIRECTORY)\n"
+        "file(MAKE_DIRECTORY \"${OUTPUT_DIRECTORY}\")\n"
+        "file(WRITE \"${OUTPUT}\" \"#ifndef EXAMPLE_GENERATED_SCHEMA_HPP\\n#define EXAMPLE_GENERATED_SCHEMA_HPP\\n#endif\\n\")\n",
+        encoding="utf-8",
+    )
+    insertion = """\
+besa_generated_include_add(NAME schema TARGET schema.generate OUTPUT_VARIABLE SCHEMA_INCLUDE)
+add_custom_target(
+  schema.generate
+  COMMAND "${CMAKE_COMMAND}"
+    "-DOUTPUT=${SCHEMA_INCLUDE}/example_generated/schema.hpp"
+    -P "${CMAKE_CURRENT_SOURCE_DIR}/generate-schema.cmake"
+  VERBATIM
+)
+
+"""
+    text = text.replace(
+        "# --------------------------------------------------------------------------------------------------\n# PROJECT STRUCTURE\n",
+        insertion
+        + "# --------------------------------------------------------------------------------------------------\n# PROJECT STRUCTURE\n",
+    )
+    cmake.write_text(text, encoding="utf-8")
+
+    _run(["cmake", "-S", ".", "-B", "build/generated"], project)
+
+    meta_root = project / "build" / "generated" / "generated" / "meta" / "include"
+    schema_root = project / "build" / "generated" / "generated" / "schema" / "include"
+    assert (meta_root / "example_generated" / "version.hpp").is_file()
+    assert not (schema_root / "example_generated" / "schema.hpp").exists()
+
+    commands = (project / "build" / "generated" / "compile_commands.json").read_text(
+        encoding="utf-8"
+    )
+    assert str(meta_root) in commands
+    assert str(schema_root) in commands
+
+    _run(["cmake", "--build", "build/generated"], project)
+    assert (schema_root / "example_generated" / "schema.hpp").is_file()
+    prefix = tmp_path / "generated-prefix"
+    _run(
+        ["cmake", "--install", "build/generated", "--prefix", str(prefix)],
+        project,
+    )
+    assert (prefix / "include" / "example_generated" / "version.hpp").is_file()
+    assert (prefix / "include" / "example_generated" / "schema.hpp").is_file()
 
 
 @pytest.mark.cpp
@@ -1075,7 +1132,25 @@ Function Documentation
     historical_header.write_text("#ifndef EXAMPLE_DOCS_HISTORICAL_HPP\n#define EXAMPLE_DOCS_HISTORICAL_HPP\n#endif\n", encoding="utf-8")
     shutil.copytree(project / "cmake" / "besa", historical / "cmake" / "besa")
     (historical / "CMakeLists.txt").write_text(
-        "project(example_docs VERSION 9.8.7 LANGUAGES NONE)\n", encoding="utf-8"
+        """\
+cmake_minimum_required(VERSION 3.26.1)
+project(example_docs VERSION 9.8.7 LANGUAGES NONE)
+list(PREPEND CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/besa")
+find_package(besa CONFIG REQUIRED)
+set(PROJECT_FEATURES "" CACHE STRING "")
+set(PROJECT_DEVTOOLS "none" CACHE STRING "")
+set(PROJECT_WARNINGS "essential" CACHE STRING "")
+set(TEST_MODES "" CACHE STRING "")
+set(BUILD_TESTING OFF CACHE BOOL "")
+set(RELEASE_TYPE "release" CACHE STRING "")
+set(RELEASE_REVISION "1" CACHE STRING "")
+besa_features_add(FEATURES user-docs)
+besa_configure_complete()
+besa_generated_include_add(NAME schema OUTPUT_VARIABLE SCHEMA_INCLUDE)
+file(MAKE_DIRECTORY "${SCHEMA_INCLUDE}/example_docs")
+file(WRITE "${SCHEMA_INCLUDE}/example_docs/schema.hpp" "#ifndef EXAMPLE_DOCS_SCHEMA_HPP\n#define EXAMPLE_DOCS_SCHEMA_HPP\n#endif\n")
+""",
+        encoding="utf-8",
     )
     (historical_api / "Doxyfile").write_text(
         (api_docs / "Doxyfile").read_text(encoding="utf-8"), encoding="utf-8"
@@ -1094,6 +1169,7 @@ Function Documentation
     historical_version = historical_public / "example_docs" / "version.hpp"
     assert historical_version.is_file()
     assert 'return "9.8.7";' in historical_version.read_text(encoding="utf-8")
+    assert (historical_public / "example_docs" / "schema.hpp").is_file()
     assert historical_app.config.release == "9.8.7"
     assert historical_app.config.breathe_projects == {
         "example_docs": str(historical_output / "xml")
