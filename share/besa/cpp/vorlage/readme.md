@@ -60,23 +60,55 @@ ProperDocs owns the site root and the Reference page. Its **Versioned API** sect
 entry point into the Sphinx/Breathe trees mounted below `reference/api/`. Every generated API page
 contains a persistent link back to the ProperDocs site and an API-version selector.
 
+The API-version landing page contains the namespace and file hierarchy directly; BESA does not add an
+intermediate `<project> API` landing page. Historical refs created by older BESA versions retain their
+original layout when rendered.
+
+Set the standard `repo_url` in `properdocs.yml` to enable a source-file action at the top-right of every
+ProperDocs page. BESA links to a human Git tag or branch (including detached CI checkouts when the CI
+provider exposes the ref) and never falls back to a commit hash. The same repository URL supplies the
+404 page's **Report a documentation issue** action. GitHub is detected directly; other hosts default to
+the GitLab URL layout and can be overridden with `extra.besa_repo_provider`. `extra.besa_issue_url` can
+override the issue-board destination.
+
 Cross-references between the two documentation surfaces use semantic targets rather than deployed hostnames:
 
 - C/C++ Doxygen comments use `@projectdocs`, `@projectdocs{path}`, or
   `@projectdocs{path,link text}`.
 - ProperDocs Markdown uses `@apidocs::qualified::cpp::symbol`; `extra.besa_api_version` in
-  `properdocs.yml` selects the API version for those links.
+  `properdocs.yml` selects the default API version for those links. A single reference can override
+  the default with `@apidocs[v0.2.0]::qualified::cpp::symbol`.
 
-For API-only debugging, build the current checkout or all Git refs directly:
+For API-only debugging, build the current checkout or the selected historical versions directly:
 
 ```bash
 cmake --build build --target user.docs.api
 cmake --build build --target user.docs.multiversion
 ```
 
+Historical API generation defaults to every tag plus `main`. Configure a persistent subset with
+`extra.besa_api_versions` in `properdocs.yml`, or override one invocation with `BESA_API_VERSIONS`:
+
+```text
+all
+latest:4
+range:>=0.2,<0.6
+refs:v0.2.0,v0.4.0,v0.5.1
+```
+
+For example:
+
+```bash
+BESA_API_VERSIONS=latest:4 properdocs serve
+BESA_API_VERSIONS='range:>=0.2,<0.6' cmake --build build --target user.docs.multiversion
+```
+
+`latest:N` and `range:...` compare parseable version tags by version rather than Git date or
+lexicographic order. `refs:...` is the escape hatch for an exact set of tags or local branches.
+`main` is included independently in every selection as the development API.
+
 The raw multiversion API output is written to `build/doc/api/multiversion/`. It contains
-`versions.json` and one Sphinx site per selected local branch head/tag, but it is not itself the
-publication root.
+`versions.json` and one Sphinx site per selected ref, but it is not itself the publication root.
 
 With `vorlage+user_docs` selected and the development bundle installed with `+docs`, local documentation
 development is just:
@@ -85,10 +117,10 @@ development is just:
 properdocs serve
 ```
 
-The default development server previews all selected branches and tags while retaining live
+The default development server previews all selected historical versions while retaining live
 working-tree API documentation under `main/`. ProperDocs watches `src/`, `test/base/`, `api-docs/`,
-and Git refs. Historical versions are regenerated only when the refs change; ordinary source edits regenerate only
-the working-tree `main/` API. Prose-only edits do not rerun Doxygen.
+and Git refs. Historical versions are regenerated when the refs or version selector change; ordinary
+source edits regenerate only the working-tree `main/` API. Prose-only edits do not rerun Doxygen.
 
 All live documentation working state is kept outside the checkout below `../build/properdocs/`:
 

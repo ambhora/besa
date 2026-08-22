@@ -6,8 +6,8 @@ For example, build provenance is exposed by @apidocs::vorlage::meta::build.
 
 ## Versioned API
 
-The C/C++ API is extracted with Doxygen, rendered through Breathe and Sphinx, and built for the Git
-branch heads and tags selected by sphinx-multiversion.
+The C/C++ API is extracted with Doxygen, rendered through Breathe and Sphinx, and built for `main`
+plus the historical Git refs selected by BESA.
 
 The complete `user.docs` build publishes each available API version below this section. Every Sphinx
 API page also exposes a version selector. Selecting another version keeps the current page when that

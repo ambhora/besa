@@ -1,0 +1,36 @@
+{# -------------------------------------------------------------------------------------------------
+   SPDX-License-Identifier: Apache-2.0
+   -------------------------------------------------------------------------------------------------
+   Preserve Material's standard edit/view actions when projects opt into them, then add BESA's
+   branch/tag-aware source link. The latter is supplied by properdocs_multiversion_hook.py.
+#}
+{% if page.edit_url %}
+  {% if "content.action.edit" in features %}
+    <a href="{{ page.edit_url }}" title="{{ lang.t('action.edit') }}" class="md-content__button md-icon">
+      {% set icon = config.theme.icon.edit or "material/file-edit-outline" %}
+      {% include ".icons/" ~ icon ~ ".svg" %}
+    </a>
+  {% endif %}
+  {% if "content.action.view" in features %}
+    {% if "/blob/" in page.edit_url %}
+      {% set part = "blob" %}
+    {% else %}
+      {% set part = "edit" %}
+    {% endif %}
+    <a href="{{ page.edit_url | replace(part, 'raw') }}" title="{{ lang.t('action.view') }}" class="md-content__button md-icon">
+      {% set icon = config.theme.icon.view or "material/file-eye-outline" %}
+      {% include ".icons/" ~ icon ~ ".svg" %}
+    </a>
+  {% endif %}
+{% endif %}
+{% if besa_source_url %}
+  <a
+    href="{{ besa_source_url }}"
+    title="View this page's source"
+    class="md-content__button md-icon"
+    target="_blank"
+    rel="noopener noreferrer"
+  >
+    {% include ".icons/material/file-code-outline.svg" %}
+  </a>
+{% endif %}

@@ -11,12 +11,14 @@ source edits remain visible without losing the ability to browse older versions.
 from __future__ import annotations
 
 import json
+import os
 import posixpath
 import re
 import shutil
 import subprocess
 from pathlib import Path, PurePosixPath
 from typing import Iterable
+from urllib.parse import quote, urlparse
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 PROPERDOCS_WORK_DIRECTORY = PROJECT_ROOT.parent / "build" / "properdocs"
@@ -26,12 +28,14 @@ MULTIVERSION_API_BUILD_DIRECTORY = BUILD_DIRECTORY / "doc" / "api" / "multiversi
 API_PUBLIC_PATH = Path("reference") / "api"
 
 _APIDOCS_REFERENCE = re.compile(
-    r"@apidocs::(?P<symbol>[A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_][A-Za-z0-9_]*)*)"
+    r"@apidocs(?:\[(?P<version>[A-Za-z0-9][A-Za-z0-9._-]*)\])?::"
+    r"(?P<symbol>[A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_][A-Za-z0-9_]*)*)"
 )
 
 _serve_active = False
 _last_source_fingerprint: tuple[tuple[str, int, int], ...] | None = None
 _last_refs_fingerprint: tuple[tuple[str, int, int], ...] | None = None
+_last_versions_selector: str | None = None
 
 
 def _fingerprint(paths: Iterable[Path]) -> tuple[tuple[str, int, int], ...]:
@@ -96,18 +100,159 @@ def _configure() -> None:
     )
 
 
-def _build(target: str) -> None:
+def _build(target: str, api_versions: str | None = None) -> None:
+    environment = None
+    if api_versions is not None:
+        environment = os.environ.copy()
+        environment["BESA_API_VERSIONS"] = api_versions
     subprocess.run(
         ["cmake", "--build", str(BUILD_DIRECTORY), "--target", target],
         cwd=PROJECT_ROOT,
         check=True,
+        env=environment,
     )
 
 
-def _ensure_multiversion_api() -> None:
-    """Refresh only the API portions whose inputs changed."""
+def _configured_api_versions(config) -> str:
+    return (
+        os.environ.get("BESA_API_VERSIONS")
+        or str(config.get("extra", {}).get("besa_api_versions", "all"))
+    ).strip()
 
-    global _last_source_fingerprint, _last_refs_fingerprint
+
+def _git_output(*arguments: str) -> str | None:
+    """Return stripped Git output, or ``None`` when no repository/ref is available."""
+
+    try:
+        completed = subprocess.run(
+            ["git", *arguments],
+            cwd=PROJECT_ROOT,
+            check=True,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    value = completed.stdout.strip()
+    return value or None
+
+
+def _source_ref() -> str | None:
+    """Resolve a human branch/tag name for source links, never a commit hash."""
+
+    explicit = os.environ.get("BESA_SOURCE_REF")
+    if explicit:
+        return explicit
+
+    # CI systems know the human ref even when the checkout itself is detached.
+    for variable in ("CI_COMMIT_TAG", "CI_COMMIT_BRANCH"):
+        if value := os.environ.get(variable):
+            return value
+
+    if os.environ.get("GITHUB_REF_TYPE") in {"branch", "tag"}:
+        if value := os.environ.get("GITHUB_REF_NAME"):
+            return value
+
+    if value := os.environ.get("CI_COMMIT_REF_NAME"):
+        return value
+
+    # A normal local checkout should stay on its branch even when HEAD also happens to carry a tag.
+    # Detached release checkouts have no symbolic branch, so fall back to an exact tag in that case.
+    if branch := _git_output("symbolic-ref", "--quiet", "--short", "HEAD"):
+        return branch
+    tags = _git_output("tag", "--points-at", "HEAD")
+    if tags:
+        return sorted(line for line in tags.splitlines() if line)[-1]
+    return None
+
+
+def _repository_provider(repo_url: str, extra) -> str:
+    """Return the repository URL layout used for source and issue links."""
+
+    override = str(extra.get("besa_repo_provider", "")).strip().lower()
+    if override:
+        if override not in {"github", "gitlab", "bitbucket"}:
+            raise RuntimeError(
+                "extra.besa_repo_provider must be github, gitlab, or bitbucket"
+            )
+        return override
+
+    host = (urlparse(repo_url).hostname or "").lower()
+    if host.endswith("github.com"):
+        return "github"
+    if host.endswith("bitbucket.org"):
+        return "bitbucket"
+    # Self-hosted GitLab cannot be inferred from its hostname. BESA's Git-oriented project hosting
+    # commonly uses GitLab, so unknown hosts use that URL layout and can be overridden above.
+    return "gitlab"
+
+
+def _repository_base(repo_url: str) -> str:
+    value = repo_url.rstrip("/")
+    return value[:-4] if value.endswith(".git") else value
+
+
+def _source_url(repo_url: str, provider: str, ref: str, source_path: str) -> str:
+    base = _repository_base(repo_url)
+    ref_part = quote(ref, safe="/")
+    path_part = quote(source_path, safe="/")
+    if provider == "github":
+        return f"{base}/blob/{ref_part}/{path_part}"
+    if provider == "bitbucket":
+        return f"{base}/src/{ref_part}/{path_part}"
+    return f"{base}/-/blob/{ref_part}/{path_part}"
+
+
+def _default_issue_url(repo_url: str, provider: str) -> str:
+    base = _repository_base(repo_url)
+    if provider == "gitlab":
+        return f"{base}/-/issues/new"
+    return f"{base}/issues/new"
+
+
+def on_config(config, **_kwargs):
+    """Resolve repository-wide source/issue metadata once for the ProperDocs build."""
+
+    extra = dict(config.get("extra", {}) or {})
+    repo_url = str(config.get("repo_url") or "").strip()
+    if repo_url:
+        provider = _repository_provider(repo_url, extra)
+        extra["besa_repo_provider"] = provider
+        extra["besa_source_ref"] = _source_ref()
+        if not extra.get("besa_issue_url"):
+            extra["besa_issue_url"] = _default_issue_url(repo_url, provider)
+    config["extra"] = extra
+    return config
+
+
+def on_page_context(context, page, config, nav, **_kwargs):
+    """Expose the branch/tag-aware repository URL for the current Markdown source page."""
+
+    del nav
+    repo_url = str(config.get("repo_url") or "").strip()
+    extra = config.get("extra", {}) or {}
+    ref = extra.get("besa_source_ref")
+    if not repo_url or not ref:
+        context["besa_source_url"] = None
+        return context
+
+    source = Path(page.file.abs_src_path).resolve()
+    try:
+        relative_source = source.relative_to(PROJECT_ROOT).as_posix()
+    except ValueError:
+        context["besa_source_url"] = None
+        return context
+
+    provider = _repository_provider(repo_url, extra)
+    context["besa_source_url"] = _source_url(repo_url, provider, str(ref), relative_source)
+    return context
+
+
+def _ensure_multiversion_api(api_versions: str = "all") -> None:
+    """Refresh only the API portions whose inputs or selected historical versions changed."""
+
+    global _last_source_fingerprint, _last_refs_fingerprint, _last_versions_selector
 
     source_fingerprint = _source_fingerprint()
     refs_fingerprint = _refs_fingerprint()
@@ -115,6 +260,7 @@ def _ensure_multiversion_api() -> None:
     rebuild_versions = (
         not MULTIVERSION_API_BUILD_DIRECTORY.is_dir()
         or refs_fingerprint != _last_refs_fingerprint
+        or api_versions != _last_versions_selector
     )
     rebuild_current = (
         not CURRENT_API_BUILD_DIRECTORY.is_dir()
@@ -126,8 +272,9 @@ def _ensure_multiversion_api() -> None:
 
     _configure()
     if rebuild_versions:
-        _build("user.docs.multiversion")
+        _build("user.docs.multiversion", api_versions)
         _last_refs_fingerprint = refs_fingerprint
+        _last_versions_selector = api_versions
     if rebuild_current:
         _build("user.docs.api")
         _last_source_fingerprint = source_fingerprint
@@ -209,9 +356,9 @@ def on_startup(*, command: str, dirty: bool = False, **_kwargs) -> None:
     _serve_active = command == "serve"
 
 
-def on_pre_build(**_kwargs) -> None:
+def on_pre_build(config, **_kwargs) -> None:
     if _serve_active:
-        _ensure_multiversion_api()
+        _ensure_multiversion_api(_configured_api_versions(config))
 
 
 def _api_symbol_public_path(symbol: str, version: str) -> PurePosixPath:
@@ -233,16 +380,21 @@ def _api_symbol_build_path(symbol: str, version: str) -> Path:
 
 
 def on_page_markdown(markdown, page, config, **_kwargs):
-    """Resolve ``@apidocs::qualified::name`` to one selected version of the generated API."""
+    """Resolve ``@apidocs[version]::qualified::name`` to the generated API.
+
+    Omitting ``[version]`` uses ``extra.besa_api_version`` from ``properdocs.yml`` and ultimately
+    falls back to ``main``. An explicit version always overrides that site-wide default.
+    """
 
     if _APIDOCS_REFERENCE.search(markdown) is None:
         return markdown
 
-    version = str(config.get("extra", {}).get("besa_api_version", "main"))
+    default_version = str(config.get("extra", {}).get("besa_api_version", "main"))
     page_directory = PurePosixPath(page.file.dest_uri).parent
 
     def replace_reference(match: re.Match[str]) -> str:
         symbol = match.group("symbol")
+        version = match.group("version") or default_version
         # `properdocs serve` builds the API before Markdown rendering, so unresolved references are
         # errors there. A standalone ProperDocs build may intentionally run before API generation;
         # in that mode we still emit the stable semantic URL and let final site assembly provide it.

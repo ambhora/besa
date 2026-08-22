@@ -138,6 +138,7 @@ function(besa_add_sphinx_breathe_docs)
   find_package(Doxygen REQUIRED COMPONENTS dot)
   find_program(_besa_sphinx_build NAMES sphinx-build)
   find_program(_besa_sphinx_multiversion NAMES sphinx-multiversion)
+  find_program(_besa_python NAMES python3 python)
 
   if(NOT _besa_sphinx_build)
     message(
@@ -151,6 +152,13 @@ function(besa_add_sphinx_breathe_docs)
       FATAL_ERROR
       "besa_add_sphinx_breathe_docs: sphinx-multiversion was not found. Install "
       "sphinx-multiversion before enabling the user-docs feature."
+    )
+  endif()
+  if(NOT _besa_python)
+    message(
+      FATAL_ERROR
+      "besa_add_sphinx_breathe_docs: Python was not found. Python is required to resolve the "
+      "BESA_API_VERSIONS selector before invoking sphinx-multiversion."
     )
   endif()
 
@@ -202,8 +210,12 @@ function(besa_add_sphinx_breathe_docs)
       "BESA_PROJECT_BINARY_DIRECTORY=${PROJECT_BINARY_DIR}"
       "BESA_CMAKE_EXECUTABLE=${CMAKE_COMMAND}"
       "BESA_PROPERDOCS_ROOT_DEPTH=${ARG_SITE_ROOT_DEPTH}"
-      "${_besa_sphinx_multiversion}" -W --keep-going
-      "${_besa_docs_source_relative}" "${ARG_MULTIVERSION_OUTPUT_DIRECTORY}"
+      "${_besa_python}" "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/userdocs/multiversion.py"
+      "--sphinx-multiversion" "${_besa_sphinx_multiversion}"
+      "--project-root" "${PROJECT_SOURCE_DIR}"
+      "--source-directory" "${_besa_docs_source_relative}"
+      "--output-directory" "${ARG_MULTIVERSION_OUTPUT_DIRECTORY}"
+      -- -W --keep-going
     COMMAND
       "${CMAKE_COMMAND}"
       "-DOUTPUT_DIRECTORY=${ARG_MULTIVERSION_OUTPUT_DIRECTORY}"

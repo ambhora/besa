@@ -9,6 +9,12 @@
   max-width: 100%;
 }
 
+/* Keep the complete interactive header cluster flush right. Search is explicitly placed in
+ * navbar_end together with project navigation, version selection, and the theme toggle. */
+.navbar-header-items__end {
+  margin-inline-start: auto;
+}
+
 /* Keep the API navigation readable rather than compressing all header actions together. */
 .besa-api-project-links {
   align-items: center;
@@ -176,6 +182,15 @@ dl.c > dt,
 
 .sig {
   padding: 0.34rem 0.55rem;
+}
+
+/* Sphinx itself decides when a C++ parameter list exceeds the configured 80-character logical
+ * line length. conf.py mirrors that decision onto the signature as besa-multiline-signature. For
+ * those signatures only, put the return type on a separate line; Sphinx's native multiline
+ * parameter-list renderer already places every parameter on its own logical line. */
+dl.cpp > dt.besa-multiline-signature .sig-return-type {
+  display: block;
+  margin-bottom: 0.18rem;
 }
 
 .bd-article dl.cpp,

@@ -77,12 +77,44 @@ html_css_files = ["css/besa-api.css"]
 html_js_files = ["js/besa-api-version.js", "js/besa-api-presentation.js"]
 exclude_patterns: list[str] = []
 
+# Long C++ signatures use Sphinx's native logical-line formatting. Sphinx decides whether a
+# parameter list is multiline from the rendered signature length, so short declarations remain
+# compact and individual directives can still opt out with :single-line-parameter-list:.
+cpp_maximum_signature_line_length = 80
+
 html_theme = "pydata_sphinx_theme"
+# Keep the navbar title version-independent. The selected API version is shown by the dedicated
+# version selector, while Sphinx multiversion builds can otherwise inherit the current checkout
+# release in the title even when rendering a historical ref.
+html_title = f"{project} documentation"
+html_short_title = html_title
 html_theme_options = {
-    "navbar_align": "left",
-    "navbar_end": ["project-links.html", "theme-switcher", "navbar-icon-links"],
+    "navbar_align": "right",
+    # API entities belong in the persistent left section navigation, not in the site header.
+    # PyData's default navbar-nav component renders every root toctree entry across the top.
+    "navbar_center": [],
+    # Keep all interactive header controls in one right-aligned group. Search is normally placed in
+    # PyData's persistent header section, which leaves it next to the project title when the center
+    # navbar is empty. Moving it into navbar_end makes Search, project docs, version, and theme mode
+    # behave as one cluster.
+    "navbar_persistent": [],
+    "navbar_end": [
+        "search-button-field",
+        "project-links.html",
+        "theme-switcher",
+        "navbar-icon-links",
+    ],
     "secondary_sidebar_items": ["page-toc"],
-    "show_prev_next": True,
+    "show_prev_next": False,
+}
+
+# The merged API landing page owns the root toctree, so its generated API pages are top-level Sphinx
+# documents. PyData's stock sidebar starts at depth 1 and would therefore hide them. BESA uses the
+# same sidebar renderer starting at depth 0, keeping namespaces/types/functions in the left sidebar.
+html_sidebars = {
+    # Keep only BESA's navigation component here. Older PyData Sphinx Theme releases do not
+    # provide sidebar-collapse.html, while newer releases make collapsing an optional enhancement.
+    "**": ["api-sidebar.html"],
 }
 
 # BESA mounts each Sphinx build below <ProperDocs root>/<API path>/<version>/. Templates use this
@@ -101,14 +133,16 @@ html_context = {
 # irrelevant to documentation authors.
 _projectdocs_root_from_api_index = "../" * _besa_properdocs_root_depth
 rst_prolog = (
-    f".. |projectdocs| replace:: "
-    f"`main project documentation <{_projectdocs_root_from_api_index}>`_\n"
+    ".. |projectdocs| replace:: main project documentation\n"
+    f".. _projectdocs: {_projectdocs_root_from_api_index}\n"
 )
 
-# sphinx-multiversion defaults already select local branch heads and tags. Keep that explicit so the
-# generated project's publication model is visible in one place.
-smv_branch_whitelist = r"^.*$"
-smv_tag_whitelist = r"^.*$"
+# sphinx-multiversion receives exact branch/tag filters from BESA's multiversion driver through
+# environment variables. Using the environment rather than ``-D smv_*`` is intentional: SMV reads
+# its configuration before its Sphinx extension registers those keys, so command-line overrides are
+# otherwise reported as unknown and ignored. Historical exported refs need no Git access here.
+smv_branch_whitelist = os.environ.get("BESA_SMV_BRANCH_WHITELIST", r"^main$")
+smv_tag_whitelist = os.environ.get("BESA_SMV_TAG_WHITELIST", r"^.*$")
 smv_outputdir_format = r"{ref.name}"
 
 # Exhale automatically emits the complete API model represented by Doxygen XML. No class/function
@@ -389,20 +423,6 @@ def _write_api_symbol_aliases(app, exception) -> None:
     )
 
 
-def _generated_namespace_pages(generated: Path) -> dict[str, str]:
-    """Map fully-qualified namespaces to their Exhale document names."""
-
-    result: dict[str, str] = {}
-    pattern = re.compile(r"^\.\. doxygennamespace::\s+(.+?)\s*$", flags=re.MULTILINE)
-    for path in generated.rglob("*.rst"):
-        if path.name == "library_root.rst":
-            continue
-        match = pattern.search(path.read_text(encoding="utf-8"))
-        if match:
-            result[match.group(1)] = path.relative_to(generated).with_suffix("").as_posix()
-    return result
-
-
 def _xml_text(element: ET.Element | None) -> str:
     """Return all textual content below one Doxygen XML element."""
 
@@ -505,6 +525,7 @@ def _simplified_entity_title(title: str) -> str | None:
         ("Struct ", "struct"),
         ("Enum ", "enum"),
         ("Function ", "function"),
+        ("Define ", "define"),
     ):
         if not title.startswith(prefix):
             continue
@@ -530,10 +551,11 @@ def _simplify_generated_entity_pages(generated: Path) -> None:
         "Struct Documentation",
         "Enum Documentation",
         "Function Documentation",
+        "Define Documentation",
         "Documentation",
     }
     explicit_reference = re.compile(
-        r":ref:`(?P<title>(?:Class|Struct|Enum|Function) .+?) <(?P<target>[^<>]+)>`"
+        r":ref:`(?P<title>(?:Class|Struct|Enum|Function|Define) .+?) <(?P<target>[^<>]+)>`"
     )
 
     for path in generated.glob("*.rst"):
@@ -582,12 +604,19 @@ def _simplify_generated_entity_pages(generated: Path) -> None:
             path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def _api_namespace_overview(index_xml: Path, generated: Path) -> str:
-    """Build a compact namespace-oriented API index from Doxygen's index XML.
+def _api_namespace_tree(
+    index_xml: Path,
+    generated: Path,
+    *,
+    root_namespace: str | None = None,
+    include_root: bool = True,
+    overload_pages: dict[tuple[str, str], str] | None = None,
+) -> str:
+    """Render the API below one namespace (or all root namespaces) as a recursive tree.
 
-    The landing page is deliberately a synopsis.  Classes, structs, enums, and functions are
-    listed directly below the namespace that owns them, and overloaded functions are represented
-    once by name.  Detailed signatures remain on the generated namespace/entity pages.
+    Exhale namespace pages enumerate only immediate members.  BESA uses the same namespace model as
+    the landing page to make every namespace page transitive: selecting ``foo`` exposes members of
+    ``foo`` and of every descendant namespace while preserving the containment hierarchy.
     """
 
     root = ET.parse(index_xml).getroot()
@@ -598,8 +627,8 @@ def _api_namespace_overview(index_xml: Path, generated: Path) -> str:
         if compound.get("kind") == "namespace"
         if (name := compound.findtext("name"))
     }
-    namespace_pages = _generated_namespace_pages(generated)
-    overload_pages = _write_overload_pages(index_xml, generated)
+    if overload_pages is None:
+        overload_pages = _write_overload_pages(index_xml, generated)
 
     children: dict[str, set[str]] = {name: set() for name in namespace_names}
     members: dict[str, set[tuple[str, str, str]]] = {name: set() for name in namespace_names}
@@ -656,46 +685,157 @@ def _api_namespace_overview(index_xml: Path, generated: Path) -> str:
 
     def namespace_link(namespace: str) -> str:
         short_name = namespace.rsplit("::", 1)[-1]
-        target = namespace_pages.get(namespace)
-        if target:
-            # Use an absolute Sphinx document path so namespace links remain valid when this
-            # overview is included from Exhale's generated root and in sphinx-multiversion refs.
-            return f":doc:`{short_name} </generated/{target}>`"
-        return f"``{short_name}``"
+        # Exhale gives namespace pages stable labels derived from the qualified name. ``::`` becomes
+        # ``__``; use the label rather than depending on Exhale's generated filename.
+        target = "namespace_" + namespace.replace(":", "_").replace(os.sep, "_").replace(" ", "_")
+        return f":ref:`{short_name} <{target}>`"
 
     def emit_item(text: str, depth: int) -> None:
-        # reStructuredText requires a blank line before a nested bullet list.  Emitting every
-        # tree item as a small paragraph keeps arbitrary namespace depths valid and readable.
+        # reStructuredText requires a blank line before a nested bullet list. Emitting every tree
+        # item as a small paragraph keeps arbitrary namespace depths valid and readable.
         lines.append(f"{'  ' * depth}* {text}")
         lines.append("")
+
+    def emit_member(namespace: str, member: tuple[str, str, str], depth: int) -> None:
+        kind, short_name, qualified_name = member
+        marker = markers[kind]
+        display_name = f"{short_name}()" if kind == "function" else short_name
+        if kind == "function" and function_counts.get((namespace, short_name), 0) > 1:
+            target = overload_pages.get((namespace, short_name))
+            if target:
+                link = f":doc:`{display_name} </generated/{target}>`"
+            else:
+                link = f"``{display_name}``"
+        else:
+            role = roles[kind]
+            link = f":{role}:`{display_name} <{qualified_name}>`"
+        emit_item(f":api-kind:`{marker}` {link}", depth)
 
     def emit_namespace(namespace: str, depth: int) -> None:
         emit_item(f":api-kind:`N` {namespace_link(namespace)}", depth)
         for child in sorted(children[namespace]):
             emit_namespace(child, depth + 1)
-        for kind, short_name, qualified_name in sorted(
-            members[namespace], key=lambda item: (item[1].lower(), item[0])
+        for member in sorted(members[namespace], key=lambda item: (item[1].lower(), item[0])):
+            emit_member(namespace, member, depth + 1)
+
+    if root_namespace is None:
+        for namespace in sorted(roots):
+            emit_namespace(namespace, 0)
+        if not roots:
+            lines.append("No public namespaces were discovered.")
+    elif root_namespace not in namespace_names:
+        lines.append("No public members were discovered.")
+    elif include_root:
+        emit_namespace(root_namespace, 0)
+    else:
+        # The namespace page title already names the root. Show its own members and recursively
+        # expand every child namespace below it, without adding a redundant root item to the tree.
+        for child in sorted(children[root_namespace]):
+            emit_namespace(child, 0)
+        for member in sorted(
+            members[root_namespace], key=lambda item: (item[1].lower(), item[0])
         ):
-            marker = markers[kind]
-            display_name = f"{short_name}()" if kind == "function" else short_name
-            if kind == "function" and function_counts.get((namespace, short_name), 0) > 1:
-                target = overload_pages.get((namespace, short_name))
-                if target:
-                    link = f":doc:`{display_name} </generated/{target}>`"
-                else:
-                    link = f"``{display_name}``"
-            else:
-                role = roles[kind]
-                link = f":{role}:`{display_name} <{qualified_name}>`"
-            emit_item(f":api-kind:`{marker}` {link}", depth + 1)
-
-    for namespace in sorted(roots):
-        emit_namespace(namespace, 0)
-
-    if not roots:
-        lines.append("No public namespaces were discovered.")
+            emit_member(root_namespace, member, 0)
+        if not children[root_namespace] and not members[root_namespace]:
+            lines.append("No public members were discovered.")
 
     return "\n".join(lines) + "\n"
+
+
+def _api_namespace_overview(
+    index_xml: Path,
+    generated: Path,
+    overload_pages: dict[tuple[str, str], str] | None = None,
+) -> str:
+    """Build the recursive namespace-oriented API synopsis for the landing page."""
+
+    return _api_namespace_tree(
+        index_xml,
+        generated,
+        overload_pages=overload_pages,
+    )
+
+
+_NAMESPACE_MEMBER_HEADINGS = {
+    "Namespaces",
+    "Classes",
+    "Structs",
+    "Unions",
+    "Concepts",
+    "Enums",
+    "Functions",
+    "Variables",
+    "Typedefs",
+    "Defines",
+}
+
+
+def _namespace_page_member_start(lines: list[str]) -> int | None:
+    """Return the first Exhale immediate-member section on a namespace page."""
+
+    for index, line in enumerate(lines[:-1]):
+        if line not in _NAMESPACE_MEMBER_HEADINGS or not lines[index + 1]:
+            continue
+        adornment = lines[index + 1][0]
+        if adornment == "-" and all(character == adornment for character in lines[index + 1]):
+            return index
+    return None
+
+
+def _rewrite_namespace_pages(
+    index_xml: Path,
+    generated: Path,
+    overload_pages: dict[tuple[str, str], str],
+) -> None:
+    """Replace Exhale's immediate-only namespace listings with recursive member trees.
+
+    Everything before Exhale's first member-kind section is retained, including the namespace title,
+    contents directive, and any namespace prose. Only the member enumeration is replaced.
+    """
+
+    root = ET.parse(index_xml).getroot()
+    for compound in root.findall("compound"):
+        if compound.get("kind") != "namespace":
+            continue
+        namespace = compound.findtext("name") or ""
+        refid = compound.get("refid", "")
+        if not namespace or not refid:
+            continue
+
+        page = generated / f"{refid}.rst"
+        if not page.is_file():
+            # Doxygen refids normally are Exhale filenames. Fall back to Exhale's stable namespace
+            # label for compatibility with historical generator naming.
+            label = "namespace_" + namespace.replace(":", "_").replace(" ", "_")
+            for candidate in generated.glob("*.rst"):
+                head = "\n".join(candidate.read_text(encoding="utf-8").splitlines()[:16])
+                if f".. _{label}:" in head:
+                    page = candidate
+                    break
+        if not page.is_file():
+            continue
+
+        lines = page.read_text(encoding="utf-8").splitlines()
+        start = _namespace_page_member_start(lines)
+        if start is None:
+            while lines and lines[-1] == "":
+                lines.pop()
+            prefix = lines
+        else:
+            prefix = lines[:start]
+            while prefix and prefix[-1] == "":
+                prefix.pop()
+
+        tree = _api_namespace_tree(
+            index_xml,
+            generated,
+            root_namespace=namespace,
+            include_root=False,
+            overload_pages=overload_pages,
+        ).rstrip()
+        replacement = [*prefix, "", "Members", "-------", "", tree, ""]
+        page.write_text("\n".join(replacement), encoding="utf-8")
+
 
 def _unabridged_documents(unabridged: Path) -> list[str]:
     """Extract Exhale's generated document list for one invisible root toctree."""
@@ -711,7 +851,14 @@ def _unabridged_documents(unabridged: Path) -> list[str]:
 
 
 def _prepare_api_landing(app) -> None:
-    """Replace Exhale's noisy root page with a compact namespace synopsis."""
+    """Build the compact namespace/file synopsis used by the API landing page.
+
+    New BESA projects include ``generated/api_landing.rst.include`` directly from ``index.rst`` so
+    the API reference opens on the useful namespace/file hierarchy instead of an intermediate
+    ``<project> API`` page. Historical Git refs may still contain the old index that points at
+    Exhale's ``library_root.rst``; preserve that layout when rendering those refs so current BESA
+    configuration remains compatible with already-published tags.
+    """
 
     api_docs_directory = Path(app.srcdir).resolve()
     generated = api_docs_directory / "generated"
@@ -720,38 +867,41 @@ def _prepare_api_landing(app) -> None:
     unabridged = generated / "unabridged_api.rst.include"
     xml_directory = Path(app.config.breathe_projects[project])
     index_xml = xml_directory / "index.xml"
+    index_source = api_docs_directory / "index.rst"
 
-    if not index_xml.is_file() or not root_file.is_file():
+    if not index_xml.is_file() or not root_file.is_file() or not index_source.is_file():
         return
 
     _simplify_generated_entity_pages(generated)
 
+    overload_pages = _write_overload_pages(index_xml, generated)
     overview = generated / "api_namespace_overview.rst.include"
-    overview.write_text(_api_namespace_overview(index_xml, generated), encoding="utf-8")
-
-    title = f"{project} API"
-    lines = [
-        title,
-        "=" * len(title),
-        "",
-        "Namespace hierarchy",
-        "-------------------",
-        "",
-        ".. include:: api_namespace_overview.rst.include",
-        "",
-    ]
-    if file_hierarchy.is_file():
-        lines.extend(
-            [
-                ".. include:: file_view_hierarchy.rst.include",
-                "",
-            ]
-        )
+    overview.write_text(
+        _api_namespace_overview(index_xml, generated, overload_pages),
+        encoding="utf-8",
+    )
+    _rewrite_namespace_pages(index_xml, generated, overload_pages)
 
     documents = _unabridged_documents(unabridged)
     documents.extend(
         path.name for path in sorted(generated.glob("api_overload_*.rst")) if path.name not in documents
     )
+
+    merged_landing = "generated/api_landing.rst.include" in index_source.read_text(encoding="utf-8")
+    lines = [
+        "Namespace hierarchy",
+        "-------------------",
+        "",
+        ".. include:: /generated/api_namespace_overview.rst.include",
+        "",
+    ]
+    if file_hierarchy.is_file():
+        lines.extend(
+            [
+                ".. include:: /generated/file_view_hierarchy.rst.include",
+                "",
+            ]
+        )
     if documents:
         lines.extend(
             [
@@ -759,12 +909,43 @@ def _prepare_api_landing(app) -> None:
                 "   :hidden:",
                 "   :maxdepth: 1",
                 "",
-                *[f"   {document}" for document in documents],
+                *[f"   /generated/{Path(document).with_suffix('').as_posix()}" for document in documents],
                 "",
             ]
         )
 
-    root_file.write_text("\n".join(lines), encoding="utf-8")
+    if merged_landing:
+        landing = generated / "api_landing.rst.include"
+        landing.write_text("\n".join(lines), encoding="utf-8")
+        # Exhale requires a root file while generating, but the merged index owns navigation in new
+        # projects. Keep the generated root out of Sphinx's orphan checks and out of the public UI.
+        root_file.write_text(":orphan:\n", encoding="utf-8")
+        return
+
+    # Compatibility path for historical refs created before BESA merged the two landing pages.
+    title = f"{project} API"
+    legacy_lines = [title, "=" * len(title), "", *lines]
+    root_file.write_text("\n".join(legacy_lines), encoding="utf-8")
+
+
+def _mark_multiline_signatures(_app, doctree) -> None:
+    """Mark signatures whose parameter list Sphinx chose to render on logical lines.
+
+    The C++ domain owns the 80-character decision. This callback only exposes that decision as a
+    CSS class so BESA can move a return type onto its own line without reimplementing Sphinx's
+    signature-length calculation. Import Sphinx lazily so the generated conf.py remains importable
+    by BESA's template tests even when Sphinx is not installed in that test environment.
+    """
+
+    from sphinx import addnodes
+
+    for signature in doctree.findall(addnodes.desc_signature):
+        parameter_lists = signature.findall(addnodes.desc_parameterlist)
+        if any(node.get("multi_line_parameter_list", False) for node in parameter_lists):
+            classes = signature.setdefault("classes", [])
+            if "besa-multiline-signature" not in classes:
+                classes.append("besa-multiline-signature")
+
 
 def setup(app) -> None:
     """Generate checkout-specific XML before Exhale expands it into Sphinx pages."""
@@ -776,4 +957,5 @@ def setup(app) -> None:
     # Run afterwards, but still before Sphinx discovers source documents.  In particular, overload
     # pages must exist at discovery time or Sphinx will report them as unknown/nonexistent docs.
     app.connect("builder-inited", _prepare_api_landing, priority=900)
+    app.connect("doctree-read", _mark_multiline_signatures)
     app.connect("build-finished", _write_api_symbol_aliases)

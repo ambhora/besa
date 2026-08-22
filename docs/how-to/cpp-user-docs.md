@@ -61,8 +61,8 @@ cmake --build build --target user.docs
 `user.docs` performs three steps:
 
 1. ProperDocs builds the main site.
-2. sphinx-multiversion builds the API reference for selected local branch heads and tags; each Sphinx
-   build runs Doxygen at `builder-inited`, and Breathe consumes that checkout's Doxygen XML.
+2. sphinx-multiversion builds the API reference for `main` plus the selected historical refs; each
+   Sphinx build runs Doxygen at `builder-inited`, and Breathe consumes that checkout's Doxygen XML.
 3. BESA assembles the API trees below the Versioned API section of the ProperDocs Reference page.
 
 Before Doxygen runs for each checkout, `api-docs/conf.py` constructs a temporary documented-header
@@ -131,11 +131,32 @@ The current checkout can be rendered independently with:
 cmake --build build --target user.docs.api
 ```
 
-Build all selected refs without assembling the ProperDocs site with:
+Build the selected historical refs without assembling the ProperDocs site with:
 
 ```bash
 cmake --build build --target user.docs.multiversion
 ```
+
+By default BESA builds every tag plus `main`. Set `extra.besa_api_versions` in `properdocs.yml` to
+change the persistent selection, or use `BESA_API_VERSIONS` to override one invocation:
+
+```text
+all
+latest:4
+range:>=0.2,<0.6
+refs:v0.2.0,v0.4.0,v0.5.1
+```
+
+For example:
+
+```bash
+BESA_API_VERSIONS=latest:4 properdocs serve
+BESA_API_VERSIONS='range:>=0.2,<0.6' cmake --build build --target user.docs.multiversion
+```
+
+`latest:N` and `range:...` operate on parseable version tags and sort/compare them as versions, not
+by Git date or lexicographic string order. `refs:...` selects an exact set of tags or local branches.
+`main` is included independently as the development API for every selector.
 
 The raw multiversion API output is:
 
@@ -160,11 +181,11 @@ BESA computes the number of path levels from the configured API mount point and 
 The links are therefore relative and do not depend on a GitHub Pages repository prefix, hostname, or
 custom domain.
 
-## CI and remote branch heads
+## CI and available refs
 
-sphinx-multiversion builds local branch heads and tags by default. In CI, make sure the refs you want
-to publish are fetched. If you explicitly want remote refs instead, configure sphinx-multiversion in
-`api-docs/conf.py`.
+BESA selects from local tags and local branch heads. `all`, `latest:N`, and `range:...` are tag-oriented;
+`refs:...` can explicitly add another local branch. In CI, fetch the tags and branches needed by the
+configured selector before building the documentation.
 
 ## Install built documentation
 

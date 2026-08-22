@@ -772,6 +772,7 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     config_text = (project / "properdocs.yml").read_text(encoding="utf-8")
     assert "site_dir: ../build/properdocs/site" in config_text
     assert "besa_api_version: main" in config_text
+    assert "besa_api_versions: all" in config_text
     assert "  - test/base" in config_text
     assert "  - .git/refs" in config_text
     assert "  - properdocs_multiversion_hook.py" in config_text
@@ -790,6 +791,19 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert "  - assets/stylesheets/ambhora.css" in config_text
     assert "copyright: Copyright &copy; example_docs developers &middot; Apache-2.0" in config_text
     assert "generator: false" in config_text
+    assert "custom_dir: overrides" in config_text
+    assert "# repo_url:" in config_text
+    actions_template = project / "overrides" / "partials" / "actions.html"
+    not_found_template = project / "overrides" / "404.html"
+    assert actions_template.is_file()
+    assert not_found_template.is_file()
+    actions_text = actions_template.read_text(encoding="utf-8")
+    assert "besa_source_url" in actions_text
+    assert "View this page's source" in actions_text
+    not_found_text = not_found_template.read_text(encoding="utf-8")
+    assert "This documentation page isn't here." in not_found_text
+    assert "besa_issue_url" in not_found_text
+    assert "Report a documentation issue" in not_found_text
     brand_css = docs / "assets" / "stylesheets" / "ambhora.css"
     assert brand_css.is_file()
     brand_text = brand_css.read_text(encoding="utf-8")
@@ -802,6 +816,8 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert "min-height: 2.1rem" in brand_text
     assert "height: 1.8rem" in brand_text
     assert "border-bottom: 0.12rem solid var(--ambhora-green)" in brand_text
+    assert ".besa-404" in brand_text
+    assert ".besa-404__actions" in brand_text
 
     # Sphinx/Breathe/Exhale/Doxygen is a separate API-only source tree. Exhale owns the generated
     # entity pages; the project does not maintain a hand-selected doxygenindex list.
@@ -840,20 +856,38 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert '"exhale"' in conf_text
     assert '"sphinx_multiversion"' in conf_text
     assert 'html_theme = "pydata_sphinx_theme"' in conf_text
+    assert 'html_title = f"{project} documentation"' in conf_text
+    assert "html_short_title = html_title" in conf_text
+    assert '"show_prev_next": False' in conf_text
     assert 'html_js_files = ["js/besa-api-version.js", "js/besa-api-presentation.js"]' in conf_text
     assert '"kindsWithContentsDirectives": ["namespace", "file"]' in conf_text
+    assert '"navbar_align": "right"' in conf_text
+    assert '"navbar_center": []' in conf_text
+    assert '"navbar_persistent": []' in conf_text
+    assert '"search-button-field"' in conf_text
+    assert '"**": ["api-sidebar.html"]' in conf_text
+    assert '"sidebar-collapse"' not in conf_text
+    api_sidebar = (api_docs / "_templates" / "api-sidebar.html").read_text(encoding="utf-8")
+    assert "startdepth=0" in api_sidebar
+    assert '"sidebar"' in api_sidebar
     assert '"primary_sidebar_end"' not in conf_text
     assert '"containmentFolder": "./generated"' in conf_text
     assert '"rootFileName": "library_root.rst"' in conf_text
-    assert 'smv_branch_whitelist = r"^.*$"' in conf_text
-    assert 'smv_tag_whitelist = r"^.*$"' in conf_text
+    assert 'smv_branch_whitelist = os.environ.get("BESA_SMV_BRANCH_WHITELIST", r"^main$")' in conf_text
+    assert 'smv_tag_whitelist = os.environ.get("BESA_SMV_TAG_WHITELIST", r"^.*$")' in conf_text
     assert 'smv_outputdir_format = r"{ref.name}"' in conf_text
+    assert "_selected_smv_refs" not in conf_text
+    assert "packaging.version" not in conf_text
+    assert "cpp_maximum_signature_line_length = 80" in conf_text
     assert "BESA_PROPERDOCS_ROOT_DEPTH" in conf_text
     assert "BESA_API_PROJECT_SOURCE_DIRECTORY" in conf_text
     assert "Path(app.srcdir).resolve()" in conf_text
     api_index_text = (api_docs / "index.rst").read_text(encoding="utf-8")
     assert "doxygenindex" not in api_index_text
-    assert "|projectdocs|" in api_index_text
+    assert "|projectdocs|_" in api_index_text
+    assert ".. include:: generated/api_landing.rst.include" in api_index_text
+    assert "generated/library_root" not in api_index_text
+    assert ".. _projectdocs:" in conf_text
     assert "_write_api_symbol_aliases" in conf_text
     assert "projectdocs{{1}}" in conf_text
     assert "projectdocs{{2}}" in conf_text
@@ -862,6 +896,14 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert 'set(_besa_current_sphinx_source "${PROJECT_BINARY_DIR}/doc/work/sphinx-current")' in userdocs_cmake
     assert '"BESA_API_PROJECT_SOURCE_DIRECTORY=${PROJECT_SOURCE_DIR}"' in userdocs_cmake
     assert '"${_besa_current_sphinx_source}" "${ARG_OUTPUT_DIRECTORY}"' in userdocs_cmake
+    assert 'userdocs/multiversion.py' in userdocs_cmake
+    assert '"--sphinx-multiversion" "${_besa_sphinx_multiversion}"' in userdocs_cmake
+    multiversion_driver = project / "cmake" / "besa" / "userdocs" / "multiversion.py"
+    assert multiversion_driver.is_file()
+    driver_text = multiversion_driver.read_text(encoding="utf-8")
+    assert 'environment["BESA_API_VERSIONS"] = "all"' in driver_text
+    assert 'environment["BESA_SMV_BRANCH_WHITELIST"] = branch_pattern' in driver_text
+    assert 'environment["BESA_SMV_TAG_WHITELIST"] = tag_pattern' in driver_text
 
     doxyfile_text = (api_docs / "Doxyfile").read_text(encoding="utf-8")
     assert "EXTRACT_ALL            = YES" in doxyfile_text
@@ -872,6 +914,8 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert ".bd-page-width" in css
     assert "max-width: 90rem" in css
     assert "min-width: 13rem" in css
+    assert ".navbar-header-items__end" in css
+    assert "margin-inline-start: auto" in css
     assert ".besa-api-project-links" in css
     assert "gap: 1.25rem" in css
     assert ".besa-api-version-select" in css
@@ -879,6 +923,8 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert ".api-kind" in css
     assert ".besa-api-qualifiers" in css
     assert ".besa-api-qualifier" in css
+    assert "dt.besa-multiline-signature .sig-return-type" in css
+    assert "display: block" in css
     assert "font-size: 0.84rem" in css
     assert "font-size: 0.68rem" in css
     assert "font-style: normal" in css
@@ -929,6 +975,7 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     builder_callbacks = events["builder-inited"]
     assert (module._prepare_api, 100) in builder_callbacks
     assert (module._prepare_api_landing, 900) in builder_callbacks
+    assert (module._mark_multiline_signatures, 500) in events["doctree-read"]
     assert (module._write_api_symbol_aliases, 500) in events["build-finished"]
     assert "env-before-read-docs" not in events
 
@@ -967,8 +1014,8 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert current_app.config.exhale_args["containmentFolder"] == str(api_docs / "generated")
     assert current_app.config.exhale_args["doxygenStripFromPath"] == str(current_public)
 
-    # Exhale generates all detailed pages, then BESA replaces only its root document with a compact
-    # namespace-oriented synopsis.  Overloads are intentionally collapsed by name on this page.
+    # Exhale generates all detailed pages, then BESA writes a compact synopsis fragment included by
+    # index.rst. Overloads are intentionally collapsed by name on this page.
     xml_dir = current_output / "xml"
     xml_dir.mkdir(parents=True, exist_ok=True)
     (xml_dir / "index.xml").write_text(
@@ -1059,6 +1106,7 @@ Functions
    struct1.rst
    enum1.rst
    function1.rst
+   define1.rst
 """,
         encoding="utf-8",
     )
@@ -1104,14 +1152,28 @@ Function Documentation
 """,
         encoding="utf-8",
     )
+    (generated_api / "define1.rst").write_text(
+        """\
+.. _exhale_define_define1:
+
+Define TESTEXAMPLE_DOCS_FEATURE
+===============================
+
+Define Documentation
+--------------------
+
+.. doxygendefine:: TESTEXAMPLE_DOCS_FEATURE
+""",
+        encoding="utf-8",
+    )
     module._prepare_api_landing(current_app)
     overview_text = (generated_api / "api_namespace_overview.rst.include").read_text(
         encoding="utf-8"
     )
-    assert ":api-kind:`N` :doc:`example_docs </generated/namespaceexample__docs>`" in overview_text
-    assert ":api-kind:`N` :doc:`meta </generated/namespaceexample__docs_1_1meta>`" in overview_text
-    assert "* :api-kind:`N` :doc:`example_docs </generated/namespaceexample__docs>`\n\n  * :api-kind:`N`" in overview_text
-    assert "  * :api-kind:`N` :doc:`meta </generated/namespaceexample__docs_1_1meta>`\n\n    * :api-kind:`E`" in overview_text
+    assert ":api-kind:`N` :ref:`example_docs <namespace_example_docs>`" in overview_text
+    assert ":api-kind:`N` :ref:`meta <namespace_example_docs__meta>`" in overview_text
+    assert "* :api-kind:`N` :ref:`example_docs <namespace_example_docs>`\n\n  * :api-kind:`N`" in overview_text
+    assert "  * :api-kind:`N` :ref:`meta <namespace_example_docs__meta>`\n\n    * :api-kind:`E`" in overview_text
     assert overview_text.count("to_string()") == 1
     assert ":api-kind:`F` :doc:`to_string() </generated/api_overload_example_docs_meta_to_string>`" in overview_text
     overload_text = (generated_api / "api_overload_example_docs_meta_to_string.rst").read_text(
@@ -1124,14 +1186,29 @@ Function Documentation
     assert ":api-kind:`F` :cpp:func:`version() <example_docs::meta::version>`" in overview_text
     assert ":api-kind:`S` :cpp:struct:`semantic_version <example_docs::meta::semantic_version>`" in overview_text
     assert ":api-kind:`E` :cpp:enum:`release_type <example_docs::meta::release_type>`" in overview_text
+    landing_text = (generated_api / "api_landing.rst.include").read_text(encoding="utf-8")
+    assert "Namespace hierarchy" in landing_text
+    assert "Class Hierarchy" not in landing_text
+    assert "Full API" not in landing_text
+    assert landing_text.count("/generated/file_view_hierarchy.rst.include") == 1
+    assert "   :hidden:" in landing_text
+    assert "   /generated/namespaceexample__docs" in landing_text
     root_text = (generated_api / "library_root.rst").read_text(encoding="utf-8")
-    assert "Namespace hierarchy" in root_text
-    assert "Class Hierarchy" not in root_text
-    assert "Full API" not in root_text
-    assert "File hierarchy\n--------------" not in root_text
-    assert root_text.count("file_view_hierarchy.rst.include") == 1
-    assert "   :hidden:" in root_text
-    assert "   namespaceexample__docs.rst" in root_text
+    assert root_text == ":orphan:\n"
+
+    # Historical refs from before the landing-page merge still point index.rst at library_root.rst.
+    # Current BESA configuration must continue to render those old refs without changing their source.
+    (api_docs / "index.rst").write_text(
+        "API reference\n=============\n\n.. toctree::\n\n   generated/library_root\n",
+        encoding="utf-8",
+    )
+    (generated_api / "library_root.rst").write_text("old noisy root\n", encoding="utf-8")
+    module._prepare_api_landing(current_app)
+    legacy_root = (generated_api / "library_root.rst").read_text(encoding="utf-8")
+    assert legacy_root.startswith("example_docs API\n================\n")
+    assert "Namespace hierarchy" in legacy_root
+    assert "api_landing.rst.include" not in legacy_root
+
     struct_page = (generated_api / "struct1.rst").read_text(encoding="utf-8")
     enum_page = (generated_api / "enum1.rst").read_text(encoding="utf-8")
     function_page = (generated_api / "function1.rst").read_text(encoding="utf-8")
@@ -1144,15 +1221,33 @@ Function Documentation
     assert ".. doxygenstruct:: example_docs::meta::semantic_version" in struct_page
     assert ".. doxygenenum:: example_docs::meta::release_type" in enum_page
     assert ".. doxygenfunction:: example_docs::meta::version" in function_page
+    root_namespace_page = (generated_api / "namespaceexample__docs.rst").read_text(
+        encoding="utf-8"
+    )
+    assert "Members\n-------" in root_namespace_page
+    assert ":api-kind:`N` :ref:`meta <namespace_example_docs__meta>`" in root_namespace_page
+    assert ":api-kind:`S` :cpp:struct:`semantic_version <example_docs::meta::semantic_version>`" in root_namespace_page
+    assert ":api-kind:`E` :cpp:enum:`release_type <example_docs::meta::release_type>`" in root_namespace_page
+    assert ":api-kind:`F` :cpp:func:`version() <example_docs::meta::version>`" in root_namespace_page
+
     namespace_page = (generated_api / "namespaceexample__docs_1_1meta.rst").read_text(
         encoding="utf-8"
     )
-    assert ":ref:`semantic_version <exhale_struct_struct1>`" in namespace_page
-    assert ":ref:`release_type <exhale_enum_enum1>`" in namespace_page
-    assert ":ref:`version <exhale_function_function1>`" in namespace_page
+    assert "Members\n-------" in namespace_page
+    assert ":api-kind:`S` :cpp:struct:`semantic_version <example_docs::meta::semantic_version>`" in namespace_page
+    assert ":api-kind:`E` :cpp:enum:`release_type <example_docs::meta::release_type>`" in namespace_page
+    assert ":api-kind:`F` :cpp:func:`version() <example_docs::meta::version>`" in namespace_page
     assert "Struct semantic_version" not in namespace_page
     assert "Enum release_type" not in namespace_page
     assert "Function example_docs::meta::version" not in namespace_page
+
+    define_page = (generated_api / "define1.rst").read_text(encoding="utf-8")
+    assert define_page.startswith(
+        ".. _exhale_define_define1:\n\nTESTEXAMPLE_DOCS_FEATURE\n========================"
+    )
+    assert "Define TESTEXAMPLE_DOCS_FEATURE" not in define_page
+    assert "Define Documentation" not in define_page
+    assert ".. doxygendefine:: TESTEXAMPLE_DOCS_FEATURE" in define_page
 
     # Reproduce sphinx-multiversion's important shape: conf.py remains in the current checkout while
     # app.srcdir points at a different checkout. The generated Doxyfile must use only that checkout.
@@ -1382,6 +1477,129 @@ besa_configure_complete()
     assert "Build testing : ON" in result.stdout
     assert "Release type  : release" in result.stdout
     assert "Version       : 1.2.3" in result.stdout
+
+
+@pytest.mark.cpp
+def test_generated_api_version_selectors_choose_semantic_tags_and_exact_refs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import importlib.util
+    import re
+
+    if shutil.which("git") is None:
+        pytest.skip("Git is required")
+
+    project = cpp_generate(tmp_path, "example_versions")
+    _run(["git", "init", "-b", "main"], project)
+    _run(["git", "config", "user.email", "besa-test@example.invalid"], project)
+    _run(["git", "config", "user.name", "BESA Test"], project)
+    _run(["git", "add", "."], project)
+    _run(["git", "commit", "-m", "initial"], project)
+    for tag in ("v0.8.0", "v0.9.0", "v0.10.0", "v0.11.0-rc.1", "v0.11.0", "nightly"):
+        _run(["git", "tag", tag], project)
+    _run(["git", "branch", "maintenance"], project)
+
+    driver = project / "cmake" / "besa" / "userdocs" / "multiversion.py"
+    spec = importlib.util.spec_from_file_location("example_versions_driver", driver)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    all_branches, all_tags = module.selected_refs(project, "all")
+    assert all_branches == r"^(?:main)$"
+    assert all_tags == r"^.*$"
+
+    latest_branches, latest_tags = module.selected_refs(project, "latest:3")
+    assert re.fullmatch(latest_branches, "main")
+    assert not re.fullmatch(latest_branches, "maintenance")
+    assert re.fullmatch(latest_tags, "v0.11.0")
+    assert re.fullmatch(latest_tags, "v0.11.0-rc.1")
+    assert re.fullmatch(latest_tags, "v0.10.0")
+    assert not re.fullmatch(latest_tags, "v0.9.0")
+    assert not re.fullmatch(latest_tags, "nightly")
+
+    _range_branches, ranged_tags = module.selected_refs(project, "range:>=0.9,<0.11")
+    assert re.fullmatch(ranged_tags, "v0.9.0")
+    assert re.fullmatch(ranged_tags, "v0.10.0")
+    assert re.fullmatch(ranged_tags, "v0.11.0-rc.1")
+    assert not re.fullmatch(ranged_tags, "v0.8.0")
+    assert not re.fullmatch(ranged_tags, "v0.11.0")
+
+    explicit_branches, explicit_tags = module.selected_refs(
+        project, "refs:v0.8.0,maintenance"
+    )
+    assert re.fullmatch(explicit_branches, "main")
+    assert re.fullmatch(explicit_branches, "maintenance")
+    assert re.fullmatch(explicit_tags, "v0.8.0")
+    assert not re.fullmatch(explicit_tags, "v0.9.0")
+
+    with pytest.raises(RuntimeError, match="unknown BESA API Git refs"):
+        module.selected_refs(project, "refs:v9.9.9")
+
+    monkeypatch.delenv("BESA_API_VERSIONS", raising=False)
+    properdocs = project / "properdocs.yml"
+    properdocs.write_text(
+        properdocs.read_text(encoding="utf-8").replace(
+            "besa_api_versions: all", "besa_api_versions: latest:2"
+        ),
+        encoding="utf-8",
+    )
+    assert module._selector(project) == "latest:2"
+
+
+@pytest.mark.cpp
+def test_multiversion_driver_neutralizes_selector_inside_historical_configs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import importlib.util
+
+    project = cpp_generate(tmp_path, "example_versions_driver")
+    driver = project / "cmake" / "besa" / "userdocs" / "multiversion.py"
+    spec = importlib.util.spec_from_file_location("example_versions_runtime_driver", driver)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    monkeypatch.setenv("BESA_API_VERSIONS", "latest:2")
+    monkeypatch.setattr(
+        module,
+        "selected_refs",
+        lambda _root, selector: (r"^(?:main)$", r"^(?:v0\.3\.0|v1\.0\.0)$")
+        if selector == "latest:2"
+        else (_ for _ in ()).throw(AssertionError(selector)),
+    )
+
+    calls = []
+
+    def fake_run(command, *, cwd, check, env):
+        calls.append((command, cwd, check, env))
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+    assert module.main(
+        [
+            "--sphinx-multiversion",
+            "/bin/sphinx-multiversion",
+            "--project-root",
+            str(project),
+            "--source-directory",
+            "api-docs",
+            "--output-directory",
+            str(tmp_path / "out"),
+            "--",
+            "-W",
+            "--keep-going",
+        ]
+    ) == 0
+
+    assert len(calls) == 1
+    command, cwd, check, environment = calls[0]
+    assert cwd == project.resolve()
+    assert check is True
+    assert environment["BESA_API_VERSIONS"] == "all"
+    assert environment["BESA_SMV_BRANCH_WHITELIST"] == r"^(?:main)$"
+    assert environment["BESA_SMV_TAG_WHITELIST"] == r"^(?:v0\.3\.0|v1\.0\.0)$"
+    assert not any(argument.startswith("smv_branch_whitelist=") for argument in command)
+    assert not any(argument.startswith("smv_tag_whitelist=") for argument in command)
 
 
 @pytest.mark.cpp
@@ -1759,25 +1977,99 @@ def test_generated_properdocs_multiversion_hook_rebuilds_refs_and_current_indepe
         nonlocal configured
         configured += 1
 
+    def fake_build(target: str, api_versions: str | None = None) -> None:
+        targets.append(f"{target}:{api_versions or '-'}")
+
     monkeypatch.setattr(module, "_configure", fake_configure)
-    monkeypatch.setattr(module, "_build", targets.append)
+    monkeypatch.setattr(module, "_build", fake_build)
 
-    module._ensure_multiversion_api()
+    module._ensure_multiversion_api("all")
     assert configured == 1
-    assert targets == ["user.docs.multiversion", "user.docs.api"]
+    assert targets == ["user.docs.multiversion:all", "user.docs.api:-"]
 
-    module._ensure_multiversion_api()
+    module._ensure_multiversion_api("all")
     assert configured == 1
 
     source_state[0] = [("src/a.hpp", 2, 1)]
-    module._ensure_multiversion_api()
+    module._ensure_multiversion_api("all")
     assert configured == 2
-    assert targets[-1] == "user.docs.api"
+    assert targets[-1] == "user.docs.api:-"
 
     refs_state[0] = [(".git/refs/heads/main", 2, 1)]
-    module._ensure_multiversion_api()
+    module._ensure_multiversion_api("all")
     assert configured == 3
-    assert targets[-1] == "user.docs.multiversion"
+    assert targets[-1] == "user.docs.multiversion:all"
+
+    module._ensure_multiversion_api("latest:3")
+    assert configured == 4
+    assert targets[-1] == "user.docs.multiversion:latest:3"
+
+
+@pytest.mark.cpp
+def test_generated_properdocs_source_links_follow_human_refs_and_404_issues(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import importlib.util
+    import re
+    from types import SimpleNamespace
+
+    project = cpp_generate(tmp_path, "example_source_docs")
+    hook_path = project / "properdocs_multiversion_hook.py"
+    spec = importlib.util.spec_from_file_location("example_source_docs_hook", hook_path)
+    assert spec is not None and spec.loader is not None
+    hook = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(hook)
+
+    monkeypatch.setenv("BESA_SOURCE_REF", "feature/docs-links")
+    github_config = {
+        "repo_url": "https://github.com/example/example_source_docs.git",
+        "extra": {},
+    }
+    hook.on_config(github_config)
+    assert github_config["extra"]["besa_source_ref"] == "feature/docs-links"
+    assert github_config["extra"]["besa_repo_provider"] == "github"
+    assert github_config["extra"]["besa_issue_url"] == (
+        "https://github.com/example/example_source_docs/issues/new"
+    )
+
+    page = SimpleNamespace(
+        file=SimpleNamespace(abs_src_path=str(project / "docs" / "reference" / "index.md"))
+    )
+    context = hook.on_page_context({}, page, github_config, nav=None)
+    assert context["besa_source_url"] == (
+        "https://github.com/example/example_source_docs/blob/feature/docs-links/"
+        "docs/reference/index.md"
+    )
+    assert not re.search(r"/[0-9a-f]{40}/", context["besa_source_url"])
+
+    # Unknown/self-hosted repository hosts use GitLab's URL layout unless explicitly overridden.
+    gitlab_config = {
+        "repo_url": "https://code.example.org/software/example_source_docs",
+        "extra": {},
+    }
+    hook.on_config(gitlab_config)
+    assert gitlab_config["extra"]["besa_repo_provider"] == "gitlab"
+    assert gitlab_config["extra"]["besa_issue_url"] == (
+        "https://code.example.org/software/example_source_docs/-/issues/new"
+    )
+    gitlab_context = hook.on_page_context({}, page, gitlab_config, nav=None)
+    assert gitlab_context["besa_source_url"] == (
+        "https://code.example.org/software/example_source_docs/-/blob/feature/docs-links/"
+        "docs/reference/index.md"
+    )
+
+    # Explicit issue/provider configuration wins over inference.
+    explicit = {
+        "repo_url": "https://git.example.org/example_source_docs",
+        "extra": {
+            "besa_repo_provider": "bitbucket",
+            "besa_issue_url": "https://issues.example.org/new",
+        },
+    }
+    hook.on_config(explicit)
+    assert explicit["extra"]["besa_issue_url"] == "https://issues.example.org/new"
+    explicit_context = hook.on_page_context({}, page, explicit, nav=None)
+    assert "/src/feature/docs-links/docs/reference/index.md" in explicit_context["besa_source_url"]
 
 
 @pytest.mark.cpp
@@ -1858,6 +2150,16 @@ def test_generated_documentation_cross_references_are_semantic(
         "(api/main/_symbols/example_xrefs/meta/build/)"
     ) in rendered
 
+    rendered_versioned = hook.on_page_markdown(
+        "Released metadata: @apidocs[v0.2.0]::example_xrefs::meta::build.",
+        page,
+        {"extra": {"besa_api_version": "main"}},
+    )
+    assert (
+        "[`example_xrefs::meta::build`]"
+        "(api/v0.2.0/_symbols/example_xrefs/meta/build/)"
+    ) in rendered_versioned
+
     hook.CURRENT_API_BUILD_DIRECTORY = output
     monkeypatch.setattr(hook, "_serve_active", True)
     hook.on_page_markdown(
@@ -1868,6 +2170,30 @@ def test_generated_documentation_cross_references_are_semantic(
     with pytest.raises(RuntimeError, match="unresolved API documentation reference"):
         hook.on_page_markdown(
             "@apidocs::example_xrefs::meta::missing",
+            page,
+            {"extra": {"besa_api_version": "main"}},
+        )
+
+    hook.MULTIVERSION_API_BUILD_DIRECTORY = tmp_path / "multiversion"
+    released_alias = (
+        hook.MULTIVERSION_API_BUILD_DIRECTORY
+        / "v0.2.0"
+        / "_symbols"
+        / "example_xrefs"
+        / "meta"
+        / "build"
+        / "index.html"
+    )
+    released_alias.parent.mkdir(parents=True)
+    released_alias.write_text("released", encoding="utf-8")
+    hook.on_page_markdown(
+        "@apidocs[v0.2.0]::example_xrefs::meta::build",
+        page,
+        {"extra": {"besa_api_version": "main"}},
+    )
+    with pytest.raises(RuntimeError, match="version 'v9.9.9'"):
+        hook.on_page_markdown(
+            "@apidocs[v9.9.9]::example_xrefs::meta::build",
             page,
             {"extra": {"besa_api_version": "main"}},
         )

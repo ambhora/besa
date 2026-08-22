@@ -1,19 +1,33 @@
 site_name: vorlage
 site_description: Documentation for vorlage
 site_dir: ../build/properdocs/site
+
+# Set this to the canonical Git repository to enable per-page source links and the 404 issue action.
+# GitHub and GitLab repository URLs are supported directly; other/self-hosted layouts can set
+# extra.besa_repo_provider explicitly.
+# repo_url: https://github.com/example/vorlage
 copyright: Copyright &copy; vorlage developers &middot; BESA_PROJECT_LICENSE
 
 extra:
   # The project-specific copyright above replaces MaterialX's generator credit.
   generator: false
-  # @apidocs::... references resolve against this version. Pin a release/tag here when prose should
-  # deliberately target a released API rather than the live development API.
+  # @apidocs::... references resolve against this default version. Individual references can
+  # override it with @apidocs[v0.2.0]::qualified::symbol.
   besa_api_version: main
+  # Historical API generation defaults to every tag plus main. Alternatives include latest:4,
+  # range:>=0.2,<0.6, and refs:v0.2.0,v0.4.0. BESA_API_VERSIONS overrides this value.
+  besa_api_versions: all
+  # Optional when repo_url is hosted on a provider BESA cannot infer. Supported values are github,
+  # gitlab, and bitbucket. Unknown hosts default to GitLab because self-hosted GitLab is common.
+  # besa_repo_provider: gitlab
+  # Optional override when issues live somewhere other than the repository's standard issue board.
+  # besa_issue_url: https://example.invalid/project/issues/new
 
 # ProperDocs owns the public documentation site's information architecture. The versioned C/C++ API
 # reference is mounted below reference/api/ after ProperDocs has built the main documentation site.
 theme:
   name: materialx
+  custom_dir: overrides
   palette:
     - scheme: default
       primary: custom

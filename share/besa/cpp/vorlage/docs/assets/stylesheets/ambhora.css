@@ -107,3 +107,31 @@
 .md-footer-meta {
   border-top: 0.16rem solid var(--ambhora-green);
 }
+
+
+/* Documentation 404 page --------------------------------------------------------------- */
+.besa-404 {
+  max-width: 48rem;
+  margin: 10vh auto 0;
+  padding: 2rem 0 4rem;
+}
+
+.besa-404__code {
+  font-size: clamp(4rem, 14vw, 9rem);
+  font-weight: 800;
+  line-height: 0.9;
+  letter-spacing: -0.06em;
+  color: var(--ambhora-blue);
+  opacity: 0.16;
+}
+
+.besa-404 h1 {
+  margin-top: -0.35rem;
+}
+
+.besa-404__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}

@@ -44,8 +44,9 @@ isolated from the production source graph.
 
 `docs/` is the ProperDocs source tree and therefore owns the canonical site hierarchy. `api-docs/`
 is intentionally separate: Doxygen generates XML only, Breathe imports that XML into Sphinx, and
-sphinx-multiversion rebuilds the API renderer from historical Git branch heads and tags. BESA mounts
-the resulting API trees below `reference/api/<version>/` when assembling `user.docs`.
+sphinx-multiversion rebuilds the API renderer for `main` plus the historical refs selected by BESA.
+The default is every tag; projects can choose `latest:N`, a version range, or an exact ref set. BESA
+mounts the resulting API trees below `reference/api/<version>/` when assembling `user.docs`.
 
 This separation lets `properdocs serve` remain a normal local authoring workflow while API generation
 can evolve independently. The build-tree Doxygen XML location is checkout-specific so simultaneous

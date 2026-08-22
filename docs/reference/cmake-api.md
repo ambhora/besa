@@ -184,8 +184,9 @@ besa_add_sphinx_breathe_docs(
 ```
 
 Registers the API-rendering layer only. `NAME` builds the current checkout with Sphinx;
-`MULTIVERSION_NAME` builds selected Git refs with sphinx-multiversion. Doxygen produces XML for each
-checkout and Breathe exposes that XML to Sphinx.
+`MULTIVERSION_NAME` builds the Git refs selected by `BESA_API_VERSIONS` (or the generated
+`properdocs.yml` default) with sphinx-multiversion. Doxygen produces XML for each checkout and
+Breathe exposes that XML to Sphinx.
 
 The multiversion root contains one Sphinx tree per selected ref plus `versions.json`. It deliberately
 does not create a root `index.html`: when used by `besa_add_user_docs()`, ProperDocs owns the API
