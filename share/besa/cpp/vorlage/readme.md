@@ -21,15 +21,7 @@ repository are declared directly in `spack.yaml`.
 
 The local `dev-env` recipe is also the development description consumed by `amstack sync`
 when constructing the installable `vorlage` package. The development environment does not install
-`vorlage` itself; package installation through amstack is a separate operation. Development-bundle
-variants only control which tools are present in the environment. For example, CUDA tooling can be
-enabled with:
-
-```bash
-spack change dev-env+cuda
-spack concretize -f
-spack install
-```
+`vorlage` itself; package installation through amstack is a separate operation. Development-bundle variants only control which tools are present in the environment.
 
 ## User documentation
 

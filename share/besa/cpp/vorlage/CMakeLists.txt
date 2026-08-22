@@ -81,11 +81,7 @@ set(RELEASE_REVISION "1" CACHE STRING "Revision of Release")
 besa_features_add(
   FEATURES
     build-source
-    toolchain-c
     toolchain-cpp
-    toolchain-cuda
-    toolchain-hip
-    toolchain-asm
     user-docs
     project-kosha25
     showcase-hello

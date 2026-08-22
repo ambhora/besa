@@ -102,7 +102,9 @@ prerelease types use the declared project version.
 
 BESA writes the resolved semantic version to `PROJECT_SEMVER`, generates
 `<binary>/generated/include/<project>/version.hpp`, and writes the same resolved string into the
-installed package configuration.
+installed package configuration. The generated header exposes structured `project::meta`
+constexpr metadata for the base version, release information, and CMake-derived build information,
+with explicit `to_string(...)` conversion helpers.
 
 ## Configure-time summary
 

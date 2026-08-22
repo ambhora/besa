@@ -72,9 +72,12 @@ Defaults: `KIND NORMAL`, `PROVIDER CMAKE`, `VISIBILITY PRIVATE`.
 Conditionally calls `add_subdirectory()`.
 
 ### `besa_add_source_directory(NAME directory LANGUAGE language [WHEN ...])`
-Processes a language-specific root using the `include/`, `lib/`, `bin/` convention. Multiple roots
-may contribute sources/headers to the shared `lib<project>` target. Each direct file in `bin/`
-creates or contributes to an executable named after its file stem.
+Processes a language-specific root using the `include/`, `lib/<library>/`, `bin/` convention.
+Multiple roots may contribute sources/headers to the shared `lib<project>` target. The generated
+template places the main project's implementation below `lib/<project>/`, leaving sibling library
+directories available for experiments. BESA currently collects every source below `lib/` into the
+shared `lib<project>` target; separate library targets are not inferred from those directories yet.
+Each direct file in `bin/` creates or contributes to an executable named after its file stem.
 
 ## Targets
 

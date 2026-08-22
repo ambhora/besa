@@ -14,8 +14,6 @@ class DevEnv(BundlePackage):
     variant("docs", default=False, description="Documentation toolchain")
     variant("tests", default=True, description="C++ test dependencies")
     variant("coverage", default=False, description="Coverage reporting tools")
-    variant("cuda", default=False, description="CUDA development toolchain")
-    variant("hip", default=False, description="HIP development toolchain")
 
     depends_on("cmake")
     depends_on("ninja")
@@ -26,9 +24,6 @@ class DevEnv(BundlePackage):
     depends_on("catch2", when="+tests")
     depends_on("lcov", when="+coverage")
     depends_on("py-gcovr", when="+coverage")
-
-    depends_on("cuda", when="+cuda")
-    depends_on("hip", when="+hip")
 
     depends_on("doxygen", when="+docs")
     depends_on("graphviz", when="+docs")

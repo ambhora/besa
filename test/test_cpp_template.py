@@ -40,6 +40,28 @@ def test_generated_cpp_project_builds_with_multiple_compilers(
 
 
 @pytest.mark.cpp
+def test_generated_cpp_project_groups_library_sources_by_library(tmp_path: Path) -> None:
+    project = cpp_generate(tmp_path, "example_layout")
+
+    cpp_library = project / "src" / "cpp" / "lib" / "example_layout"
+    assert (cpp_library / "example_layout.cpp").is_file()
+    assert not (project / "src" / "cpp" / "lib" / "example_layout.cpp").exists()
+
+    source_roots = {path.name for path in (project / "src").iterdir() if path.is_dir()}
+    assert source_roots == {"cpp"}
+
+    root_cmake = (project / "CMakeLists.txt").read_text(encoding="utf-8")
+    for feature in ("toolchain-c", "toolchain-hip", "toolchain-asm", "toolchain-cuda"):
+        assert f"    {feature}\n" not in root_cmake
+
+    dev_env = (
+        project / "spack" / "spack_repo" / "dev" / "packages" / "dev_env" / "package.py"
+    ).read_text(encoding="utf-8")
+    assert 'variant("hip"' not in dev_env
+    assert 'depends_on("hip"' not in dev_env
+
+
+@pytest.mark.cpp
 def test_generated_cpp_project_vendors_and_builds_prova_support(tmp_path: Path) -> None:
     if shutil.which("cmake") is None or shutil.which("g++") is None:
         pytest.skip("CMake and g++ are required")
@@ -140,9 +162,9 @@ public:
     )
     _run(["cmake", "--build", "build/prova", "--target", "libtestexample_prova"], project)
     _run(["cmake", "--build", "build/prova", "--target", "prova.runner.t"], project)
-    _run(["cmake", "--build", "build/prova", "--target", "unit.hello.t"], project)
+    _run(["cmake", "--build", "build/prova", "--target", "unit.version.t"], project)
     _run(
-        ["ctest", "--test-dir", "build/prova", "-R", "^unit.hello.t$", "--output-on-failure"],
+        ["ctest", "--test-dir", "build/prova", "-R", "^unit.version.t$", "--output-on-failure"],
         project,
     )
 
@@ -176,7 +198,9 @@ target_link_libraries(consumer PRIVATE example_install::libexample_install)
         encoding="utf-8",
     )
     (consumer / "main.cpp").write_text(
-        "#include <example_install/example_install.hpp>\nint main(){return example_install::hello().empty();}\n",
+        "#include <example_install/example_install.hpp>\n"
+        "int main(){constexpr auto v = example_install::meta::version(); "
+        "static_assert(v.major == 0 && v.minor == 1 && v.patch == 0); return 0;}\n",
         encoding="utf-8",
     )
     _run(
@@ -362,7 +386,15 @@ def test_release_version_is_written_to_generated_header(tmp_path: Path) -> None:
         project,
     )
     version_header = project / "build" / "version" / "generated" / "include" / "example_version" / "version.hpp"
-    assert '0.1.0-rc.3' in version_header.read_text(encoding="utf-8")
+    version_text = version_header.read_text(encoding="utf-8")
+    assert "namespace example_version::meta" in version_text
+    assert "struct semantic_version" in version_text
+    assert "struct release_info" in version_text
+    assert "struct build_info" in version_text
+    assert "return {0, 1, 0, 0};" in version_text
+    assert 'return {release_type::release_candidate, 3};' in version_text
+    assert 'return "0.1.0";' in version_text
+    assert 'return "rc.3";' in version_text
 
 
 @pytest.mark.cpp
@@ -658,23 +690,6 @@ endif()
         encoding="utf-8",
     )
     _run(["cmake", "-P", str(script)], tmp_path)
-
-
-@pytest.mark.cpp
-def test_generated_cpp_project_can_enable_asm_toolchain(tmp_path: Path) -> None:
-    """ASM is a real toolchain feature and can be enabled in a generated C++ project."""
-    project = cpp_generate(tmp_path, "asmproject")
-    _run(
-        [
-            "cmake",
-            "-S",
-            ".",
-            "-B",
-            "build-asm",
-            "-DPROJECT_FEATURES=toolchain-asm",
-        ],
-        project,
-    )
 
 @pytest.mark.cpp
 def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
@@ -1129,7 +1144,7 @@ def test_generated_cpp_spack_environment_uses_amstack_and_local_dev_bundle(
     assert "from spack_repo.builtin.build_systems.bundle import BundlePackage" in environment_package
     assert "class DevEnv(BundlePackage):" in environment_package
     assert 'version("1.1")' in environment_package
-    for variant in ("docs", "tests", "coverage", "cuda", "hip"):
+    for variant in ("docs", "tests", "coverage"):
         assert f'variant("{variant}"' in environment_package
     assert 'depends_on("doxygen", when="+docs")' in environment_package
     assert 'depends_on("py-sphinx@:8", when="+docs")' in environment_package
@@ -1138,8 +1153,9 @@ def test_generated_cpp_spack_environment_uses_amstack_and_local_dev_bundle(
     assert 'depends_on("py-pydata-sphinx-theme", when="+docs")' in environment_package
     assert 'depends_on("py-sphinx-multiversion", when="+docs")' in environment_package
     assert 'depends_on("properdocs", when="+docs")' in environment_package
-    assert 'depends_on("cuda", when="+cuda")' in environment_package
-    assert 'depends_on("hip", when="+hip")' in environment_package
+    for toolchain in ("cuda", "hip"):
+        assert f'variant("{toolchain}"' not in environment_package
+        assert f'depends_on("{toolchain}"' not in environment_package
     assert not (repo / "packages" / "properdocs").exists()
 
     compile(environment_package, "dev_env/package.py", "exec")

@@ -1,13 +1,13 @@
 // -------------------------------------------------------------------------------------------------
 // SPDX-License-Identifier: Apache-2.0
 // -------------------------------------------------------------------------------------------------
-#include <vorlage/version.hpp>
 #include <vorlage/vorlage.hpp>
 
 #include <iostream>
 
 int main()
 {
-  std::cout << vorlage::hello() << " vorlage " << vorlage::version << '\n';
+  std::cout << "vorlage " << vorlage::meta::to_string(vorlage::meta::version());
+  std::cout << " (" << vorlage::meta::to_string(vorlage::meta::release()) << ")\n";
   return 0;
 }

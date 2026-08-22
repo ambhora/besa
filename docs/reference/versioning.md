@@ -32,7 +32,35 @@ contains the resolved string. BESA also writes:
 ```
 
 and attaches that generated header to the main `lib<project>` file set when the conventional source
-layout creates the library.
+layout creates the library. The header exposes compile-time metadata in `<project>::meta`:
+
+```cpp
+auto constexpr version = project::meta::version();
+auto constexpr release = project::meta::release();
+auto constexpr build = project::meta::build();
+
+static_assert(version.major == 1);
+static_assert(project::meta::to_string(version) == "1.2.3");
+static_assert(project::meta::to_string(release.type) == "rc");
+```
+
+`version()` returns a `semantic_version` with `major`, `minor`, `patch`, and `tweak` components derived
+from CMake's `PROJECT_VERSION_*` values. Missing components are zero.
+
+`release()` returns a `release_info` containing the resolved release kind and revision. The enum
+values are `development`, `release`, `alpha`, `beta`, and `release_candidate`.
+
+`build()` returns `build_info` with only CMake-derived build metadata:
+
+- C++ compiler ID;
+- C++ compiler version;
+- target system name;
+- target processor;
+- build type (or `multi-config` / `none` when appropriate).
+
+String conversion is explicit. `project::meta::to_string(...)` converts the structured metadata to
+canonical string forms such as the base `PROJECT_VERSION`, `rc.2`, or a compact build-description
+string.
 
 During installation, BESA writes the resolved version string into `<project>Config.cmake` and uses
 the base `PROJECT_VERSION` to generate `<project>ConfigVersion.cmake` compatibility metadata.

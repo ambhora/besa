@@ -1,6 +1,6 @@
 # C++ project layout
 
-The generated project uses language-specific roots below `src/`:
+The generated starter project contains a single C++ source root below `src/`:
 
 ```text
 project/
@@ -22,33 +22,23 @@ project/
 │       └── versioning.html
 ├── src/
 │   ├── CMakeLists.txt
-│   ├── cpp/
-│   │   ├── bin/
-│   │   ├── include/
-│   │   └── lib/
-│   ├── c/
-│   │   ├── bin/
-│   │   ├── include/
-│   │   └── lib/
-│   └── cuda/
+│   └── cpp/
 │       ├── bin/
 │       ├── include/
+│       │   └── <project>/
 │       └── lib/
+│           └── <project>/
 ├── test/
 ├── project/
 └── showcase/
 ```
 
-`src/CMakeLists.txt` contains `besa_add_source_directory()` calls. `project/` and `showcase/` use
-feature selectors so long-lived experiments and demonstrations remain isolated from the production
-source graph.
+`src/CMakeLists.txt` contains the `besa_add_source_directory()` call for the C++ source root. The
+generated project's main library lives below `src/cpp/lib/<project>/`. Additional language roots
+can be added explicitly when a project needs them; they are not part of the starter source tree.
 
-HIP and ASM source roots use the same `include/`, `lib/`, and `bin/` convention as the C-family
-roots. A project can therefore use `src/hip` with `LANGUAGE HIP` and `src/asm` with `LANGUAGE ASM`
-without changing the surrounding source-directory model.
-
-For Fortran, BESA reserves the possibility of adding a `mod/` convention in a future release without
-requiring existing project-level CMake descriptions to change.
+`project/` and `showcase/` use feature selectors so long-lived experiments and demonstrations remain
+isolated from the production source graph.
 
 
 ## User-documentation layout

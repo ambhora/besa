@@ -28,14 +28,15 @@ endfunction()
 
 # Add one language-specific source root.  The directory convention is deliberately small:
 #
-#   <name>/include/  public headers
-#   <name>/lib/      library implementation sources
-#   <name>/bin/      one executable source per file (file stem becomes target name)
-#   <name>/mod/      reserved for Fortran module-oriented source organization
+#   <name>/include/        public headers
+#   <name>/lib/<library>/  library implementation sources grouped by logical library
+#   <name>/bin/            one executable source per file (file stem becomes target name)
+#   <name>/mod/            reserved for Fortran module-oriented source organization
 #
-# Multiple language roots may contribute to the same `lib<project>` target.  This lets a C++ and a
-# CUDA directory coexist without the top-level project script knowing how either language is laid
-# out.  New conventions can therefore be added in BESA without changing project-owned CMake code.
+# Multiple language roots may contribute to the same `lib<project>` target. The template keeps that
+# target's sources under `lib/<project>/`. BESA currently collects all files below `lib/` into
+# `lib<project>`; the subdirectory boundary is organizational until explicit multi-library
+# source-directory support is introduced.
 function(besa_add_source_directory)
   _besa_require_config_complete("besa_add_source_directory")
   cmake_parse_arguments(ARG "" "NAME;LANGUAGE" "WHEN" ${ARGN})
