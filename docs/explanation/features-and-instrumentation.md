@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: 2026 BESA developers -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Configuration families are intentionally orthogonal
 
 BESA keeps several configuration concepts separate because they answer different questions.

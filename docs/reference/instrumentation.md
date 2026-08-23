@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: 2026 BESA developers -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Instrumentation and developer-tool reference
 
 Instrumentation is selected through `PROJECT_DEVTOOLS` and resolved by

@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: 2026 BESA developers -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # C++ project layout
 
 The generated starter project contains a single C++ source root below `src/`:

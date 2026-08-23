@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: 2026 BESA developers -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Release process
 
 BESA separates the version declared by the project from the release state of a particular build.

@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: 2026 BESA developers -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Configuration variables
 
 BESA deliberately separates configuration families by **who defines the available names** and by

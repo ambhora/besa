@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: 2026 BESA developers -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Create a Python project
 
 Python generation is intentionally minimal for now. Create an empty directory whose name is the

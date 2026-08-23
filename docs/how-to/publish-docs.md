@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: 2026 BESA developers -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Build and publish the documentation
 
 The site is a normal ProperDocs project rooted at `properdocs.yml` with source under `docs/`.

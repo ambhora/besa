@@ -1,3 +1,4 @@
+# SPDX-FileCopyrightText: 2026 BESA developers
 # SPDX-License-Identifier: Apache-2.0
 from spack_repo.builtin.packages.doxygen.package import Doxygen as BuiltinDoxygen
 

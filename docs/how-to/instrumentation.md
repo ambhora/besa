@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: 2026 BESA developers -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Enable instrumentation and developer tools
 
 Instrumentation is orthogonal to structural features. Select it with `PROJECT_DEVTOOLS`:

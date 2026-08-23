@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 BESA developers
+# SPDX-License-Identifier: Apache-2.0
 # ProperDocs owns the documentation-site root. Doxygen/Breathe/Exhale/Sphinx provide only the versioned API
 # reference mounted below reference/api/. The final user.docs target assembles both trees into one
 # static artifact under <build>/doc/site.

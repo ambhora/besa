@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 BESA developers
+# SPDX-License-Identifier: Apache-2.0
 # Smoke tests validate the environment before more expensive tests are trusted.  Sanitizer smoke
 # tests intentionally trigger their sanitizer so a misconfigured instrumentation runtime is caught.
 

@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: 2026 BESA developers -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Run the BESA regression suite
 
 The repository tests generate fresh template projects and exercise them rather than compiling the

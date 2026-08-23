@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: 2026 BESA developers -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Add configuration constraints
 
 BESA lets a project reject otherwise valid combinations in three independently resolved

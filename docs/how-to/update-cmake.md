@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: 2026 BESA developers -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Update the vendored BESA CMake module
 
 A generated C++ project contains a project-owned copy of BESA under `cmake/besa`. Update only that

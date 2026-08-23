@@ -1,4 +1,5 @@
 # --------------------------------------------------------------------------------------------------
+# SPDX-FileCopyrightText: 2026 BESA developers
 # SPDX-License-Identifier: Apache-2.0
 # --------------------------------------------------------------------------------------------------
 # Project-local test support.  This library is intentionally not installed.  It provides the

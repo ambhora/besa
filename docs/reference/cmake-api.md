@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: 2026 BESA developers -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # CMake API reference
 
 All public BESA functions use named arguments. Positional calling conventions are reserved for BESA

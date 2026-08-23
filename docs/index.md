@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: 2026 BESA developers -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # BESA
 
 BESA provides a small declarative layer for project development. Its C++ support is designed around a

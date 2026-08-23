@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: 2026 BESA developers -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Dependency model
 
 BESA separates **why** a dependency exists from **how** CMake discovers it.

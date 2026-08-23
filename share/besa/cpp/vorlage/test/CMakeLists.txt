@@ -1,4 +1,5 @@
 # --------------------------------------------------------------------------------------------------
+# SPDX-FileCopyrightText: 2026 BESA developers
 # SPDX-License-Identifier: Apache-2.0
 # --------------------------------------------------------------------------------------------------
 # Tests have their own first-class dependency graph.  libtestvorlage is intentionally not part of

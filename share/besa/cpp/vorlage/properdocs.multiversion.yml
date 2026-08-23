@@ -1,2 +1,4 @@
+# SPDX-FileCopyrightText: 2026 BESA developers
+# SPDX-License-Identifier: Apache-2.0
 # Compatibility alias. Multiversion serving is the default in properdocs.yml.
 INHERIT: properdocs.yml

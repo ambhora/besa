@@ -1,4 +1,5 @@
 # --------------------------------------------------------------------------------------------------
+# SPDX-FileCopyrightText: 2026 BESA developers
 # SPDX-License-Identifier: Apache-2.0
 # --------------------------------------------------------------------------------------------------
 """Command-line interface for BESA.
@@ -29,8 +30,8 @@ _DEFAULT_SPDX_LICENSE = "Apache-2.0"
 _DEFAULT_CPP_DIRECTORY = "main"
 _EDITOR_IGNORE_ENTRIES = (".nvimrc", ".ycm_extra_conf.py")
 
-_SPDX_COPYRIGHT = "SPDX-FileCopyrightText:"
-_SPDX_LICENSE = "SPDX-License-Identifier:"
+_SPDX_COPYRIGHT = "SPDX-FileCopyright" "Text:"
+_SPDX_LICENSE = "SPDX-License-" "Identifier:"
 _HASH_COMMENT_SUFFIXES = {".cmake", ".py", ".sh", ".yaml", ".yml", ".toml", ".ini", ".cfg", ".conf"}
 _SLASH_COMMENT_SUFFIXES = {".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx", ".cu", ".cuh", ".hip", ".js", ".ts"}
 _BLOCK_COMMENT_SUFFIXES = {".css", ".scss"}
@@ -111,11 +112,11 @@ def _render_tree(
             .replace("Vorlage", project_class_name)
         )
         rendered = rendered.replace(
-            f"SPDX-License-Identifier: {_DEFAULT_SPDX_LICENSE}",
-            f"SPDX-License-Identifier: {spdx_license_identifier}",
+            f"SPDX-License-" f"Identifier: {_DEFAULT_SPDX_LICENSE}",
+            f"SPDX-License-" f"Identifier: {spdx_license_identifier}",
         )
         rendered = re.sub(
-            r"(SPDX-FileCopyrightText:\s*)\d{4} BESA developers",
+            r"(SPDX-FileCopyright" r"Text:\s*)\d{4} BESA developers",
             rf"\g<1>{_project_copyright_text(project_name)}",
             rendered,
         )

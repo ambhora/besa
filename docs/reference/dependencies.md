@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: 2026 BESA developers -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Dependency reference
 
 `besa_dependency_add()` describes a dependency in two independent dimensions: why the dependency

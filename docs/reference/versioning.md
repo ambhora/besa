@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: 2026 BESA developers -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Release and versioning reference
 
 The normal CMake `project(... VERSION ...)` value is the release base version. BESA adds release

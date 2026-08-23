@@ -1,4 +1,5 @@
 # --------------------------------------------------------------------------------------------------
+# SPDX-FileCopyrightText: 2026 BESA developers
 # SPDX-License-Identifier: Apache-2.0
 # --------------------------------------------------------------------------------------------------
 # This file is intentionally a description of project intent rather than an implementation of build

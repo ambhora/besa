@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 BESA developers
+# SPDX-License-Identifier: Apache-2.0
 from __future__ import annotations
 
 import shutil
@@ -2445,15 +2447,15 @@ def test_generated_cpp_project_has_reuse_metadata(tmp_path: Path) -> None:
         except UnicodeDecodeError:
             text = ""
 
-        if "SPDX-FileCopyrightText:" in text and "SPDX-License-Identifier:" in text:
+        if "SPDX-FileCopyright" "Text:" in text and "SPDX-License-" "Identifier:" in text:
             metadata = text
         else:
             sidecar = Path(str(path) + ".license")
             assert sidecar.is_file(), f"missing REUSE metadata for {relative}"
             metadata = sidecar.read_text(encoding="utf-8")
 
-        assert "SPDX-FileCopyrightText:" in metadata
-        assert "SPDX-License-Identifier: Apache-2.0" in metadata
+        assert "SPDX-FileCopyright" "Text:" in metadata
+        assert "SPDX-License-" "Identifier: Apache-2.0" in metadata
         if relative.parts[:2] == ("cmake", "besa"):
             assert "BESA developers" in metadata
         else:
@@ -2471,10 +2473,10 @@ def test_generated_cpp_custom_license_requires_and_installs_license_text(tmp_pat
 
     assert (project / "LICENSES" / "Apache-2.0.txt").is_file()
     assert (project / "LICENSES" / "MIT.txt").read_text(encoding="utf-8") == "MIT License\n"
-    assert "SPDX-License-Identifier: MIT" in (project / "CMakeLists.txt").read_text(
+    assert "SPDX-License-" "Identifier: MIT" in (project / "CMakeLists.txt").read_text(
         encoding="utf-8"
     )
-    assert "SPDX-License-Identifier: Apache-2.0" in (
+    assert "SPDX-License-" "Identifier: Apache-2.0" in (
         project / "cmake" / "besa" / "besaConfig.cmake"
     ).read_text(encoding="utf-8")
 

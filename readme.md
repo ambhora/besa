@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: 2026 BESA developers -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # BESA
 
 BESA is project-development tooling for declarative, self-contained build descriptions. Its current

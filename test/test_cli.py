@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 BESA developers
+# SPDX-License-Identifier: Apache-2.0
 from __future__ import annotations
 
 from pathlib import Path
@@ -55,8 +57,8 @@ def test_cpp_generate_accepts_explicit_spdx_license(tmp_path: Path) -> None:
     project = cpp_generate(tmp_path, "example_mit", "MIT", license_text=license_text)
     header = project / "src" / "cpp" / "include" / "example_mit" / "example_mit.hpp"
     text = header.read_text(encoding="utf-8")
-    assert "SPDX-License-Identifier: MIT" in text
-    assert "SPDX-License-Identifier: Apache-2.0" not in text
+    assert "SPDX-License-" "Identifier: MIT" in text
+    assert "SPDX-License-" "Identifier: Apache-2.0" not in text
     properdocs = (project / "properdocs.yml").read_text(encoding="utf-8")
     assert "Copyright &copy; example_mit developers &middot; MIT" in properdocs
     assert "BESA_PROJECT_LICENSE" not in properdocs
@@ -83,7 +85,7 @@ def test_cpp_generate_cli_accepts_license_option(tmp_path: Path) -> None:
         == 0
     )
     header = tmp_path / "main" / "src" / "cpp" / "include" / "example_bsd" / "example_bsd.hpp"
-    assert "SPDX-License-Identifier: BSD-3-Clause" in header.read_text(encoding="utf-8")
+    assert "SPDX-License-" "Identifier: BSD-3-Clause" in header.read_text(encoding="utf-8")
 
 
 def test_cpp_generate_cli_defaults_to_main_and_apache_without_stdin(
@@ -116,7 +118,7 @@ def test_cpp_generate_cli_defaults_to_main_and_apache_without_stdin(
         / "example_default_license"
         / "example_default_license.hpp"
     )
-    assert "SPDX-License-Identifier: Apache-2.0" in header.read_text(encoding="utf-8")
+    assert "SPDX-License-" "Identifier: Apache-2.0" in header.read_text(encoding="utf-8")
 
 
 def test_cpp_generate_cli_accepts_custom_directory(tmp_path: Path) -> None:
@@ -178,8 +180,8 @@ def test_cpp_generate_cli_can_install_gitignored_nvim_ycm_config(tmp_path: Path)
     assert ycm.is_file()
     assert ".nvimrc" in gitignore.splitlines()
     assert ".ycm_extra_conf.py" in gitignore.splitlines()
-    assert "SPDX-License-Identifier: MIT" in nvimrc.read_text(encoding="utf-8")
-    assert "SPDX-License-Identifier: MIT" in ycm.read_text(encoding="utf-8")
+    assert "SPDX-License-" "Identifier: MIT" in nvimrc.read_text(encoding="utf-8")
+    assert "SPDX-License-" "Identifier: MIT" in ycm.read_text(encoding="utf-8")
     assert 'call s:insert_license_slash()' in nvimrc.read_text(encoding="utf-8")
     assert 'call s:insert_license_cpp()' not in nvimrc.read_text(encoding="utf-8")
     assert '"-std=c++26"' in ycm.read_text(encoding="utf-8")

@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: 2026 BESA developers -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Create and build a C++ project
 
 This tutorial creates a C++ project, examines the generated build description, and builds it with two

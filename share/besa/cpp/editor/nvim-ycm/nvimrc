@@ -1,11 +1,12 @@
 " --------------------------------------------------------------------------------------------------
+" SPDX-FileCopyrightText: 2026 BESA developers
 " SPDX-License-Identifier: Apache-2.0
 " --------------------------------------------------------------------------------------------------
 
 function! s:insert_license_slash()
   set formatoptions-=cro
   execute "normal! i// -------------------------------------------------------------------------------------------------"
-  execute "normal! o// SPDX-License-Identifier: Apache-2.0"
+  execute "normal! o// SPDX-License-" . "Identifier: Apache-2.0"
   execute "normal! o// -------------------------------------------------------------------------------------------------"
   normal! o
   set formatoptions+=cro
@@ -14,7 +15,7 @@ endfunction
 function! s:insert_license_hash()
   set formatoptions-=cro
   execute "normal! i# --------------------------------------------------------------------------------------------------"
-  execute "normal! o# SPDX-License-Identifier: Apache-2.0"
+  execute "normal! o# SPDX-License-" . "Identifier: Apache-2.0"
   execute "normal! o# --------------------------------------------------------------------------------------------------"
   set formatoptions+=cro
 endfunction
@@ -22,7 +23,7 @@ endfunction
 function! s:insert_license_percent()
   set formatoptions-=cro
   execute "normal! i% --------------------------------------------------------------------------------------------------"
-  execute "normal! o% SPDX-License-Identifier: Apache-2.0"
+  execute "normal! o% SPDX-License-" . "Identifier: Apache-2.0"
   execute "normal! o% --------------------------------------------------------------------------------------------------"
   set formatoptions+=cro
 endfunction
@@ -30,7 +31,7 @@ endfunction
 function! s:insert_license_quote()
   set formatoptions-=cro
   execute "normal! i\" --------------------------------------------------------------------------------------------------"
-  execute "normal! o\" SPDX-License-Identifier: Apache-2.0"
+  execute "normal! o\" SPDX-License-" . "Identifier: Apache-2.0"
   execute "normal! o\" --------------------------------------------------------------------------------------------------"
   set formatoptions+=cro
 endfunction
@@ -38,7 +39,7 @@ endfunction
 function! s:insert_license_html()
   set formatoptions-=cro
   execute "normal! i<!--"
-  execute "normal! o- SPDX-License-Identifier: Apache-2.0"
+  execute "normal! o- SPDX-License-" . "Identifier: Apache-2.0"
   execute "normal! o-->"
   set formatoptions+=cro
 endfunction

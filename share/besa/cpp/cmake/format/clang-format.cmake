@@ -1,4 +1,5 @@
 # --------------------------------------------------------------------------------------------------
+# SPDX-FileCopyrightText: 2026 BESA developers
 # SPDX-License-Identifier: Apache-2.0
 # --------------------------------------------------------------------------------------------------
 if(NOT DEFINED CLANG_FORMAT OR NOT DEFINED SOURCE_DIR)

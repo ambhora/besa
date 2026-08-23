@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: 2026 BESA developers -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Selector reference
 
 Selectors are conditions evaluated against the **resolved enabled feature set**. They are accepted as

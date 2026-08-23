@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: 2026 BESA developers -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Why generated C++ projects vendor BESA
 
 The Python package is a development tool, not a runtime requirement of generated C++ software.

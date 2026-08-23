@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: 2026 BESA developers -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Use feature selectors
 
 Functions which conditionally add project structure accept a named `WHEN` argument. Four selector
