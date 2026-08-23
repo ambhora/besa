@@ -12,6 +12,15 @@ function(_besa_register_install_target TARGET_NAME)
 endfunction()
 
 function(_besa_target_common TARGET_NAME)
+  # ``projectdocs`` is a BESA/Doxygen alias used in C++ documentation comments. Clang otherwise
+  # diagnoses it as an unknown documentation command when -Wdocumentation is enabled (for example
+  # by the ``everything`` warning policy). Register only the custom command instead of suppressing
+  # unknown-command diagnostics globally, so misspelled standard Doxygen commands still warn.
+  target_compile_options(
+    "${TARGET_NAME}" PRIVATE
+    $<$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>:-fcomment-block-commands=projectdocs>
+  )
+
   _besa_target_apply_warning_policy("${TARGET_NAME}")
   _besa_target_apply_devtools("${TARGET_NAME}")
 endfunction()

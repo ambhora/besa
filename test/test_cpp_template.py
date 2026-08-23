@@ -38,6 +38,12 @@ def test_generated_cpp_project_builds_with_multiple_compilers(
     _run(["cmake", "--workflow", "--preset", preset, "--fresh"], project)
     assert (project / "build" / preset / "src" / f"example_{preset}").exists()
 
+    if preset == "clang":
+        compile_commands = (project / "build" / preset / "compile_commands.json").read_text(
+            encoding="utf-8"
+        )
+        assert "-fcomment-block-commands=projectdocs" in compile_commands
+
 
 @pytest.mark.cpp
 def test_generated_cpp_project_groups_library_sources_by_library(tmp_path: Path) -> None:
