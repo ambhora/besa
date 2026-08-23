@@ -115,9 +115,9 @@ html_theme_options = {
     "show_prev_next": False,
 }
 
-# The merged API landing page owns the root toctree, so its generated API pages are top-level Sphinx
-# documents. PyData's stock sidebar starts at depth 1 and would therefore hide them. BESA uses the
-# same sidebar renderer starting at depth 0, keeping namespaces/types/functions in the left sidebar.
+# Keep API navigation deliberately small. The left section navigation is a namespace index only;
+# classes, functions, concepts, files, and other entities are reached from the namespace/member
+# trees rather than repeated as one very long global sidebar.
 html_sidebars = {
     # Keep only BESA's navigation component here. Older PyData Sphinx Theme releases do not
     # provide sidebar-collapse.html, while newer releases make collapsing an optional enhancement.
@@ -1293,6 +1293,65 @@ def _prepare_api_landing(app) -> None:
     root_file.write_text("\n".join(legacy_lines), encoding="utf-8")
 
 
+def _api_sidebar_namespaces(app) -> list[dict[str, str]]:
+    """Return the public namespaces and their generated Sphinx documents.
+
+    The global left sidebar intentionally contains namespaces only.  Exhale filenames are normally
+    Doxygen refids, but historical versions have used different namespace filenames, so fall back
+    to Exhale's stable namespace label when resolving the generated page.
+    """
+
+    cached = getattr(app, "_besa_api_sidebar_namespaces", None)
+    if cached is not None:
+        return cached
+
+    generated = Path(app.srcdir).resolve() / "generated"
+    xml_directory = Path(app.config.breathe_projects[project])
+    index_xml = xml_directory / "index.xml"
+    if not generated.is_dir() or not index_xml.is_file():
+        app._besa_api_sidebar_namespaces = []
+        return []
+
+    label_documents: dict[str, str] = {}
+    for candidate in generated.glob("namespace*.rst"):
+        for line in candidate.read_text(encoding="utf-8").splitlines()[:16]:
+            match = re.match(r"^\.\. _([^:]+):$", line)
+            if match:
+                label_documents[match.group(1)] = f"generated/{candidate.stem}"
+
+    entries: list[dict[str, str]] = []
+    root = ET.parse(index_xml).getroot()
+    for compound in root.findall("compound"):
+        if compound.get("kind") != "namespace":
+            continue
+        namespace = compound.findtext("name") or ""
+        refid = compound.get("refid") or ""
+        if not namespace:
+            continue
+
+        document = ""
+        direct = generated / f"{refid}.rst"
+        if refid and direct.is_file():
+            document = f"generated/{direct.stem}"
+        else:
+            label = "namespace_" + namespace.replace(":", "_").replace(" ", "_")
+            document = label_documents.get(label, "")
+
+        if document:
+            entries.append({"name": namespace, "document": document})
+
+    entries.sort(key=lambda item: item["name"].casefold())
+    app._besa_api_sidebar_namespaces = entries
+    return entries
+
+
+def _api_sidebar_context(app, pagename, _templatename, context, _doctree) -> None:
+    """Expose the namespace-only API navigation to the custom PyData sidebar template."""
+
+    context["besa_api_sidebar_namespaces"] = _api_sidebar_namespaces(app)
+    context["besa_api_sidebar_current"] = pagename
+
+
 def _mark_multiline_signatures(_app, doctree) -> None:
     """Mark signatures whose parameter list Sphinx chose to render on logical lines.
 
@@ -1323,4 +1382,5 @@ def setup(app) -> None:
     # pages must exist at discovery time or Sphinx will report them as unknown/nonexistent docs.
     app.connect("builder-inited", _prepare_api_landing, priority=900)
     app.connect("doctree-read", _mark_multiline_signatures)
+    app.connect("html-page-context", _api_sidebar_context)
     app.connect("build-finished", _write_api_symbol_aliases)

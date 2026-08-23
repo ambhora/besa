@@ -829,6 +829,12 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     # entity pages; the project does not maintain a hand-selected doxygenindex list.
     assert (api_docs / "conf.py").is_file()
     assert (api_docs / "besa_exhale_compat.py").is_file()
+    compat_text = (api_docs / "besa_exhale_compat.py").read_text(encoding="utf-8")
+    assert '"cpp:parent_key"' in compat_text
+    assert 'node.attributes.pop("cpp:parent_key")' in compat_text
+    assert 'node.pop("cpp:parent_key")' not in compat_text
+    assert "except AssertionError" in compat_text
+    assert 'getattr(original, "_besa_parent_key_retry", False)' in compat_text
     assert (api_docs / "Doxyfile.in").is_file()
     assert (api_docs / "index.rst").is_file()
     assert (api_docs / "_static" / "css" / "besa-api.css").is_file()
@@ -878,8 +884,9 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert '"**": ["api-sidebar.html"]' in conf_text
     assert '"sidebar-collapse"' not in conf_text
     api_sidebar = (api_docs / "_templates" / "api-sidebar.html").read_text(encoding="utf-8")
-    assert "startdepth=0" in api_sidebar
-    assert '"sidebar"' in api_sidebar
+    assert "besa_api_sidebar_namespaces" in api_sidebar
+    assert "generate_toctree_html" not in api_sidebar
+    assert "Namespace {{ namespace.name }}" in api_sidebar
     assert '"primary_sidebar_end"' not in conf_text
     assert '"containmentFolder": "./generated"' in conf_text
     assert '"rootFileName": "library_root.rst"' in conf_text
@@ -1001,6 +1008,7 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert (module._prepare_api, 100) in builder_callbacks
     assert (module._prepare_api_landing, 900) in builder_callbacks
     assert (module._mark_multiline_signatures, 500) in events["doctree-read"]
+    assert (module._api_sidebar_context, 500) in events["html-page-context"]
     assert (module._write_api_symbol_aliases, 500) in events["build-finished"]
     assert "env-before-read-docs" not in events
 
@@ -1311,6 +1319,22 @@ Define Documentation
 """,
         encoding="utf-8",
     )
+    sidebar_namespaces = module._api_sidebar_namespaces(current_app)
+    assert sidebar_namespaces == [
+        {"name": "example_docs", "document": "generated/namespaceexample__docs"},
+        {"name": "example_docs::meta", "document": "generated/namespaceexample__docs_1_1meta"},
+    ]
+    sidebar_context: dict[str, object] = {}
+    module._api_sidebar_context(
+        current_app,
+        "generated/namespaceexample__docs_1_1meta",
+        "page.html",
+        sidebar_context,
+        None,
+    )
+    assert sidebar_context["besa_api_sidebar_namespaces"] == sidebar_namespaces
+    assert sidebar_context["besa_api_sidebar_current"] == "generated/namespaceexample__docs_1_1meta"
+
     module._prepare_api_landing(current_app)
     overview_text = (generated_api / "api_namespace_overview.rst.include").read_text(
         encoding="utf-8"
