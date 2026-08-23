@@ -861,6 +861,7 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     conf_text = (api_docs / "conf.py").read_text(encoding="utf-8")
     assert '"besa_exhale_compat"' in conf_text
     assert conf_text.index('"besa_exhale_compat"') < conf_text.index('"exhale"')
+    assert "sys.path.insert(0, str(CONFIG_DIRECTORY))" in conf_text
     assert '"breathe"' in conf_text
     assert '"exhale"' in conf_text
     assert '"sphinx_multiversion"' in conf_text

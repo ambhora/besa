@@ -26,10 +26,15 @@ import posixpath
 import re
 import shutil
 import subprocess
+import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path, PurePosixPath
 
 CONFIG_DIRECTORY = Path(__file__).resolve().parent
+# Sphinx loads extensions through normal Python imports. In multiversion builds the configuration
+# directory is supplied with ``-c`` and is not guaranteed to be on ``sys.path``, so make the
+# project-local compatibility extension next to this file importable explicitly.
+sys.path.insert(0, str(CONFIG_DIRECTORY))
 
 project = "vorlage"
 author = ""
