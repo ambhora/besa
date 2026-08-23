@@ -29,15 +29,17 @@ project/
 │           └── <project>/
 ├── test/
 ├── project/
-└── showcase/
+└── showcases/
 ```
 
 `src/CMakeLists.txt` contains the `besa_add_source_directory()` call for the C++ source root. The
 generated project's main library lives below `src/cpp/lib/<project>/`. Additional language roots
 can be added explicitly when a project needs them; they are not part of the starter source tree.
 
-`project/` and `showcase/` use feature selectors so long-lived experiments and demonstrations remain
-isolated from the production source graph.
+`project/` is intended for exploratory work selected through `project-*` features. `showcases/` is
+for experiments, demonstrations, and results that are intended to remain in the repository; each
+showcase is selected through a `showcase-*` feature. Both stay isolated from the production source
+graph.
 
 
 ## User-documentation layout

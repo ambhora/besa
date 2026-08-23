@@ -171,7 +171,7 @@ besa_add_directory(
 )
 
 besa_add_directory(
-  NAME showcase
+  NAME showcases
   WHEN REGEX "^showcase-"
 )
 

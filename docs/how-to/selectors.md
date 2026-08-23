@@ -35,7 +35,7 @@ At least one atom must match.
 
 ```cmake
 besa_add_directory(NAME project WHEN REGEX "^project-")
-besa_add_directory(NAME showcase WHEN REGEX "^showcase-")
+besa_add_directory(NAME showcases WHEN REGEX "^showcase-")
 ```
 
 The value is a regular expression, not a glob.
