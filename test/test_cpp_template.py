@@ -893,6 +893,10 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert "BESA_API_PROJECT_SOURCE_DIRECTORY" in conf_text
     assert "_configured_doxyfile" in conf_text
     assert "Path(app.srcdir).resolve()" in conf_text
+    assert "_compile_database_cxx_standard" in conf_text
+    assert "_cmake_default_cxx_standard" in conf_text
+    assert "_clang_resource_directory" in conf_text
+    assert "-print-resource-dir" in conf_text
     api_index_text = (api_docs / "index.rst").read_text(encoding="utf-8")
     assert "doxygenindex" not in api_index_text
     assert "|projectdocs|_" in api_index_text
@@ -1000,6 +1004,18 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert (module._write_api_symbol_aliases, 500) in events["build-finished"]
     assert "env-before-read-docs" not in events
 
+    explicit_standard_build = tmp_path / "explicit-standard-build"
+    explicit_standard_build.mkdir()
+    (explicit_standard_build / "compile_commands.json").write_text(
+        '[{"directory":".","command":"c++ -std=c++26 -c example.cpp","file":"example.cpp"}]',
+        encoding="utf-8",
+    )
+    assert module._compile_database_cxx_standard(explicit_standard_build) == "-std=c++26"
+
+    fake_resource = tmp_path / "clang-resource"
+    fake_resource.mkdir()
+    monkeypatch.setenv("BESA_CLANG_RESOURCE_DIRECTORY", str(fake_resource))
+
     fake_doxygen = tmp_path / "fake-doxygen"
     fake_doxygen.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
     fake_doxygen.chmod(0o755)
@@ -1014,7 +1030,12 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert 'PROJECT_NUMBER = "0.1.0"' in generated_text
     current_configured_build = current_output / "project-build"
     assert f'CLANG_DATABASE_PATH    = "{current_configured_build}"' in generated_text
+    current_standard = module._cmake_default_cxx_standard(current_configured_build) or "-std=c++20"
     current_public = current_output / "public-include"
+    assert (
+        f'CLANG_OPTIONS += "{current_standard}" "-resource-dir={fake_resource}" '
+        f'"-I{str(current_public).replace(chr(92), "/")}"'
+    ) in generated_text
     assert str(current_public).replace("\\", "/") in generated_text
     assert str(project / "src").replace("\\", "/") not in generated_text
     assert (current_public / "example_docs" / "example_docs.hpp").is_file()
@@ -1161,6 +1182,8 @@ Functions
    struct1.rst
    enum1.rst
    function1.rst
+   function_overload1.rst
+   function_overload2.rst
    function_unique.rst
    function_guide.rst
    function_operator.rst
@@ -1198,7 +1221,7 @@ Enum Documentation
     )
     (generated_api / "function1.rst").write_text(
         """\
-.. _exhale_function_function1:
+.. _exhale_function_function3:
 
 Function example_docs::meta::version
 ====================================
@@ -1207,6 +1230,28 @@ Function Documentation
 ----------------------
 
 .. doxygenfunction:: example_docs::meta::version
+""",
+        encoding="utf-8",
+    )
+    (generated_api / "function_overload1.rst").write_text(
+        """\
+.. _exhale_function_function1:
+
+Function example_docs::meta::to_string
+======================================
+
+.. doxygenfunction:: example_docs::meta::to_string(semantic_version)
+""",
+        encoding="utf-8",
+    )
+    (generated_api / "function_overload2.rst").write_text(
+        """\
+.. _exhale_function_function2:
+
+Function example_docs::meta::to_string
+======================================
+
+.. doxygenfunction:: example_docs::meta::to_string(release_type)
 """,
         encoding="utf-8",
     )
@@ -1281,16 +1326,16 @@ Define Documentation
     )
     assert overload_text.startswith("to_string\n=========\n")
     assert "Function example_docs::meta::to_string" not in overload_text
-    assert ":cpp:func:`to_string(semantic_version) <std::string_view example_docs::meta::to_string(semantic_version)>`" in overload_text
-    assert ":cpp:func:`to_string(release_type) <std::string_view example_docs::meta::to_string(release_type)>`" in overload_text
-    assert ":api-kind:`F` :cpp:func:`version() <example_docs::meta::version>`" in overview_text
-    assert ":api-kind:`S` :cpp:struct:`semantic_version <example_docs::meta::semantic_version>`" in overview_text
-    assert ":api-kind:`E` :cpp:enum:`release_type <example_docs::meta::release_type>`" in overview_text
-    assert ":api-kind:`K` :cpp:concept:`sortable <example_docs::meta::sortable>`" in overview_text
-    assert ":api-kind:`S` :cpp:struct:`tag_result\\< Tag, Args... > <example_docs::meta::tag_result< Tag, Args... >>`" in overview_text
-    assert ":api-kind:`F` :cpp:func:`operator\\<() <example_docs::meta::operator<>`" in overview_text
-    assert ":api-kind:`S` :cpp:struct:`box <example_docs::meta::box>`" in overview_text
-    assert ":api-kind:`F` :cpp:func:`box() <example_docs::meta::box>`" not in overview_text
+    assert ":ref:`to_string(semantic_version) <exhale_function_function1>`" in overload_text
+    assert ":ref:`to_string(release_type) <exhale_function_function2>`" in overload_text
+    assert ":api-kind:`F` :ref:`version() <exhale_function_function3>`" in overview_text
+    assert ":api-kind:`S` :ref:`semantic_version <exhale_struct_struct1>`" in overview_text
+    assert ":api-kind:`E` :ref:`release_type <exhale_enum_enum1>`" in overview_text
+    assert ":api-kind:`K` :ref:`sortable <besa_concept_conceptexample__docs_1_1meta_1asortable>`" in overview_text
+    assert ":api-kind:`S` :ref:`tag_result\\< Tag, Args... > <exhale_struct_struct3>`" in overview_text
+    assert ":api-kind:`F` :ref:`operator\\<() <exhale_function_function5>`" in overview_text
+    assert ":api-kind:`S` :ref:`box <exhale_struct_struct2>`" in overview_text
+    assert ":api-kind:`F` :ref:`box() <exhale_function_guide1>`" not in overview_text
     landing_text = (generated_api / "api_landing.rst.include").read_text(encoding="utf-8")
     assert "Namespace hierarchy" in landing_text
     assert "Class Hierarchy" not in landing_text
@@ -1303,8 +1348,11 @@ Define Documentation
     unique_function_page = (generated_api / "function_unique.rst").read_text(encoding="utf-8")
     assert ".. doxygenfunction:: example_docs::meta::to_static_array\n" in unique_function_page
     assert "Args&&..." not in unique_function_page
-    assert not (generated_api / "function_guide.rst").exists()
-    assert "/generated/function_guide" not in landing_text
+    guide_page = (generated_api / "function_guide.rst").read_text(encoding="utf-8")
+    assert ".. _exhale_function_guide1:" in guide_page
+    assert ".. doxygenfunction::" not in guide_page
+    assert "Class template deduction guide" in guide_page
+    assert "/generated/function_guide" in landing_text
     concept_page = generated_api / "besa_concept_conceptexample__docs_1_1meta_1asortable.rst"
     assert concept_page.is_file()
     concept_text = concept_page.read_text(encoding="utf-8")
@@ -1329,7 +1377,7 @@ Define Documentation
     function_page = (generated_api / "function1.rst").read_text(encoding="utf-8")
     assert struct_page.startswith(".. _exhale_struct_struct1:\n\nsemantic_version\n================")
     assert enum_page.startswith(".. _exhale_enum_enum1:\n\nrelease_type\n============")
-    assert function_page.startswith(".. _exhale_function_function1:\n\nversion\n=======")
+    assert function_page.startswith(".. _exhale_function_function3:\n\nversion\n=======")
     assert "Documentation\n" not in struct_page
     assert "Documentation\n" not in enum_page
     assert "Documentation\n" not in function_page
@@ -1341,20 +1389,20 @@ Define Documentation
     )
     assert "Members\n-------" in root_namespace_page
     assert ":api-kind:`N` :ref:`meta <namespace_example_docs__meta>`" in root_namespace_page
-    assert ":api-kind:`S` :cpp:struct:`semantic_version <example_docs::meta::semantic_version>`" in root_namespace_page
-    assert ":api-kind:`E` :cpp:enum:`release_type <example_docs::meta::release_type>`" in root_namespace_page
-    assert ":api-kind:`F` :cpp:func:`version() <example_docs::meta::version>`" in root_namespace_page
+    assert ":api-kind:`S` :ref:`semantic_version <exhale_struct_struct1>`" in root_namespace_page
+    assert ":api-kind:`E` :ref:`release_type <exhale_enum_enum1>`" in root_namespace_page
+    assert ":api-kind:`F` :ref:`version() <exhale_function_function3>`" in root_namespace_page
 
     namespace_page = (generated_api / "namespaceexample__docs_1_1meta.rst").read_text(
         encoding="utf-8"
     )
     assert "Members\n-------" in namespace_page
-    assert ":api-kind:`S` :cpp:struct:`semantic_version <example_docs::meta::semantic_version>`" in namespace_page
-    assert ":api-kind:`E` :cpp:enum:`release_type <example_docs::meta::release_type>`" in namespace_page
-    assert ":api-kind:`F` :cpp:func:`version() <example_docs::meta::version>`" in namespace_page
-    assert ":api-kind:`K` :cpp:concept:`sortable <example_docs::meta::sortable>`" in namespace_page
-    assert ":api-kind:`S` :cpp:struct:`tag_result\\< Tag, Args... > <example_docs::meta::tag_result< Tag, Args... >>`" in namespace_page
-    assert ":api-kind:`F` :cpp:func:`box() <example_docs::meta::box>`" not in namespace_page
+    assert ":api-kind:`S` :ref:`semantic_version <exhale_struct_struct1>`" in namespace_page
+    assert ":api-kind:`E` :ref:`release_type <exhale_enum_enum1>`" in namespace_page
+    assert ":api-kind:`F` :ref:`version() <exhale_function_function3>`" in namespace_page
+    assert ":api-kind:`K` :ref:`sortable <besa_concept_conceptexample__docs_1_1meta_1asortable>`" in namespace_page
+    assert ":api-kind:`S` :ref:`tag_result\\< Tag, Args... > <exhale_struct_struct3>`" in namespace_page
+    assert ":api-kind:`F` :ref:`box() <exhale_function_guide1>`" not in namespace_page
     assert "Struct semantic_version" not in namespace_page
     assert "Enum release_type" not in namespace_page
     assert "Function example_docs::meta::version" not in namespace_page
@@ -1415,8 +1463,10 @@ file(WRITE "${SCHEMA_INCLUDE}/example_docs/schema.hpp" "#ifndef EXAMPLE_DOCS_SCH
     assert 'PROJECT_NUMBER = "9.8.7"' in historical_text
     historical_configured_build = historical_output / "project-build"
     assert f'CLANG_DATABASE_PATH    = "{historical_configured_build}"' in historical_text
+    assert f'"-resource-dir={fake_resource}"' in historical_text
     historical_public = historical_output / "public-include"
     assert str(historical_public).replace("\\", "/") in historical_text
+    assert f'"-I{str(historical_public).replace(chr(92), "/")}"' in historical_text
     assert str(historical / "src").replace("\\", "/") not in historical_text
     assert str(project / "src").replace("\\", "/") not in historical_text
     assert (historical_public / "example_docs" / "historical.hpp").is_file()
