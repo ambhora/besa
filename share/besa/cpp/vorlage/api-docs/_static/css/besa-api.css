@@ -1,8 +1,8 @@
 /* BESA API presentation: compact, reference-oriented, and structurally obvious. */
 
 .bd-page-width {
-  /* Roughly three quarters of a 1920 px desktop, but still fluid on smaller displays. */
-  max-width: 90rem;
+  /* Allow roughly 1.5x the previous desktop documentation width while remaining fluid. */
+  max-width: 135rem;
 }
 
 .bd-main .bd-content .bd-article-container {
@@ -184,7 +184,28 @@ dl.c > dt,
   padding: 0.34rem 0.55rem;
 }
 
-/* Sphinx itself decides when a C++ parameter list exceeds the configured 80-character logical
+/* Make each callable a clearly delimited API item.  The accent marks the top of the item rather
+ * than the left edge of the signature, avoiding the visual language of a block quote. */
+dl.cpp.function,
+dl.cpp.function-template,
+dl.c.function {
+  border: 1px solid var(--pst-color-border);
+  border-radius: 0.45rem;
+  border-top: 0.24rem solid var(--pst-color-primary);
+  margin: 0.9rem 0 1.1rem;
+  padding: 0.65rem 0.8rem 0.75rem;
+}
+
+dl.cpp.function > dt.sig,
+dl.cpp.function-template > dt.sig,
+dl.c.function > dt.sig {
+  border-left: 0;
+  border-radius: 0;
+  margin: 0;
+  padding: 0;
+}
+
+/* Sphinx itself decides when a C++ parameter list exceeds the configured 122-character logical
  * line length. conf.py mirrors that decision onto the signature as besa-multiline-signature. For
  * those signatures only, put the return type on a separate line; Sphinx's native multiline
  * parameter-list renderer already places every parameter on its own logical line. */
@@ -201,8 +222,8 @@ dl.cpp > dt.besa-multiline-signature .sig-return-type {
 
 .bd-article dl.cpp > dd,
 .bd-article dl.c > dd {
-  margin-left: 0.8rem;
-  margin-top: 0.3rem;
+  margin-left: 0;
+  margin-top: 0.45rem;
 }
 
 .breathe-sectiondef-title {
@@ -223,15 +244,21 @@ dl.cpp > dt.besa-multiline-signature .sig-return-type {
   padding: 0.45rem 0.7rem;
 }
 
-/* Function qualifiers are surfaced as compact metadata above the declaration.  These are labels,
- * not interactive controls, but the pill shape makes them easy to scan independently of the type
- * and parameter list. */
+/* Function qualifiers are properties of the callable.  Place them below the signature and before
+ * the prose documentation so they cannot be mistaken for controls belonging to the previous item. */
 .besa-api-qualifiers {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
   gap: 0.28rem;
-  margin: 0.18rem 0 0.28rem;
+  margin: 0 0 0.55rem;
+}
+
+.besa-api-properties-label {
+  color: var(--pst-color-text-muted);
+  font-size: 0.72rem;
+  font-weight: 650;
+  margin-right: 0.12rem;
 }
 
 .besa-api-qualifier {
@@ -245,4 +272,15 @@ dl.cpp > dt.besa-multiline-signature .sig-return-type {
   line-height: 1.2;
   padding: 0.12rem 0.42rem;
   white-space: nowrap;
+}
+
+
+/* The function body owns the properties row and the documentation that follows it. */
+dl.cpp.function > dd,
+dl.cpp.function-template > dd,
+dl.c.function > dd {
+  border-top: 1px solid color-mix(in srgb, var(--pst-color-border) 75%, transparent);
+  margin-left: 0;
+  margin-top: 0.55rem;
+  padding-top: 0.55rem;
 }

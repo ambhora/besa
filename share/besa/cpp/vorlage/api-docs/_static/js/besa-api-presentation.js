@@ -49,7 +49,7 @@
   }
 
   function addQualifierBadges(signature) {
-    const declaration = signature.closest("dl.cpp.function, dl.cpp.function-template");
+    const declaration = signature.closest("dl.cpp.function, dl.cpp.function-template, dl.c.function");
     if (!declaration || declaration.dataset.besaQualifiers === "true") return;
 
     const qualifiers = qualifiersFor(signature);
@@ -58,7 +58,12 @@
 
     const row = document.createElement("div");
     row.className = "besa-api-qualifiers";
-    row.setAttribute("aria-label", "Function qualifiers");
+    row.setAttribute("aria-label", "Function properties");
+
+    const label = document.createElement("span");
+    label.className = "besa-api-properties-label";
+    label.textContent = "Properties";
+    row.appendChild(label);
 
     for (const qualifier of qualifiers) {
       const badge = document.createElement("span");
@@ -67,11 +72,16 @@
       row.appendChild(badge);
     }
 
-    declaration.before(row);
+    const description = declaration.querySelector(":scope > dd");
+    if (description) {
+      description.prepend(row);
+    } else {
+      signature.insertAdjacentElement("afterend", row);
+    }
   }
 
   function initialize() {
-    for (const signature of document.querySelectorAll("dl.cpp.function > dt.sig, dl.cpp.function-template > dt.sig")) {
+    for (const signature of document.querySelectorAll("dl.cpp.function > dt.sig, dl.cpp.function-template > dt.sig, dl.c.function > dt.sig")) {
       addQualifierBadges(signature);
     }
   }

@@ -861,6 +861,8 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert '"constexpr"' in presentation_script_text
     assert "noexcept" in presentation_script_text
     assert 'className = "besa-api-qualifiers"' in presentation_script_text
+    assert 'label.textContent = "Properties"' in presentation_script_text
+    assert 'description.prepend(row)' in presentation_script_text
     assert 'document.addEventListener("DOMContentLoaded", initialize' in presentation_script_text
     assert not (docs / "conf.py").exists()
 
@@ -895,7 +897,9 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert 'smv_outputdir_format = r"{ref.name}"' in conf_text
     assert "_selected_smv_refs" not in conf_text
     assert "packaging.version" not in conf_text
-    assert "cpp_maximum_signature_line_length = 80" in conf_text
+    assert "cpp_maximum_signature_line_length = 122" in conf_text
+    assert "_mark_template_specializations_no_link" in conf_text
+    assert ":no-link:" in conf_text
     assert "BESA_PROPERDOCS_ROOT_DEPTH" in conf_text
     assert "BESA_API_PROJECT_SOURCE_DIRECTORY" in conf_text
     assert "_configured_doxyfile" in conf_text
@@ -942,7 +946,7 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
 
     css = (api_docs / "_static" / "css" / "besa-api.css").read_text(encoding="utf-8")
     assert ".bd-page-width" in css
-    assert "max-width: 90rem" in css
+    assert "max-width: 135rem" in css
     assert "min-width: 13rem" in css
     assert ".navbar-header-items__end" in css
     assert "margin-inline-start: auto" in css
@@ -953,6 +957,8 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert ".api-kind" in css
     assert ".besa-api-qualifiers" in css
     assert ".besa-api-qualifier" in css
+    assert "border-top: 0.24rem solid var(--pst-color-primary)" in css
+    assert ".besa-api-properties-label" in css
     assert "dt.besa-multiline-signature .sig-return-type" in css
     assert "display: block" in css
     assert "font-size: 0.84rem" in css

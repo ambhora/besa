@@ -87,7 +87,7 @@ exclude_patterns: list[str] = []
 # Long C++ signatures use Sphinx's native logical-line formatting. Sphinx decides whether a
 # parameter list is multiline from the rendered signature length, so short declarations remain
 # compact and individual directives can still opt out with :single-line-parameter-list:.
-cpp_maximum_signature_line_length = 80
+cpp_maximum_signature_line_length = 122
 
 html_theme = "pydata_sphinx_theme"
 # Keep the navbar title version-independent. The selected API version is shown by the dedicated
@@ -666,6 +666,59 @@ def _directive_function_name(target: str, names: set[str]) -> str | None:
     return None
 
 
+def _mark_template_specializations_no_link(index_xml: Path, generated: Path) -> None:
+    """Render template specializations without registering duplicate C++ domain targets.
+
+    Doxygen gives class and struct specializations their own compounds, and Exhale therefore creates
+    a page for each specialization.  Sphinx/Breathe can nevertheless normalize a constrained or
+    partial specialization to the same C++ domain declaration as its primary template.  With
+    warnings-as-errors this becomes a duplicate-declaration failure.
+
+    Breathe's class/struct directives support ``:no-link:`` specifically for rendering a declaration
+    without registering another cross-reference target.  Keep the specialization page and its
+    Exhale label, but make only the specialization's Breathe declaration non-linking.  The primary
+    template remains the canonical C++ domain target.
+    """
+
+    root = ET.parse(index_xml).getroot()
+    specializations = {
+        compound.get("refid", "")
+        for compound in root.findall("compound")
+        if compound.get("kind") in {"class", "struct"}
+        if "<" in (compound.findtext("name") or "")
+        if compound.get("refid")
+    }
+    if not specializations:
+        return
+
+    directive = re.compile(r"^(?P<indent>\s*)\.\. doxygen(?:class|struct)::\s*.+$")
+    for refid in specializations:
+        page = generated / f"{refid}.rst"
+        if not page.is_file():
+            continue
+
+        lines = page.read_text(encoding="utf-8").splitlines()
+        changed = False
+        for index, line in enumerate(lines):
+            match = directive.match(line)
+            if match is None:
+                continue
+
+            option_indent = f"{match.group('indent')}   "
+            option_end = index + 1
+            while option_end < len(lines) and lines[option_end].startswith(option_indent + ":"):
+                if lines[option_end].strip() == ":no-link:":
+                    break
+                option_end += 1
+            else:
+                lines.insert(index + 1, f"{option_indent}:no-link:")
+                changed = True
+            break
+
+        if changed:
+            page.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def _neutralize_deduction_guide_pages(index_xml: Path, generated: Path) -> None:
     """Keep Exhale CTAD pages addressable without registering a duplicate C++ declaration.
 
@@ -1229,6 +1282,7 @@ def _prepare_api_landing(app) -> None:
     if not index_xml.is_file() or not root_file.is_file() or not index_source.is_file():
         return
 
+    _mark_template_specializations_no_link(index_xml, generated)
     _neutralize_deduction_guide_pages(index_xml, generated)
     _simplify_unique_function_directives(index_xml, generated)
     _simplify_generated_entity_pages(generated)
@@ -1355,7 +1409,7 @@ def _api_sidebar_context(app, pagename, _templatename, context, _doctree) -> Non
 def _mark_multiline_signatures(_app, doctree) -> None:
     """Mark signatures whose parameter list Sphinx chose to render on logical lines.
 
-    The C++ domain owns the 80-character decision. This callback only exposes that decision as a
+    The C++ domain owns the 122-character decision. This callback only exposes that decision as a
     CSS class so BESA can move a return type onto its own line without reimplementing Sphinx's
     signature-length calculation. Import Sphinx lazily so the generated conf.py remains importable
     by BESA's template tests even when Sphinx is not installed in that test environment.
