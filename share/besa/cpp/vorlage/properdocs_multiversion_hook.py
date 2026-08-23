@@ -257,14 +257,16 @@ def _ensure_multiversion_api(api_versions: str = "all") -> None:
     source_fingerprint = _source_fingerprint()
     refs_fingerprint = _refs_fingerprint()
 
+    refs_changed = refs_fingerprint != _last_refs_fingerprint
     rebuild_versions = (
         not MULTIVERSION_API_BUILD_DIRECTORY.is_dir()
-        or refs_fingerprint != _last_refs_fingerprint
+        or refs_changed
         or api_versions != _last_versions_selector
     )
     rebuild_current = (
         not CURRENT_API_BUILD_DIRECTORY.is_dir()
         or source_fingerprint != _last_source_fingerprint
+        or refs_changed
     )
 
     if not rebuild_versions and not rebuild_current:

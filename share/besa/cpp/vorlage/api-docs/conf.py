@@ -666,57 +666,62 @@ def _directive_function_name(target: str, names: set[str]) -> str | None:
     return None
 
 
-def _mark_template_specializations_no_link(index_xml: Path, generated: Path) -> None:
+def _mark_template_specializations_no_link(_index_xml: Path, generated: Path) -> None:
     """Render template specializations without registering duplicate C++ domain targets.
 
-    Doxygen gives class and struct specializations their own compounds, and Exhale therefore creates
-    a page for each specialization.  Sphinx/Breathe can nevertheless normalize a constrained or
-    partial specialization to the same C++ domain declaration as its primary template.  With
-    warnings-as-errors this becomes a duplicate-declaration failure.
+    Exhale gives primary templates and specializations separate pages.  Breathe/Sphinx can still
+    normalize a constrained or partial specialization to the same C++ declaration as the primary
+    template, which triggers ``duplicate_declaration.cpp`` under warnings-as-errors.
 
-    Breathe's class/struct directives support ``:no-link:`` specifically for rendering a declaration
-    without registering another cross-reference target.  Keep the specialization page and its
-    Exhale label, but make only the specialization's Breathe declaration non-linking.  The primary
-    template remains the canonical C++ domain target.
+    Detect this from the generated Breathe directives themselves rather than from Doxygen's
+    ``index.xml``.  Doxygen does not reliably preserve ``<...>`` in the index compound name for
+    specializations, while Exhale's page directive does.  Only mark a ``<...>`` directive when a
+    primary directive with the same base name is also present, so ordinary primary class templates
+    remain canonical cross-reference targets.
     """
 
-    root = ET.parse(index_xml).getroot()
-    specializations = {
-        compound.get("refid", "")
-        for compound in root.findall("compound")
-        if compound.get("kind") in {"class", "struct"}
-        if "<" in (compound.findtext("name") or "")
-        if compound.get("refid")
-    }
-    if not specializations:
-        return
+    directive = re.compile(
+        r"^(?P<indent>\s*)\.\. doxygen(?:class|struct)::\s*(?P<target>.+?)\s*$"
+    )
+    pages: list[tuple[Path, list[str], int, re.Match[str]]] = []
+    primary_names: set[str] = set()
 
-    directive = re.compile(r"^(?P<indent>\s*)\.\. doxygen(?:class|struct)::\s*.+$")
-    for refid in specializations:
-        page = generated / f"{refid}.rst"
-        if not page.is_file():
-            continue
-
+    for page in generated.glob("*.rst"):
         lines = page.read_text(encoding="utf-8").splitlines()
-        changed = False
         for index, line in enumerate(lines):
             match = directive.match(line)
             if match is None:
                 continue
 
-            option_indent = f"{match.group('indent')}   "
-            option_end = index + 1
-            while option_end < len(lines) and lines[option_end].startswith(option_indent + ":"):
-                if lines[option_end].strip() == ":no-link:":
-                    break
-                option_end += 1
-            else:
-                lines.insert(index + 1, f"{option_indent}:no-link:")
-                changed = True
+            target = match.group("target").strip()
+            base = target.split("<", 1)[0].strip()
+            pages.append((page, lines, index, match))
+            if "<" not in target:
+                primary_names.add(base)
             break
 
-        if changed:
-            page.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    for page, lines, index, match in pages:
+        target = match.group("target").strip()
+        if "<" not in target:
+            continue
+
+        base = target.split("<", 1)[0].strip()
+        if base not in primary_names:
+            continue
+
+        option_indent = f"{match.group('indent')}   "
+        option_end = index + 1
+        has_no_link = False
+        while option_end < len(lines) and lines[option_end].startswith(option_indent + ":"):
+            if lines[option_end].strip() == ":no-link:":
+                has_no_link = True
+                break
+            option_end += 1
+        if has_no_link:
+            continue
+
+        lines.insert(index + 1, f"{option_indent}:no-link:")
+        page.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def _neutralize_deduction_guide_pages(index_xml: Path, generated: Path) -> None:

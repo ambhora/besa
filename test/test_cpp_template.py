@@ -2215,7 +2215,10 @@ def test_generated_properdocs_multiversion_hook_rebuilds_refs_and_current_indepe
     refs_state[0] = [(".git/refs/heads/main", 2, 1)]
     module._ensure_multiversion_api("all")
     assert configured == 3
-    assert targets[-1] == "user.docs.multiversion:all"
+    assert targets[-2:] == [
+        "user.docs.multiversion:all",
+        "user.docs.api:-",
+    ]
 
     module._ensure_multiversion_api("latest:3")
     assert configured == 4
