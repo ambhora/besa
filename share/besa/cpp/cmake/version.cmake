@@ -41,6 +41,12 @@ function(_besa_version_resolve)
   if(NOT DEFINED RELEASE_REVISION)
     set(RELEASE_REVISION 1 CACHE STRING "Revision of prerelease")
   endif()
+  if(NOT DEFINED PKGBUILDER_ID)
+    set(PKGBUILDER_ID "vanilla" CACHE STRING "Package builder identifier")
+  endif()
+  if(NOT DEFINED PKGBUILDER_REVISION)
+    set(PKGBUILDER_REVISION "1" CACHE STRING "Package builder revision")
+  endif()
   if(NOT RELEASE_TYPE MATCHES "^(dev|release|alpha|beta|rc)$")
     _besa_fatal(
       "besa_configure_complete"
@@ -118,7 +124,18 @@ function(_besa_version_resolve)
     "${_build_compiler} ${_build_compiler_version}; ${_build_system}/${_build_processor}; ${_build_type}"
   )
 
-  foreach(_value IN ITEMS PROJECT_VERSION _release_string _build_compiler _build_compiler_version _build_system _build_processor _build_type _build_string)
+  foreach(_value IN ITEMS
+      PROJECT_VERSION
+      _release_string
+      PKGBUILDER_ID
+      PKGBUILDER_REVISION
+      _build_compiler
+      _build_compiler_version
+      _build_system
+      _build_processor
+      _build_type
+      _build_string
+  )
     _besa_cpp_string_literal_escape(_escaped_${_value} "${${_value}}")
   endforeach()
 
@@ -155,6 +172,11 @@ struct release_info {
   std::uint32_t revision;
 };
 
+struct package_info {
+  std::string_view builder;
+  std::string_view revision;
+};
+
 struct build_info {
   std::string_view compiler;
   std::string_view compiler_version;
@@ -171,6 +193,11 @@ struct build_info {
 [[nodiscard]] inline constexpr release_info release() noexcept
 {
   return {release_type::@RELEASE_ENUM@, @RELEASE_REVISION_VALUE@};
+}
+
+[[nodiscard]] inline constexpr package_info package() noexcept
+{
+  return {"@PKGBUILDER_ID_VALUE@", "@PKGBUILDER_REVISION_VALUE@"};
 }
 
 [[nodiscard]] inline constexpr build_info build() noexcept
@@ -228,6 +255,8 @@ struct build_info {
   set(VERSION_TWEAK "${_version_TWEAK}")
   set(RELEASE_ENUM "${_release_enum}")
   set(RELEASE_REVISION_VALUE "${RELEASE_REVISION}")
+  set(PKGBUILDER_ID_VALUE "${_escaped_PKGBUILDER_ID}")
+  set(PKGBUILDER_REVISION_VALUE "${_escaped_PKGBUILDER_REVISION}")
   set(PROJECT_VERSION_STRING "${_escaped_PROJECT_VERSION}")
   set(RELEASE_STRING "${_escaped__release_string}")
   set(BUILD_COMPILER "${_escaped__build_compiler}")

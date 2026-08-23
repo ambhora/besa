@@ -100,11 +100,23 @@ The prerelease revision for alpha, beta, and release-candidate versions.
 For `dev`, the resolved version is `dev.<branch>.<hash>` (with `nogit` fallbacks); release and
 prerelease types use the declared project version.
 
+## `PKGBUILDER_ID`
+
+Identifies the downstream builder or package maintainer that produced the artifact. It defaults to
+`vanilla` and is intentionally independent of the upstream version and release metadata.
+
+## `PKGBUILDER_REVISION`
+
+Identifies a downstream packaging revision or respin. It defaults to `1` and is a string so package
+maintainers are not restricted to numeric revision schemes. Changing it does not change
+`PROJECT_SEMVER`.
+
 BESA writes the resolved semantic version to `PROJECT_SEMVER`, generates
 `<binary>/generated/meta/include/<project>/version.hpp`, and writes the same resolved string into the
 installed package configuration. The generated header exposes structured `project::meta`
-constexpr metadata for the base version, release information, and CMake-derived build information,
-with explicit `to_string(...)` conversion helpers.
+constexpr metadata for the base version, release information, downstream package information, and
+CMake-derived build information, with explicit `to_string(...)` conversion helpers where a canonical
+string form exists.
 
 ## Configure-time summary
 
@@ -124,6 +136,8 @@ A typical summary is:
 --   Build testing : ON
 --   Release type  : dev
 --   Release rev.  : 1
+--   Package builder: vanilla
+--   Package rev.   : 1
 --   Version       : dev.main.abc1234
 ```
 

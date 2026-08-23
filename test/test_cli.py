@@ -50,7 +50,9 @@ def test_cpp_generate_vendors_cmake(tmp_path: Path) -> None:
 
 
 def test_cpp_generate_accepts_explicit_spdx_license(tmp_path: Path) -> None:
-    project = cpp_generate(tmp_path, "example_mit", "MIT")
+    license_text = tmp_path / "MIT.txt"
+    license_text.write_text("MIT License\n", encoding="utf-8")
+    project = cpp_generate(tmp_path, "example_mit", "MIT", license_text=license_text)
     header = project / "src" / "cpp" / "include" / "example_mit" / "example_mit.hpp"
     text = header.read_text(encoding="utf-8")
     assert "SPDX-License-Identifier: MIT" in text
@@ -61,6 +63,8 @@ def test_cpp_generate_accepts_explicit_spdx_license(tmp_path: Path) -> None:
 
 
 def test_cpp_generate_cli_accepts_license_option(tmp_path: Path) -> None:
+    license_text = tmp_path / "BSD-3-Clause.txt"
+    license_text.write_text("BSD 3-Clause License\n", encoding="utf-8")
     assert (
         main(
             [
@@ -72,6 +76,8 @@ def test_cpp_generate_cli_accepts_license_option(tmp_path: Path) -> None:
                 "example_bsd",
                 "--license",
                 "BSD-3-Clause",
+                "--license-text",
+                str(license_text),
             ]
         )
         == 0
@@ -142,6 +148,8 @@ def test_cpp_generate_cli_accepts_custom_directory(tmp_path: Path) -> None:
 
 
 def test_cpp_generate_cli_can_install_gitignored_nvim_ycm_config(tmp_path: Path) -> None:
+    license_text = tmp_path / "MIT.txt"
+    license_text.write_text("MIT License\n", encoding="utf-8")
     assert (
         main(
             [
@@ -153,6 +161,8 @@ def test_cpp_generate_cli_can_install_gitignored_nvim_ycm_config(tmp_path: Path)
                 "example_editor",
                 "--license",
                 "MIT",
+                "--license-text",
+                str(license_text),
                 "--nvim-ycm",
             ]
         )

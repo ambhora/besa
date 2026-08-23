@@ -3,7 +3,7 @@
 ## `besa cpp generate`
 
 ```text
-besa cpp generate --path PATH --name NAME [--directory DIRECTORY] [--license SPDX-ID] [--nvim-ycm]
+besa cpp generate --path PATH --name NAME [--directory DIRECTORY] [--license SPDX-ID] [--license-text PATH] [--nvim-ycm]
 ```
 
 Creates `PATH/DIRECTORY` from `share/besa/cpp/vorlage`, substitutes `NAME` as the project name, and
@@ -25,8 +25,16 @@ besa cpp generate --path ~/software/dice --name dice --directory code
 creates `~/software/dice/code`. `DIRECTORY` must be a single relative path component.
 
 `--license` supplies the SPDX license identifier written into generated project files. It defaults to
-`Apache-2.0`. License selection is entirely command-line driven; BESA never prompts on stdin. BESA
-accepts the supplied identifier verbatim rather than maintaining its own SPDX identifier list.
+`Apache-2.0`. Generated C++ projects are REUSE-ready: project-owned files receive per-file
+`SPDX-FileCopyrightText` and `SPDX-License-Identifier` metadata, files that cannot carry comments use
+adjacent `.license` sidecars, and canonical license texts are installed below `LICENSES/`. Vendored
+`cmake/besa` files keep BESA's Apache-2.0 attribution rather than being reassigned to the generated
+project.
+
+BESA bundles the canonical `Apache-2.0` text used by the default template. When another SPDX
+identifier is selected, `--license-text PATH` supplies the corresponding canonical text that is
+copied to `LICENSES/<SPDX-ID>.txt`. Generation fails instead of silently producing an incomplete
+REUSE tree if that text is unavailable.
 
 `--nvim-ycm` installs local `.nvimrc` and `.ycm_extra_conf.py` files in the generated checkout. Both
 files are added to `.gitignore`, since they are developer-local editor configuration rather than

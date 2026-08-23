@@ -85,6 +85,25 @@ set(RELEASE_TYPE "dev" CACHE STRING "Type of Release")
 set(RELEASE_REVISION "1" CACHE STRING "Revision of Release")
 
 # --------------------------------------------------------------------------------------------------
+# PACKAGING OPTIONS
+#
+# These options are intended primarily for downstream package maintainers and other builders who
+# redistribute the software. They are deliberately independent of the upstream release metadata so
+# two artifacts built from the same source version can still be distinguished by builder and
+# downstream packaging revision.
+# --------------------------------------------------------------------------------------------------
+
+# PKGBUILDER_ID (Variable)
+# Identity of the downstream builder or package maintainer that produced the artifact. The default
+# `vanilla` value identifies a build without downstream packaging identity.
+set(PKGBUILDER_ID "vanilla" CACHE STRING "Package builder identifier")
+
+# PKGBUILDER_REVISION (Variable)
+# Downstream packaging revision. This is for respins or packaging-only changes and does not alter
+# PROJECT_VERSION, RELEASE_TYPE, RELEASE_REVISION, or PROJECT_SEMVER.
+set(PKGBUILDER_REVISION "1" CACHE STRING "Package builder revision")
+
+# --------------------------------------------------------------------------------------------------
 # FEATURE / TEST-MODE DECLARATION AND CONFIGURATION
 # --------------------------------------------------------------------------------------------------
 

@@ -47,6 +47,7 @@ packages = ["src/besa"]
 
 [tool.hatch.build.targets.wheel.shared-data]
 "share" = "share"
+"LICENSES/Apache-2.0.txt" = "share/besa/licenses/Apache-2.0.txt"
 
 # --------------------------------------------------------------------------------------------------
 # PyTest configuration

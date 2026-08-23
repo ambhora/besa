@@ -37,6 +37,7 @@ generated include roots to the main `lib<project>` target and installation. The 
 ```cpp
 auto constexpr version = project::meta::version();
 auto constexpr release = project::meta::release();
+auto constexpr package = project::meta::package();
 auto constexpr build = project::meta::build();
 
 static_assert(version.major == 1);
@@ -49,6 +50,11 @@ from CMake's `PROJECT_VERSION_*` values. Missing components are zero.
 
 `release()` returns a `release_info` containing the resolved release kind and revision. The enum
 values are `development`, `release`, `alpha`, `beta`, and `release_candidate`.
+
+`package()` returns a `package_info` containing the downstream package-builder identity and package
+revision. These values come from `PKGBUILDER_ID` and `PKGBUILDER_REVISION`; they do not alter the
+upstream semantic version or release information. The defaults are `vanilla` and `1`. A downstream
+builder can, for example, configure with `-DPKGBUILDER_ID=spack -DPKGBUILDER_REVISION=2`.
 
 `build()` returns `build_info` with only CMake-derived build metadata:
 

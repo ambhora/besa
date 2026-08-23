@@ -389,6 +389,8 @@ def test_release_version_is_written_to_generated_header(tmp_path: Path) -> None:
             "build/version",
             "-DRELEASE_TYPE=rc",
             "-DRELEASE_REVISION=3",
+            "-DPKGBUILDER_ID=spack",
+            "-DPKGBUILDER_REVISION=7",
         ],
         project,
     )
@@ -400,9 +402,11 @@ def test_release_version_is_written_to_generated_header(tmp_path: Path) -> None:
     assert "namespace example_version::meta" in version_text
     assert "struct semantic_version" in version_text
     assert "struct release_info" in version_text
+    assert "struct package_info" in version_text
     assert "struct build_info" in version_text
     assert "return {0, 1, 0, 0};" in version_text
     assert 'return {release_type::release_candidate, 3};' in version_text
+    assert 'return {"spack", "7"};' in version_text
     assert 'return "0.1.0";' in version_text
     assert 'return "rc.3";' in version_text
 
@@ -2420,27 +2424,59 @@ def test_generated_documentation_cross_references_are_semantic(
 
 
 @pytest.mark.cpp
-def test_generated_cpp_license_headers_use_only_spdx_identifier(tmp_path: Path) -> None:
-    project = cpp_generate(tmp_path, "example_license", "MIT")
-    spdx_files: list[Path] = []
+def test_generated_cpp_project_has_reuse_metadata(tmp_path: Path) -> None:
+    project = cpp_generate(tmp_path, "example_reuse")
+    project_copyright = "Example Reuse developers"
+
+    assert (project / "LICENSES" / "Apache-2.0.txt").is_file()
+    assert "Apache License" in (project / "LICENSES" / "Apache-2.0.txt").read_text(
+        encoding="utf-8"
+    )
 
     for path in project.rglob("*"):
-        if not path.is_file():
+        if not path.is_file() or path.name.endswith(".license"):
             continue
+        relative = path.relative_to(project)
+        if relative.parts and relative.parts[0] == "LICENSES":
+            continue
+
         try:
             text = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
-            continue
-        if "SPDX-License-Identifier:" not in text:
-            continue
+            text = ""
 
-        spdx_files.append(path)
-        if "cmake/besa" not in path.as_posix():
-            assert "SPDX-License-Identifier: MIT" in text
-        assert "SPDX-FileCopyrightText:" not in text
-        assert "Copyright (C)" not in text
+        if "SPDX-FileCopyrightText:" in text and "SPDX-License-Identifier:" in text:
+            metadata = text
+        else:
+            sidecar = Path(str(path) + ".license")
+            assert sidecar.is_file(), f"missing REUSE metadata for {relative}"
+            metadata = sidecar.read_text(encoding="utf-8")
 
-    assert spdx_files
+        assert "SPDX-FileCopyrightText:" in metadata
+        assert "SPDX-License-Identifier: Apache-2.0" in metadata
+        if relative.parts[:2] == ("cmake", "besa"):
+            assert "BESA developers" in metadata
+        else:
+            assert project_copyright in metadata
+
+    assert (project / "CMakePresets.json.license").is_file()
+    assert (project / "cmake" / "besa" / ".besa-cmake-module.license").is_file()
+
+
+@pytest.mark.cpp
+def test_generated_cpp_custom_license_requires_and_installs_license_text(tmp_path: Path) -> None:
+    license_text = tmp_path / "MIT.txt"
+    license_text.write_text("MIT License\n", encoding="utf-8")
+    project = cpp_generate(tmp_path, "example_license", "MIT", license_text=license_text)
+
+    assert (project / "LICENSES" / "Apache-2.0.txt").is_file()
+    assert (project / "LICENSES" / "MIT.txt").read_text(encoding="utf-8") == "MIT License\n"
+    assert "SPDX-License-Identifier: MIT" in (project / "CMakeLists.txt").read_text(
+        encoding="utf-8"
+    )
+    assert "SPDX-License-Identifier: Apache-2.0" in (
+        project / "cmake" / "besa" / "besaConfig.cmake"
+    ).read_text(encoding="utf-8")
 
 
 @pytest.mark.cpp

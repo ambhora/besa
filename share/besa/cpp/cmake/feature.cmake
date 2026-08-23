@@ -247,6 +247,8 @@ function(_besa_configuration_summary LIST_FEATURES LIST_DEVTOOLS LIST_TEST_MODES
   message(STATUS "  Build testing : ${_build_testing}")
   message(STATUS "  Release type  : ${RELEASE_TYPE}")
   message(STATUS "  Release rev.  : ${RELEASE_REVISION}")
+  message(STATUS "  Package builder: ${PKGBUILDER_ID}")
+  message(STATUS "  Package rev.   : ${PKGBUILDER_REVISION}")
   message(STATUS "  Version       : ${PROJECT_SEMVER}")
 endfunction()
 
