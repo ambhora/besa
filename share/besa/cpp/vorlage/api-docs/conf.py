@@ -474,6 +474,13 @@ def _prepare_api(app) -> None:
         encoding="utf-8",
     )
 
+    # The current working-tree build has a stable Doxygen work directory across live reloads.
+    # Remove the previous XML inventory explicitly so an entity deleted or reshaped by an
+    # uncommitted edit cannot survive into the next Breathe/Exhale pass. Historical SMV checkouts
+    # normally get checkout-specific work directories, but doing this unconditionally is harmless
+    # and keeps both paths deterministic.
+    shutil.rmtree(doxygen_output / "xml", ignore_errors=True)
+
     executable = os.environ.get("BESA_DOXYGEN_EXECUTABLE", "doxygen")
     subprocess.run(
         [executable, str(generated_config)],

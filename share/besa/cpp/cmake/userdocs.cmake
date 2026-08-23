@@ -177,6 +177,10 @@ function(besa_add_sphinx_breathe_docs)
   # remain valid on GitHub project pages, custom domains, and local static hosting.
   add_custom_target(
     "${ARG_NAME}"
+    # The live API is generated from the working tree and may be rebuilt repeatedly while files are
+    # uncommitted. Never reuse Sphinx's previous doctree/domain inventory: C++ declarations that
+    # changed identity can otherwise survive in the environment and appear as duplicate targets.
+    COMMAND "${CMAKE_COMMAND}" -E rm -rf "${ARG_OUTPUT_DIRECTORY}"
     COMMAND "${CMAKE_COMMAND}" -E rm -rf "${_besa_current_sphinx_source}"
     COMMAND "${CMAKE_COMMAND}" -E make_directory "${_besa_current_sphinx_source}"
     COMMAND
