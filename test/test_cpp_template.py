@@ -828,7 +828,8 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     # Sphinx/Breathe/Exhale/Doxygen is a separate API-only source tree. Exhale owns the generated
     # entity pages; the project does not maintain a hand-selected doxygenindex list.
     assert (api_docs / "conf.py").is_file()
-    assert (api_docs / "Doxyfile").is_file()
+    assert (api_docs / "besa_exhale_compat.py").is_file()
+    assert (api_docs / "Doxyfile.in").is_file()
     assert (api_docs / "index.rst").is_file()
     assert (api_docs / "_static" / "css" / "besa-api.css").is_file()
     project_links = api_docs / "_templates" / "project-links.html"
@@ -858,6 +859,8 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert not (docs / "conf.py").exists()
 
     conf_text = (api_docs / "conf.py").read_text(encoding="utf-8")
+    assert '"besa_exhale_compat"' in conf_text
+    assert conf_text.index('"besa_exhale_compat"') < conf_text.index('"exhale"')
     assert '"breathe"' in conf_text
     assert '"exhale"' in conf_text
     assert '"sphinx_multiversion"' in conf_text
@@ -887,6 +890,7 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert "cpp_maximum_signature_line_length = 80" in conf_text
     assert "BESA_PROPERDOCS_ROOT_DEPTH" in conf_text
     assert "BESA_API_PROJECT_SOURCE_DIRECTORY" in conf_text
+    assert "_configured_doxyfile" in conf_text
     assert "Path(app.srcdir).resolve()" in conf_text
     api_index_text = (api_docs / "index.rst").read_text(encoding="utf-8")
     assert "doxygenindex" not in api_index_text
@@ -897,6 +901,11 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert "_write_api_symbol_aliases" in conf_text
     assert "projectdocs{{1}}" in conf_text
     assert "projectdocs{{2}}" in conf_text
+
+    project_cmake = (project / "CMakeLists.txt").read_text(encoding="utf-8")
+    assert 'set(CMAKE_EXPORT_COMPILE_COMMANDS ON)' in project_cmake
+    assert '"${PROJECT_SOURCE_DIR}/api-docs/Doxyfile.in"' in project_cmake
+    assert '"${PROJECT_BINARY_DIR}/api-docs/Doxyfile"' in project_cmake
 
     userdocs_cmake = (project / "cmake" / "besa" / "userdocs.cmake").read_text(encoding="utf-8")
     assert 'set(_besa_current_sphinx_source "${PROJECT_BINARY_DIR}/doc/work/sphinx-current")' in userdocs_cmake
@@ -911,9 +920,12 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert 'environment["BESA_SMV_BRANCH_WHITELIST"] = branch_pattern' in driver_text
     assert 'environment["BESA_SMV_TAG_WHITELIST"] = tag_pattern' in driver_text
 
-    doxyfile_text = (api_docs / "Doxyfile").read_text(encoding="utf-8")
+    doxyfile_text = (api_docs / "Doxyfile.in").read_text(encoding="utf-8")
     assert "EXTRACT_ALL            = YES" in doxyfile_text
     assert "synthetic public-header tree" in doxyfile_text
+    assert "CLANG_ASSISTED_PARSING = YES" in doxyfile_text
+    assert "CLANG_ADD_INC_PATHS    = YES" in doxyfile_text
+    assert 'CLANG_DATABASE_PATH    = "@CMAKE_BINARY_DIR@"' in doxyfile_text
     assert "EXCLUDE_PATTERNS" not in doxyfile_text
 
     css = (api_docs / "_static" / "css" / "besa-api.css").read_text(encoding="utf-8")
@@ -954,6 +966,8 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert module.release == "0.1.0"
     assert module.breathe_default_project == "example_docs"
     assert module.html_context["besa_properdocs_root_depth"] == 3
+    assert module._rst_role_title("tag_result< Tag, Args... >") == "tag_result\\< Tag, Args... >"
+    assert module._rst_role_title("operator<()") == "operator\\<()"
 
     staged_api = tmp_path / "external-work" / "api-docs"
     monkeypatch.setenv("BESA_API_PROJECT_SOURCE_DIRECTORY", str(project))
@@ -997,6 +1011,8 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     assert 'GENERATE_XML           = YES' in generated_text
     assert 'GENERATE_HTML          = NO' in generated_text
     assert 'PROJECT_NUMBER = "0.1.0"' in generated_text
+    current_configured_build = current_output / "project-build"
+    assert f'CLANG_DATABASE_PATH    = "{current_configured_build}"' in generated_text
     current_public = current_output / "public-include"
     assert str(current_public).replace("\\", "/") in generated_text
     assert str(project / "src").replace("\\", "/") not in generated_text
@@ -1035,10 +1051,23 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     <member kind="function" refid="function1"><name>to_string</name></member>
     <member kind="function" refid="function2"><name>to_string</name></member>
     <member kind="function" refid="function3"><name>version</name></member>
+    <member kind="function" refid="function4"><name>to_static_array</name></member>
+    <member kind="function" refid="guide1"><name>box</name></member>
+    <member kind="function" refid="function5"><name>operator&lt;</name></member>
     <member kind="enum" refid="enum1"><name>release_type</name></member>
+    <member kind="concept" refid="conceptexample__docs_1_1meta_1asortable"><name>sortable</name></member>
   </compound>
   <compound kind="struct" refid="struct1">
     <name>example_docs::meta::semantic_version</name>
+  </compound>
+  <compound kind="struct" refid="struct2">
+    <name>example_docs::meta::box</name>
+  </compound>
+  <compound kind="struct" refid="struct3">
+    <name>example_docs::meta::tag_result&lt; Tag, Args... &gt;</name>
+  </compound>
+  <compound kind="concept" refid="conceptexample__docs_1_1meta_1asortable">
+    <name>example_docs::meta::sortable</name>
   </compound>
 </doxygenindex>
 """,
@@ -1065,6 +1094,25 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
         <type>semantic_version</type>
         <name>version</name>
         <qualifiedname>example_docs::meta::version</qualifiedname>
+      </memberdef>
+      <memberdef kind="function" id="function4">
+        <type>static_array&lt;T, sizeof...(Args)&gt;</type>
+        <name>to_static_array</name>
+        <qualifiedname>example_docs::meta::to_static_array</qualifiedname>
+        <param><type>Args &amp;&amp;...</type><declname>args</declname></param>
+      </memberdef>
+      <memberdef kind="function" id="guide1">
+        <type></type>
+        <name>box</name>
+        <qualifiedname>example_docs::meta::box</qualifiedname>
+        <param><type>int</type><declname>value</declname></param>
+      </memberdef>
+      <memberdef kind="function" id="function5">
+        <type>bool</type>
+        <name>operator&lt;</name>
+        <qualifiedname>example_docs::meta::operator&lt;</qualifiedname>
+        <param><type>box const &amp;</type><declname>left</declname></param>
+        <param><type>box const &amp;</type><declname>right</declname></param>
       </memberdef>
     </sectiondef>
   </compounddef>
@@ -1112,6 +1160,9 @@ Functions
    struct1.rst
    enum1.rst
    function1.rst
+   function_unique.rst
+   function_guide.rst
+   function_operator.rst
    define1.rst
 """,
         encoding="utf-8",
@@ -1158,6 +1209,48 @@ Function Documentation
 """,
         encoding="utf-8",
     )
+    (generated_api / "function_unique.rst").write_text(
+        """\
+.. _exhale_function_function4:
+
+Function example_docs::meta::to_static_array
+============================================
+
+Function Documentation
+----------------------
+
+.. doxygenfunction:: example_docs::meta::to_static_array(Args&&...)
+""",
+        encoding="utf-8",
+    )
+    (generated_api / "function_guide.rst").write_text(
+        """\
+.. _exhale_function_guide1:
+
+Function example_docs::meta::box
+================================
+
+Function Documentation
+----------------------
+
+.. doxygenfunction:: example_docs::meta::box(int)
+""",
+        encoding="utf-8",
+    )
+    (generated_api / "function_operator.rst").write_text(
+        """\
+.. _exhale_function_function5:
+
+Function example_docs::meta::operator<
+======================================
+
+Function Documentation
+----------------------
+
+.. doxygenfunction:: example_docs::meta::operator<(box const&, box const&)
+""",
+        encoding="utf-8",
+    )
     (generated_api / "define1.rst").write_text(
         """\
 .. _exhale_define_define1:
@@ -1179,7 +1272,7 @@ Define Documentation
     assert ":api-kind:`N` :ref:`example_docs <namespace_example_docs>`" in overview_text
     assert ":api-kind:`N` :ref:`meta <namespace_example_docs__meta>`" in overview_text
     assert "* :api-kind:`N` :ref:`example_docs <namespace_example_docs>`\n\n  * :api-kind:`N`" in overview_text
-    assert "  * :api-kind:`N` :ref:`meta <namespace_example_docs__meta>`\n\n    * :api-kind:`E`" in overview_text
+    assert "  * :api-kind:`N` :ref:`meta <namespace_example_docs__meta>`\n\n    * :api-kind:`" in overview_text
     assert overview_text.count("to_string()") == 1
     assert ":api-kind:`F` :doc:`to_string() </generated/api_overload_example_docs_meta_to_string>`" in overview_text
     overload_text = (generated_api / "api_overload_example_docs_meta_to_string.rst").read_text(
@@ -1192,6 +1285,11 @@ Define Documentation
     assert ":api-kind:`F` :cpp:func:`version() <example_docs::meta::version>`" in overview_text
     assert ":api-kind:`S` :cpp:struct:`semantic_version <example_docs::meta::semantic_version>`" in overview_text
     assert ":api-kind:`E` :cpp:enum:`release_type <example_docs::meta::release_type>`" in overview_text
+    assert ":api-kind:`K` :cpp:concept:`sortable <example_docs::meta::sortable>`" in overview_text
+    assert ":api-kind:`S` :cpp:struct:`tag_result\\< Tag, Args... > <example_docs::meta::tag_result< Tag, Args... >>`" in overview_text
+    assert ":api-kind:`F` :cpp:func:`operator\\<() <example_docs::meta::operator<>`" in overview_text
+    assert ":api-kind:`S` :cpp:struct:`box <example_docs::meta::box>`" in overview_text
+    assert ":api-kind:`F` :cpp:func:`box() <example_docs::meta::box>`" not in overview_text
     landing_text = (generated_api / "api_landing.rst.include").read_text(encoding="utf-8")
     assert "Namespace hierarchy" in landing_text
     assert "Class Hierarchy" not in landing_text
@@ -1201,6 +1299,16 @@ Define Documentation
     assert "   /generated/namespaceexample__docs" in landing_text
     root_text = (generated_api / "library_root.rst").read_text(encoding="utf-8")
     assert root_text == ":orphan:\n"
+    unique_function_page = (generated_api / "function_unique.rst").read_text(encoding="utf-8")
+    assert ".. doxygenfunction:: example_docs::meta::to_static_array\n" in unique_function_page
+    assert "Args&&..." not in unique_function_page
+    assert not (generated_api / "function_guide.rst").exists()
+    assert "/generated/function_guide" not in landing_text
+    concept_page = generated_api / "besa_concept_conceptexample__docs_1_1meta_1asortable.rst"
+    assert concept_page.is_file()
+    concept_text = concept_page.read_text(encoding="utf-8")
+    assert ".. doxygenconcept:: example_docs::meta::sortable" in concept_text
+    assert "/generated/besa_concept_conceptexample__docs_1_1meta_1asortable" in landing_text
 
     # Historical refs from before the landing-page merge still point index.rst at library_root.rst.
     # Current BESA configuration must continue to render those old refs without changing their source.
@@ -1243,6 +1351,9 @@ Define Documentation
     assert ":api-kind:`S` :cpp:struct:`semantic_version <example_docs::meta::semantic_version>`" in namespace_page
     assert ":api-kind:`E` :cpp:enum:`release_type <example_docs::meta::release_type>`" in namespace_page
     assert ":api-kind:`F` :cpp:func:`version() <example_docs::meta::version>`" in namespace_page
+    assert ":api-kind:`K` :cpp:concept:`sortable <example_docs::meta::sortable>`" in namespace_page
+    assert ":api-kind:`S` :cpp:struct:`tag_result\\< Tag, Args... > <example_docs::meta::tag_result< Tag, Args... >>`" in namespace_page
+    assert ":api-kind:`F` :cpp:func:`box() <example_docs::meta::box>`" not in namespace_page
     assert "Struct semantic_version" not in namespace_page
     assert "Enum release_type" not in namespace_page
     assert "Function example_docs::meta::version" not in namespace_page
@@ -1268,6 +1379,13 @@ Define Documentation
         """\
 cmake_minimum_required(VERSION 3.26.1)
 project(example_docs VERSION 9.8.7 LANGUAGES NONE)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+file(MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/api-docs")
+configure_file(
+  "${PROJECT_SOURCE_DIR}/api-docs/Doxyfile.in"
+  "${PROJECT_BINARY_DIR}/api-docs/Doxyfile"
+  @ONLY
+)
 list(PREPEND CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/besa")
 find_package(besa CONFIG REQUIRED)
 set(PROJECT_FEATURES "" CACHE STRING "")
@@ -1285,8 +1403,8 @@ file(WRITE "${SCHEMA_INCLUDE}/example_docs/schema.hpp" "#ifndef EXAMPLE_DOCS_SCH
 """,
         encoding="utf-8",
     )
-    (historical_api / "Doxyfile").write_text(
-        (api_docs / "Doxyfile").read_text(encoding="utf-8"), encoding="utf-8"
+    (historical_api / "Doxyfile.in").write_text(
+        (api_docs / "Doxyfile.in").read_text(encoding="utf-8"), encoding="utf-8"
     )
 
     historical_app = FakeApp(historical_api)
@@ -1294,6 +1412,8 @@ file(WRITE "${SCHEMA_INCLUDE}/example_docs/schema.hpp" "#ifndef EXAMPLE_DOCS_SCH
     historical_output = module._doxygen_output_for(historical)
     historical_text = (historical_output / "Doxyfile").read_text(encoding="utf-8")
     assert 'PROJECT_NUMBER = "9.8.7"' in historical_text
+    historical_configured_build = historical_output / "project-build"
+    assert f'CLANG_DATABASE_PATH    = "{historical_configured_build}"' in historical_text
     historical_public = historical_output / "public-include"
     assert str(historical_public).replace("\\", "/") in historical_text
     assert str(historical / "src").replace("\\", "/") not in historical_text
@@ -1720,8 +1840,8 @@ def test_generated_cpp_spack_environment_uses_amstack_and_local_dev_bundle(
         for line in manifest.splitlines()
         if line.strip().startswith("- dev-env@")
     )
-    assert dev_env_spec.startswith("dev-env@1.1")
-    assert sorted(filter(None, dev_env_spec.removeprefix("dev-env@1.1").split("+"))) == [
+    assert dev_env_spec.startswith("dev-env@1.2")
+    assert sorted(filter(None, dev_env_spec.removeprefix("dev-env@1.2").split("+"))) == [
         "docs",
         "tests",
     ]
@@ -1740,10 +1860,10 @@ def test_generated_cpp_spack_environment_uses_amstack_and_local_dev_bundle(
     ).read_text(encoding="utf-8")
     assert "from spack_repo.builtin.build_systems.bundle import BundlePackage" in environment_package
     assert "class DevEnv(BundlePackage):" in environment_package
-    assert 'version("1.1")' in environment_package
+    assert 'version("1.2")' in environment_package
     for variant in ("docs", "tests", "coverage"):
         assert f'variant("{variant}"' in environment_package
-    assert 'depends_on("doxygen", when="+docs")' in environment_package
+    assert 'depends_on("doxygen+libclang", when="+docs")' in environment_package
     assert 'depends_on("py-sphinx@:8", when="+docs")' in environment_package
     assert 'depends_on("py-breathe", when="+docs")' in environment_package
     assert 'depends_on("py-exhale", when="+docs")' in environment_package
@@ -1755,7 +1875,17 @@ def test_generated_cpp_spack_environment_uses_amstack_and_local_dev_bundle(
         assert f'depends_on("{toolchain}"' not in environment_package
     assert not (repo / "packages" / "properdocs").exists()
 
+    doxygen_package_path = repo / "packages" / "doxygen" / "package.py"
+    assert doxygen_package_path.is_file()
+    doxygen_package = doxygen_package_path.read_text(encoding="utf-8")
+    assert "from spack_repo.builtin.packages.doxygen.package import Doxygen as BuiltinDoxygen" in doxygen_package
+    assert "class Doxygen(BuiltinDoxygen):" in doxygen_package
+    assert 'variant(\n        "libclang"' in doxygen_package
+    assert 'depends_on("llvm+clang", when="+libclang")' in doxygen_package
+    assert 'define_from_variant("use_libclang", "libclang")' in doxygen_package
+
     compile(environment_package, "dev_env/package.py", "exec")
+    compile(doxygen_package, "doxygen/package.py", "exec")
 
 
 @pytest.mark.cpp

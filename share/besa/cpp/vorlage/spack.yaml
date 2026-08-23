@@ -11,7 +11,7 @@ spack:
     dev: spack/spack_repo/dev
 
   specs:
-    - dev-env@1.1 +docs +tests
+    - dev-env@1.2 +docs +tests
 
   concretizer:
     unify: true

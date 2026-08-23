@@ -66,6 +66,7 @@ def _cmake_project_version(project_root: Path) -> str:
 version = release = _cmake_project_version(_api_project_root(CONFIG_DIRECTORY))
 
 extensions = [
+    "besa_exhale_compat",
     "breathe",
     "exhale",
     "sphinx_multiversion",
@@ -249,7 +250,31 @@ def _generated_include_directories(build_directory: Path) -> list[Path]:
     return sorted(set(directories))
 
 
-def _prepare_public_include_tree(project_root: Path, doxygen_output: Path) -> Path:
+def _configured_doxyfile(api_docs_directory: Path, configured_build: Path) -> Path:
+    """Return the CMake-configured Doxyfile for this checkout.
+
+    New checkouts configure ``api-docs/Doxyfile.in`` into their own CMake build tree so
+    ``CLANG_DATABASE_PATH`` always points at that checkout's compilation database. Historical refs
+    predating this mechanism may still contain a checked-in ``api-docs/Doxyfile``; keep that as a
+    compatibility fallback so old API versions remain buildable.
+    """
+
+    configured = configured_build / "api-docs" / "Doxyfile"
+    if configured.is_file():
+        return configured
+
+    legacy = api_docs_directory / "Doxyfile"
+    if legacy.is_file():
+        return legacy
+
+    raise RuntimeError(
+        "No configured Doxyfile was produced by CMake and no legacy api-docs/Doxyfile exists"
+    )
+
+
+def _prepare_public_include_tree(
+    project_root: Path, doxygen_output: Path, configured_build: Path
+) -> Path:
     """Stage the public header namespace Doxygen should expose.
 
     The staging tree mirrors the installed include namespace and adds developer-facing test support.
@@ -271,7 +296,6 @@ def _prepare_public_include_tree(project_root: Path, doxygen_output: Path) -> Pa
         if test_include.is_dir():
             shutil.copytree(test_include, public_include, dirs_exist_ok=True)
 
-    configured_build = _configured_build_for(project_root, doxygen_output)
     for generated_include in _generated_include_directories(configured_build):
         shutil.copytree(generated_include, public_include, dirs_exist_ok=True)
 
@@ -296,8 +320,11 @@ def _prepare_api(app) -> None:
     shutil.rmtree(api_docs_directory / "generated", ignore_errors=True)
 
     doxygen_output.mkdir(parents=True, exist_ok=True)
-    public_include = _prepare_public_include_tree(project_root, doxygen_output)
-    base_config = (api_docs_directory / "Doxyfile").read_text(encoding="utf-8")
+    configured_build = _configured_build_for(project_root, doxygen_output)
+    public_include = _prepare_public_include_tree(project_root, doxygen_output, configured_build)
+    base_config = _configured_doxyfile(api_docs_directory, configured_build).read_text(
+        encoding="utf-8"
+    )
 
     # Exhale places detailed entity pages one level below the API-version root in generated/. The
     # alias therefore needs one additional parent traversal compared with index.rst. Documentation
@@ -431,12 +458,180 @@ def _xml_text(element: ET.Element | None) -> str:
     return "".join(element.itertext()).strip()
 
 
+def _rst_role_title(value: str) -> str:
+    """Escape syntax that has special meaning inside an RST role's display title.
+
+    Sphinx interprets an unescaped ``<`` in role text as the start of the explicit target in
+    ``title <target>`` syntax. C++ template arguments and operators therefore need escaping in the
+    display half while the target half remains ordinary C++ syntax.
+    """
+
+    return re.sub(r"(?<!\\)<", r"\\<", value)
+
+
+def _class_like_names(index_xml: Path) -> set[str]:
+    """Return fully-qualified class/struct names from one Doxygen index."""
+
+    root = ET.parse(index_xml).getroot()
+    return {
+        name
+        for compound in root.findall("compound")
+        if compound.get("kind") in {"class", "struct"}
+        if (name := compound.findtext("name"))
+    }
+
+
+def _deduction_guide_names(index_xml: Path) -> set[str]:
+    """Return namespace functions that are actually C++ class template deduction guides."""
+
+    class_like = _class_like_names(index_xml)
+    guides: set[str] = set()
+    root = ET.parse(index_xml).getroot()
+    for compound in root.findall("compound"):
+        if compound.get("kind") != "namespace":
+            continue
+        namespace = compound.findtext("name") or ""
+        if not namespace:
+            continue
+        for member in compound.findall("member"):
+            if member.get("kind") != "function":
+                continue
+            name = member.findtext("name") or ""
+            qualified = f"{namespace}::{name}" if name else ""
+            if qualified in class_like:
+                guides.add(qualified)
+    return guides
+
+
+def _namespace_function_counts(index_xml: Path) -> dict[str, int]:
+    """Count free functions by qualified name, excluding class template deduction guides."""
+
+    guides = _deduction_guide_names(index_xml)
+    counts: dict[str, int] = {}
+    root = ET.parse(index_xml).getroot()
+    for compound in root.findall("compound"):
+        if compound.get("kind") != "namespace":
+            continue
+        namespace = compound.findtext("name") or ""
+        if not namespace:
+            continue
+        for member in compound.findall("member"):
+            if member.get("kind") != "function":
+                continue
+            name = member.findtext("name") or ""
+            qualified = f"{namespace}::{name}" if name else ""
+            if not qualified or qualified in guides:
+                continue
+            counts[qualified] = counts.get(qualified, 0) + 1
+    return counts
+
+
+def _directive_function_name(target: str, names: set[str]) -> str | None:
+    """Return the qualified name owning one ``doxygenfunction`` directive target."""
+
+    for name in sorted(names, key=len, reverse=True):
+        if target == name or target.startswith(f"{name}("):
+            return name
+    return None
+
+
+def _remove_deduction_guide_pages(index_xml: Path, generated: Path) -> None:
+    """Remove Exhale's standalone pages for CTAD guides.
+
+    Breathe renders deduction guides as part of the owning class already. Exhale also creates a
+    namespace-function page for the same declaration, which registers the same C++ domain symbol a
+    second time and produces duplicate-declaration warnings.
+    """
+
+    guides = _deduction_guide_names(index_xml)
+    if not guides:
+        return
+    directive = re.compile(r"^\s*\.\. doxygenfunction::\s*(?P<target>.+?)\s*$", re.MULTILINE)
+    for path in generated.glob("*.rst"):
+        text = path.read_text(encoding="utf-8")
+        match = directive.search(text)
+        if match is None:
+            continue
+        if _directive_function_name(match.group("target"), guides) is not None:
+            path.unlink()
+
+
+def _simplify_unique_function_directives(index_xml: Path, generated: Path) -> None:
+    """Use name-only Breathe directives for non-overloaded free functions.
+
+    Breathe can resolve a unique function from its qualified name alone. Avoiding Exhale's parsed
+    parameter spelling makes variadic templates and other modern C++ signatures substantially less
+    fragile while preserving explicit signatures for real overload sets.
+    """
+
+    counts = _namespace_function_counts(index_xml)
+    unique = {name for name, count in counts.items() if count == 1}
+    if not unique:
+        return
+    directive = re.compile(r"^(?P<prefix>\s*\.\. doxygenfunction::\s*)(?P<target>.+?)\s*$")
+    for path in generated.glob("*.rst"):
+        lines = path.read_text(encoding="utf-8").splitlines()
+        changed = False
+        for index, line in enumerate(lines):
+            match = directive.match(line)
+            if match is None:
+                continue
+            name = _directive_function_name(match.group("target"), unique)
+            if name is None or match.group("target") == name:
+                continue
+            lines[index] = f"{match.group('prefix')}{name}"
+            changed = True
+        if changed:
+            path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _concept_document_name(refid: str) -> str:
+    """Return BESA's generated document name for one Doxygen concept."""
+
+    slug = re.sub(r"[^A-Za-z0-9_]+", "_", refid).strip("_")
+    return f"besa_concept_{slug}"
+
+
+def _write_concept_pages(index_xml: Path, generated: Path) -> list[str]:
+    """Generate the concept pages Exhale 0.3.x does not yet create itself."""
+
+    documents: list[str] = []
+    root = ET.parse(index_xml).getroot()
+    for compound in root.findall("compound"):
+        if compound.get("kind") != "concept":
+            continue
+        qualified = compound.findtext("name") or ""
+        refid = compound.get("refid", "")
+        if not qualified or not refid:
+            continue
+        title = qualified.rsplit("::", 1)[-1]
+        document_name = _concept_document_name(refid)
+        label = re.sub(r"[^A-Za-z0-9_]+", "_", f"besa_concept_{refid}")
+        (generated / f"{document_name}.rst").write_text(
+            "\n".join(
+                [
+                    f".. _{label}:",
+                    "",
+                    title,
+                    "=" * len(title),
+                    "",
+                    f".. doxygenconcept:: {qualified}",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        documents.append(f"{document_name}.rst")
+    return documents
+
+
 def _namespace_function_signatures(
     index_xml: Path,
 ) -> dict[tuple[str, str], list[tuple[str, str]]]:
     """Collect display signatures and exact C++ cross-reference targets for namespace functions."""
 
     result: dict[tuple[str, str], list[tuple[str, str]]] = {}
+    class_like = _class_like_names(index_xml)
     root = ET.parse(index_xml).getroot()
     for compound in root.findall("compound"):
         if compound.get("kind") != "namespace":
@@ -453,6 +648,8 @@ def _namespace_function_signatures(
             if not name:
                 continue
             qualified_name = member.findtext("qualifiedname") or f"{namespace}::{name}"
+            if qualified_name in class_like:
+                continue
             return_type = _xml_text(member.find("type"))
             parameters: list[str] = []
             for parameter in member.findall("param"):
@@ -470,6 +667,7 @@ def _namespace_function_signatures(
     for signatures in result.values():
         signatures[:] = sorted(set(signatures))
     return result
+
 
 def _overload_document_name(namespace: str, function: str) -> str:
     """Return a stable Sphinx document name for one overload set."""
@@ -498,7 +696,7 @@ def _write_overload_pages(
             # Sphinx's C++ domain resolves a complete function declaration to one exact overload.
             # This keeps the overload-set page compact while every entry still reaches its own
             # detailed Breathe documentation.
-            lines.append(f"* :cpp:func:`{display} <{declaration}>`")
+            lines.append(f"* :cpp:func:`{_rst_role_title(display)} <{declaration}>`")
         lines.append("")
         (generated / f"{document_name}.rst").write_text("\n".join(lines), encoding="utf-8")
         result[(namespace, function)] = document_name
@@ -555,7 +753,7 @@ def _simplify_generated_entity_pages(generated: Path) -> None:
         "Documentation",
     }
     explicit_reference = re.compile(
-        r":ref:`(?P<title>(?:Class|Struct|Enum|Function|Define) .+?) <(?P<target>[^<>]+)>`"
+        r":ref:`(?P<title>(?:Class|Struct|Enum|Function|Define) .+?) <(?P<target>exhale_[^`]+)>`"
     )
 
     for path in generated.glob("*.rst"):
@@ -596,7 +794,7 @@ def _simplify_generated_entity_pages(generated: Path) -> None:
                 if compact is None:
                     return match.group(0)
                 changed = True
-                return f":ref:`{compact} <{match.group('target')}>`"
+                return f":ref:`{_rst_role_title(compact)} <{match.group('target')}>`"
 
             lines[index] = explicit_reference.sub(replace_reference, line)
 
@@ -627,6 +825,7 @@ def _api_namespace_tree(
         if compound.get("kind") == "namespace"
         if (name := compound.findtext("name"))
     }
+    class_like = _class_like_names(index_xml)
     if overload_pages is None:
         overload_pages = _write_overload_pages(index_xml, generated)
 
@@ -645,7 +844,7 @@ def _api_namespace_tree(
     for compound in compounds:
         kind = compound.get("kind", "")
         name = compound.findtext("name") or ""
-        if kind in {"class", "struct"} and "::" in name:
+        if kind in {"class", "struct", "concept"} and "::" in name:
             parent, short_name = name.rsplit("::", 1)
             if parent in namespace_names:
                 members[parent].add((kind, short_name, name))
@@ -653,25 +852,33 @@ def _api_namespace_tree(
             continue
         for member in compound.findall("member"):
             member_kind = member.get("kind", "")
-            if member_kind not in {"enum", "function"}:
+            if member_kind not in {"enum", "function", "concept"}:
                 continue
             member_name = member.findtext("name") or ""
-            if member_name:
-                members[name].add((member_kind, member_name, f"{name}::{member_name}"))
-                if member_kind == "function":
-                    key = (name, member_name)
-                    function_counts[key] = function_counts.get(key, 0) + 1
+            qualified_name = f"{name}::{member_name}" if member_name else ""
+            if not qualified_name:
+                continue
+            if member_kind == "function" and qualified_name in class_like:
+                # Doxygen exposes class template deduction guides as namespace functions as well as
+                # part of the owning class. Keep only the class-owned representation.
+                continue
+            members[name].add((member_kind, member_name, qualified_name))
+            if member_kind == "function":
+                key = (name, member_name)
+                function_counts[key] = function_counts.get(key, 0) + 1
 
     markers = {
         "class": "C",
         "struct": "S",
         "enum": "E",
+        "concept": "K",
         "function": "F",
     }
     roles = {
         "class": "cpp:class",
         "struct": "cpp:struct",
         "enum": "cpp:enum",
+        "concept": "cpp:concept",
         "function": "cpp:func",
     }
 
@@ -679,7 +886,7 @@ def _api_namespace_tree(
         ".. role:: api-kind",
         "",
         ":api-kind:`N` namespace  ·  :api-kind:`C` class  ·  :api-kind:`S` struct  ·  "
-        ":api-kind:`E` enum  ·  :api-kind:`F` function",
+        ":api-kind:`E` enum  ·  :api-kind:`K` concept  ·  :api-kind:`F` function",
         "",
     ]
 
@@ -700,15 +907,16 @@ def _api_namespace_tree(
         kind, short_name, qualified_name = member
         marker = markers[kind]
         display_name = f"{short_name}()" if kind == "function" else short_name
+        escaped_display = _rst_role_title(display_name)
         if kind == "function" and function_counts.get((namespace, short_name), 0) > 1:
             target = overload_pages.get((namespace, short_name))
             if target:
-                link = f":doc:`{display_name} </generated/{target}>`"
+                link = f":doc:`{escaped_display} </generated/{target}>`"
             else:
                 link = f"``{display_name}``"
         else:
             role = roles[kind]
-            link = f":{role}:`{display_name} <{qualified_name}>`"
+            link = f":{role}:`{escaped_display} <{qualified_name}>`"
         emit_item(f":api-kind:`{marker}` {link}", depth)
 
     def emit_namespace(namespace: str, depth: int) -> None:
@@ -872,7 +1080,10 @@ def _prepare_api_landing(app) -> None:
     if not index_xml.is_file() or not root_file.is_file() or not index_source.is_file():
         return
 
+    _remove_deduction_guide_pages(index_xml, generated)
+    _simplify_unique_function_directives(index_xml, generated)
     _simplify_generated_entity_pages(generated)
+    concept_documents = _write_concept_pages(index_xml, generated)
 
     overload_pages = _write_overload_pages(index_xml, generated)
     overview = generated / "api_namespace_overview.rst.include"
@@ -882,7 +1093,12 @@ def _prepare_api_landing(app) -> None:
     )
     _rewrite_namespace_pages(index_xml, generated, overload_pages)
 
-    documents = _unabridged_documents(unabridged)
+    documents = [
+        document
+        for document in _unabridged_documents(unabridged)
+        if (generated / document).is_file()
+    ]
+    documents.extend(document for document in concept_documents if document not in documents)
     documents.extend(
         path.name for path in sorted(generated.glob("api_overload_*.rst")) if path.name not in documents
     )

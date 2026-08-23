@@ -50,7 +50,8 @@ endfunction()
 #   Name of the ordinary, single-checkout Sphinx target.
 #
 # SOURCE_DIRECTORY
-#   Sphinx source directory containing conf.py and Doxyfile.
+#   Sphinx source directory containing conf.py and Doxyfile.in. The project CMake configuration
+#   materializes the template into <binary>/api-docs/Doxyfile for the exact checkout.
 #
 # OUTPUT_DIRECTORY
 #   HTML output directory for the current checkout. Defaults to <binary>/doc/api/current.

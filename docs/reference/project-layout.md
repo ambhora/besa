@@ -14,7 +14,7 @@ project/
 │       └── index.md
 ├── api-docs/                   # Doxygen/Breathe/Sphinx API source
 │   ├── conf.py
-│   ├── Doxyfile
+│   ├── Doxyfile.in
 │   ├── index.rst
 │   ├── api.rst
 │   └── _templates/
@@ -46,7 +46,9 @@ isolated from the production source graph.
 is intentionally separate: Doxygen generates XML only, Breathe imports that XML into Sphinx, and
 sphinx-multiversion rebuilds the API renderer for `main` plus the historical refs selected by BESA.
 The default is every tag; projects can choose `latest:N`, a version range, or an exact ref set. BESA
-mounts the resulting API trees below `reference/api/<version>/` when assembling `user.docs`.
+mounts the resulting API trees below `reference/api/<version>/` when assembling `user.docs`. CMake
+configures `api-docs/Doxyfile.in` into the build tree so `CLANG_DATABASE_PATH` follows the exact
+`compile_commands.json` for the checkout being documented.
 
 This separation lets `properdocs serve` remain a normal local authoring workflow while API generation
 can evolve independently. The build-tree Doxygen XML location is checkout-specific so simultaneous

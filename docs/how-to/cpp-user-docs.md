@@ -18,7 +18,8 @@ cmake -S . -B build -DPROJECT_FEATURES=user-docs
 ```
 
 The documentation toolchain requires `properdocs`, `doxygen`, `dot`, `sphinx-build`, Breathe, and
-`sphinx-multiversion`.
+`sphinx-multiversion`. The Doxygen executable must be built with libclang support
+(`-Duse_libclang=ON`) because generated projects enable `CLANG_ASSISTED_PARSING`.
 
 ## Author the main site
 
@@ -34,7 +35,7 @@ docs/                       # ProperDocs Markdown
 
 api-docs/                   # API renderer only
 ├── conf.py
-├── Doxyfile
+├── Doxyfile.in
 ├── index.rst
 └── _templates/
     └── project-links.html
@@ -64,6 +65,11 @@ cmake --build build --target user.docs
 2. sphinx-multiversion builds the API reference for `main` plus the selected historical refs; each
    Sphinx build runs Doxygen at `builder-inited`, and Breathe consumes that checkout's Doxygen XML.
 3. BESA assembles the API trees below the Versioned API section of the ProperDocs Reference page.
+
+CMake configures `api-docs/Doxyfile.in` into `<build>/api-docs/Doxyfile`. The generated file points
+`CLANG_DATABASE_PATH` at that exact CMake build tree, so Clang-assisted Doxygen parsing consumes the
+same `compile_commands.json` as the project build. Historical refs receive their own private CMake
+build and therefore their own compilation database.
 
 Before Doxygen runs for each checkout, `api-docs/conf.py` constructs a temporary documented-header
 tree. It configures that checkout when necessary, then merges checked-in `src/*/include/` trees,

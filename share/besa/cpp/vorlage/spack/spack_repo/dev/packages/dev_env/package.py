@@ -9,7 +9,7 @@ class DevEnv(BundlePackage):
 
     # Bump this version when the bundle dependency graph changes so existing
     # Spack environments can be explicitly reconcretized against the new graph.
-    version("1.1")
+    version("1.2")
 
     variant("docs", default=False, description="Documentation toolchain")
     variant("tests", default=True, description="C++ test dependencies")
@@ -25,7 +25,7 @@ class DevEnv(BundlePackage):
     depends_on("lcov", when="+coverage")
     depends_on("py-gcovr", when="+coverage")
 
-    depends_on("doxygen", when="+docs")
+    depends_on("doxygen+libclang", when="+docs")
     depends_on("graphviz", when="+docs")
     depends_on("py-sphinx@:8", when="+docs")
     depends_on("py-breathe", when="+docs")
