@@ -1,0 +1,159 @@
+/* Desktop reading scale.
+ *
+ * Use more of a wide display and increase the normal reading size without
+ * requiring browser zoom. Keep the overrides desktop-only so narrow layouts
+ * retain the theme's normal responsive behaviour.
+ */
+@media (min-width: 1200px) {
+  html {
+    --pst-font-size-base: 1.25rem;
+  }
+
+  /* PyData otherwise caps the overall three-column page width. */
+  .bd-page-width {
+    max-width: 100%;
+  }
+
+  /* Let the article consume the space available between both sidebars. */
+  .bd-main .bd-content .bd-article-container {
+    max-width: 100%;
+  }
+}
+
+@media (min-width: 1600px) {
+  html {
+    --pst-font-size-base: 1.3rem;
+  }
+}
+
+@media (min-width: 1200px) {
+  .bd-sidebar-primary {
+    font-size: 0.9em;
+    width: 20%;
+  }
+
+  /* Keep the generated API outline and its title on the same compact scale. */
+  .bd-sidebar-primary .besa-api-outline,
+  .bd-sidebar-primary .besa-api-outline-link,
+  .bd-sidebar-primary .bd-links__title {
+    font-size: inherit;
+  }
+}
+
+@media (min-width: 1200px) {
+  /* Keep the desktop title bar compact independently of the larger article text. */
+  html {
+    --pst-header-height: 2.2rem;
+  }
+
+  .bd-header,
+  .bd-header .bd-header__inner {
+    height: var(--pst-header-height);
+    min-height: var(--pst-header-height);
+  }
+
+  .bd-header {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  .bd-header .navbar-header-items,
+  .bd-header .navbar-header-items__start,
+  .bd-header .navbar-header-items__center,
+  .bd-header .navbar-header-items__end,
+  .bd-header .navbar-item {
+    min-height: 0;
+    height: 100%;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  .bd-header .navbar-item {
+    align-items: center;
+    display: flex;
+  }
+
+  /* Project/site title. */
+  .bd-header .navbar-brand {
+    font-size: 0.85rem;
+    line-height: 1;
+    margin: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  .bd-header .logo__title {
+    font-size: 0.85rem;
+    line-height: 1;
+    margin: 0;
+  }
+
+  .bd-header .navbar-brand img {
+    max-height: 1.5rem;
+  }
+
+  /* Header-only navigation and controls should not inherit the enlarged reading size. */
+  .bd-header .nav-link,
+  .bd-header .search-button-field,
+  .bd-header .besa-api-version-select {
+    font-size: 0.75rem;
+    line-height: 1;
+  }
+
+  .bd-header .nav-link {
+    padding-top: 0.1rem;
+    padding-bottom: 0.1rem;
+  }
+
+  .bd-header .search-button-field,
+  .bd-header .besa-api-version-select {
+    height: 1.55rem;
+    min-height: 1.55rem;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  .bd-header .search-button-field {
+    padding-left: 0.45rem;
+    padding-right: 0.45rem;
+  }
+
+  .bd-header .pst-navbar-icon {
+    height: 1.65rem;
+    min-height: 1.65rem;
+    width: 1.65rem;
+    padding: 0.1rem;
+  }
+}
+
+@media (min-width: 1200px) {
+  .bd-sidebar-secondary {
+    flex: 0 0 23%;
+    width: 23%;
+    max-width: 23%;
+  }
+}
+
+@media (min-width: 1200px) {
+  .bd-header .besa-api-project-links > .nav-link {
+    display: inline-flex;
+    align-items: center;
+
+    padding: 0.35rem 0.7rem;
+    border-radius: 0.35rem;
+
+    background: #2f67ad;
+    color: white;
+
+    font-weight: 600;
+    text-decoration: none;
+    line-height: 1;
+  }
+
+  .bd-header .besa-api-project-links > .nav-link:hover,
+  .bd-header .besa-api-project-links > .nav-link:focus {
+    background: #275995;
+    color: white;
+    text-decoration: none;
+  }
+}

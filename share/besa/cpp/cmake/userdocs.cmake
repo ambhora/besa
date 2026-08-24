@@ -51,8 +51,7 @@ endfunction()
 #   Name of the ordinary, single-checkout Sphinx target.
 #
 # SOURCE_DIRECTORY
-#   Sphinx source directory containing conf.py and Doxyfile.in. The project CMake configuration
-#   materializes the template into <binary>/api-docs/Doxyfile for the exact checkout.
+#   Sphinx source directory containing conf.py and Doxyfile.
 #
 # OUTPUT_DIRECTORY
 #   HTML output directory for the current checkout. Defaults to <binary>/doc/api/current.
@@ -98,19 +97,19 @@ function(besa_add_sphinx_breathe_docs)
   )
 
   if(NOT ARG_OUTPUT_DIRECTORY)
-    set(ARG_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/doc/api/current")
+    set(ARG_OUTPUT_DIRECTORY "${BESA_DOCS_DIRECTORY}/api/current")
   endif()
   if(NOT ARG_MULTIVERSION_NAME)
     set(ARG_MULTIVERSION_NAME "${ARG_NAME}.multiversion")
   endif()
   if(NOT ARG_MULTIVERSION_OUTPUT_DIRECTORY)
-    set(ARG_MULTIVERSION_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/doc/api/multiversion")
+    set(ARG_MULTIVERSION_OUTPUT_DIRECTORY "${BESA_DOCS_DIRECTORY}/api/multiversion")
   endif()
   if(NOT ARG_MULTIVERSION_DEFAULT_VERSION)
     set(ARG_MULTIVERSION_DEFAULT_VERSION "main")
   endif()
   if(NOT ARG_DOXYGEN_OUTPUT_DIRECTORY)
-    set(ARG_DOXYGEN_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/doc/doxygen")
+    set(ARG_DOXYGEN_OUTPUT_DIRECTORY "${BESA_DOCS_DIRECTORY}/doxygen")
   endif()
   if(NOT ARG_SITE_ROOT_DEPTH)
     set(ARG_SITE_ROOT_DEPTH 3)
@@ -171,7 +170,7 @@ function(besa_add_sphinx_breathe_docs)
   # Exhale writes generated RST below the Sphinx source tree. Never point an ordinary current-ref
   # build at the checked-in API source directly: stage that source inside the CMake build tree so
   # generated RST, doctrees, and other Sphinx working files cannot pollute PROJECT_SOURCE_DIR.
-  set(_besa_current_sphinx_source "${PROJECT_BINARY_DIR}/doc/work/sphinx-current")
+  set(_besa_current_sphinx_source "${BESA_DOCS_DIRECTORY}/work/sphinx-current")
 
   # Doxygen is invoked by conf.py because sphinx-multiversion materializes historical refs itself.
   # The site-root depth is an output-layout property, not a hostname, so links back to ProperDocs
@@ -179,7 +178,7 @@ function(besa_add_sphinx_breathe_docs)
   add_custom_target(
     "${ARG_NAME}"
     # The live API is generated from the working tree and may be rebuilt repeatedly while files are
-    # uncommitted. Never reuse Sphinx's previous doctree/domain inventory: C++ declarations that
+    # uncommitted.  Never reuse Sphinx's previous doctree/domain inventory: C++ declarations that
     # changed identity can otherwise survive in the environment and appear as duplicate targets.
     COMMAND "${CMAKE_COMMAND}" -E rm -rf "${ARG_OUTPUT_DIRECTORY}"
     COMMAND "${CMAKE_COMMAND}" -E rm -rf "${_besa_current_sphinx_source}"
@@ -305,13 +304,13 @@ function(besa_add_user_docs)
   endif()
 
   if(NOT ARG_OUTPUT_DIRECTORY)
-    set(ARG_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/doc/site")
+    set(ARG_OUTPUT_DIRECTORY "${BESA_DOCS_DIRECTORY}/site")
   endif()
   if(NOT ARG_MULTIVERSION_DEFAULT_VERSION)
     set(ARG_MULTIVERSION_DEFAULT_VERSION "main")
   endif()
   if(NOT ARG_DOXYGEN_OUTPUT_DIRECTORY)
-    set(ARG_DOXYGEN_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/doc/doxygen")
+    set(ARG_DOXYGEN_OUTPUT_DIRECTORY "${BESA_DOCS_DIRECTORY}/doxygen")
   endif()
   if(NOT ARG_INSTALL_DIRECTORY)
     set(ARG_INSTALL_DIRECTORY "${CMAKE_INSTALL_DOCDIR}")
@@ -339,9 +338,9 @@ function(besa_add_user_docs)
   set(_besa_properdocs_target "${ARG_NAME}.properdocs")
   set(_besa_api_target "${ARG_NAME}.api")
   set(_besa_api_multiversion_target "${ARG_NAME}.multiversion")
-  set(_besa_properdocs_output "${PROJECT_BINARY_DIR}/doc/properdocs")
-  set(_besa_api_output "${PROJECT_BINARY_DIR}/doc/api/current")
-  set(_besa_api_multiversion_output "${PROJECT_BINARY_DIR}/doc/api/multiversion")
+  set(_besa_properdocs_output "${BESA_DOCS_DIRECTORY}/properdocs")
+  set(_besa_api_output "${BESA_DOCS_DIRECTORY}/api/current")
+  set(_besa_api_multiversion_output "${BESA_DOCS_DIRECTORY}/api/multiversion")
 
   # reference/api/<version>/ is three levels below the site root. Derive the number rather than
   # hard-code it so projects may mount the API reference elsewhere without changing conf.py.

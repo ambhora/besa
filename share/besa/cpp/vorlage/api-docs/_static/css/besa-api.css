@@ -5,8 +5,7 @@
 /* BESA API presentation: compact, reference-oriented, and structurally obvious. */
 
 .bd-page-width {
-  /* Allow roughly 1.5x the previous desktop documentation width while remaining fluid. */
-  max-width: 135rem;
+  max-width: 110rem;
 }
 
 .bd-main .bd-content .bd-article-container {
@@ -193,7 +192,7 @@ dl.c > dt,
 dl.cpp.function,
 dl.cpp.function-template,
 dl.c.function {
-  border: 1px solid var(--pst-color-border);
+  border: 1px solid color-mix(in srgb, var(--pst-color-primary) 38%, var(--pst-color-border));
   border-radius: 0.45rem;
   border-top: 0.24rem solid var(--pst-color-primary);
   margin: 0.9rem 0 1.1rem;
@@ -248,6 +247,33 @@ dl.cpp > dt.besa-multiline-signature .sig-return-type {
   padding: 0.45rem 0.7rem;
 }
 
+/* Function metadata sits between the declaration and its prose.  This keeps even undocumented
+ * functions informative without making metadata look like part of the signature. */
+.besa-api-function-metadata {
+  display: grid;
+  gap: 0.32rem;
+  margin-bottom: 0.6rem;
+}
+
+.besa-api-source {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  font-size: 0.75rem;
+}
+
+.besa-api-source-label {
+  color: var(--pst-color-text-muted);
+  font-weight: 650;
+}
+
+.besa-api-source-link {
+  font-family: var(--pst-font-family-monospace);
+}
+
+/* Inheritance is rendered as a normal post-API Graphviz section. */
+
 /* Function qualifiers are properties of the callable.  Place them below the signature and before
  * the prose documentation so they cannot be mistaken for controls belonging to the previous item. */
 .besa-api-qualifiers {
@@ -255,7 +281,7 @@ dl.cpp > dt.besa-multiline-signature .sig-return-type {
   display: flex;
   flex-wrap: wrap;
   gap: 0.28rem;
-  margin: 0 0 0.55rem;
+  margin: 0;
 }
 
 .besa-api-properties-label {
@@ -287,4 +313,154 @@ dl.c.function > dd {
   margin-left: 0;
   margin-top: 0.55rem;
   padding-top: 0.55rem;
+}
+
+
+/* Every program-listing line number is its own permalink. Function implementation metadata uses
+ * the same #L<number> fragments, so copied source URLs and API-to-source links are identical. */
+.besa-api-source-line-number {
+  color: inherit;
+  display: inline-block;
+  scroll-margin-top: 5rem;
+  text-decoration: none;
+}
+
+.besa-api-source-line-number:hover,
+.besa-api-source-line-number:focus-visible {
+  color: var(--pst-color-primary);
+  text-decoration: underline;
+}
+
+.besa-api-source-line-number.besa-api-source-line-target {
+  color: var(--pst-color-primary);
+  font-weight: 750;
+  text-decoration: underline;
+}
+
+/* Recursive API outline used by the persistent left sidebar. Namespace disclosure controls are
+ * intentionally separate from namespace links: the boxed +/- button expands/collapses, while the
+ * name navigates to the namespace page. Rows align kind/name columns at each tree depth, and child
+ * lists draw explicit connectors so sibling entities cannot be mistaken for namespace members. */
+.besa-api-outline,
+.besa-api-outline-children {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.besa-api-outline-children {
+  margin: 0.12rem 0 0.22rem 0.72rem;
+  padding-left: 1rem;
+}
+
+/* Draw an IDE-style tree: the vertical segment belongs to each child item, while the horizontal
+ * segment joins that item's row to its parent. The last child stops the vertical segment at the
+ * row instead of continuing below the subtree. */
+.besa-api-outline-children > li {
+  position: relative;
+}
+
+.besa-api-outline-children > li::before {
+  border-left: 1px solid var(--pst-color-border);
+  bottom: -0.22rem;
+  content: "";
+  left: -1rem;
+  position: absolute;
+  top: -0.12rem;
+}
+
+.besa-api-outline-children > li::after {
+  border-top: 1px solid var(--pst-color-border);
+  content: "";
+  left: -1rem;
+  position: absolute;
+  top: 0.78rem;
+  width: 1.18rem;
+}
+
+.besa-api-outline-children > li:last-child::before {
+  bottom: auto;
+  height: 0.9rem;
+}
+
+/* The kind and name occupy the first two columns for every row. Namespace rows add the disclosure
+ * button after the name, so expansion controls never shift namespace names away from sibling
+ * entities at the same tree depth. */
+.besa-api-outline-row {
+  align-items: center;
+  column-gap: 0.42rem;
+  display: grid;
+  grid-template-columns: 1.15rem minmax(0, max-content) 1.5rem;
+  max-width: 100%;
+  min-width: 0;
+  width: fit-content;
+}
+
+.besa-api-outline-kind {
+  color: var(--pst-color-text-muted);
+  font-family: var(--pst-font-family-monospace);
+  font-size: 0.7em;
+  font-weight: 700;
+  justify-self: center;
+  text-align: center;
+}
+
+.besa-api-outline-link {
+  border-radius: 0.18rem;
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  padding: 0.08rem 0.15rem;
+  text-decoration: none;
+}
+
+.besa-api-outline-link.current {
+  color: var(--pst-color-primary);
+  font-weight: 650;
+}
+
+/* Boxed disclosure control placed after the namespace name. The visible +/- is deliberately large
+ * enough to read as an action, while the full square is the click target. */
+.besa-api-outline-toggle {
+  align-items: center;
+  background: transparent;
+  border: 1px solid var(--pst-color-border);
+  border-radius: 0.2rem;
+  color: var(--pst-color-text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 1.05em;
+  font-weight: 750;
+  height: 1.4rem;
+  justify-content: center;
+  line-height: 1;
+  margin: 0;
+  padding: 0;
+  width: 1.4rem;
+}
+
+.besa-api-outline-toggle::before {
+  content: "+";
+  line-height: 1;
+}
+
+.besa-api-outline-toggle[aria-expanded="true"]::before {
+  content: "−";
+}
+
+.besa-api-outline-toggle:hover {
+  border-color: var(--pst-color-primary);
+  color: var(--pst-color-primary);
+}
+
+.besa-api-outline-toggle:focus-visible {
+  border-color: var(--pst-color-primary);
+  color: var(--pst-color-primary);
+  outline: 2px solid var(--pst-color-primary);
+  outline-offset: 2px;
+}
+
+.besa-api-outline-children[hidden] {
+  display: none !important;
 }

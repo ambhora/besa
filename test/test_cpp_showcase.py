@@ -41,8 +41,10 @@ def test_generated_cpp_project_builds_hello_showcase(tmp_path: Path) -> None:
     assert (showcase / "hello.cpp").is_file()
     assert not (project / "showcase").exists()
 
-    root_cmake = (project / "CMakeLists.txt").read_text(encoding="utf-8")
-    assert '  NAME showcases\n  WHEN REGEX "^showcase-"' in root_cmake
+    model = (project / "besa.toml").read_text(encoding="utf-8")
+    assert 'name = "showcase-hello"' in model
+    assert 'path = "showcases/hello"' in model
+    assert 'when = { all = ["showcase-hello"] }' in model
 
     build = project / "build-showcase"
     _run(
@@ -58,5 +60,5 @@ def test_generated_cpp_project_builds_hello_showcase(tmp_path: Path) -> None:
         project,
     )
     _run(["cmake", "--build", str(build), "--target", "showcase.hello"], project)
-    result = _run([str(build / "showcases" / "hello" / "showcase-hello")], project)
+    result = _run([str(build / "besa" / "directories" / "showcase-hello" / "showcase-hello")], project)
     assert result.stdout == "Hello world from showcase\n"

@@ -15,36 +15,38 @@ named arguments and returns a boolean plus an optional error message.
 
 ## Feature constraints
 
-Define a callback:
+Project-feature logic belongs in the portable model rather than in a CMake callback. Declare the
+complete feature domain and a Python evaluator in `besa.toml`:
 
-```cmake
-function(no_cuda_and_hip)
-  besa_feature_constraint_arguments_parse(
-    PREFIX ARG
-    ARGUMENTS ${ARGN}
-  )
-
-  if("toolchain-cuda" IN_LIST ARG_FEATURES
-     AND "toolchain-hip" IN_LIST ARG_FEATURES)
-    set("${ARG_OUTPUT_VARIABLE}" FALSE PARENT_SCOPE)
-    set(
-      "${ARG_ERROR_VARIABLE}"
-      "CUDA and HIP cannot be enabled together in this project."
-      PARENT_SCOPE
-    )
-    return()
-  endif()
-
-  set("${ARG_OUTPUT_VARIABLE}" TRUE PARENT_SCOPE)
-  set("${ARG_ERROR_VARIABLE}" "" PARENT_SCOPE)
-endfunction()
-
-besa_register_feature_constraint(
-  FUNCTION no_cuda_and_hip
-)
+```toml
+[[constraints]]
+name = "no-cuda-and-hip"
+features = ["toolchain-cuda", "toolchain-hip"]
+callback = "tools/constraints.py:no_cuda_and_hip"
 ```
 
-BESA invokes the function with `OUTPUT_VARIABLE`, `ERROR_VARIABLE`, and `FEATURES`.
+The callback receives one dictionary whose `features` member maps every declared input feature to a
+boolean:
+
+```python
+def no_cuda_and_hip(context):
+    features = context["features"]
+    valid = not (features["toolchain-cuda"] and features["toolchain-hip"])
+    return {
+        "success": True,
+        "result": valid,
+        "reason": "CUDA and HIP cannot be enabled together." if not valid else "",
+    }
+```
+
+BESA evaluates the finite domain of this function, stores its truth table below
+`<workspace>/configure_cache/constraints/`, and uses that same result for the CMake backend and API
+configuration-space analysis. The cache is invalidated when the constraint declaration or callback
+implementation changes.
+
+`success = false` means evaluation itself failed and is a configuration error. `success = true` with
+`result = false` means the examined feature assignment is invalid. A bare boolean return is also
+accepted for simple predicates.
 
 ## Devtool constraints
 
@@ -114,18 +116,11 @@ besa_register_test_mode_constraint(
 
 The callback receives `OUTPUT_VARIABLE`, `ERROR_VARIABLE`, and `MODES`.
 
-## Complete configuration after registration
+## Complete configuration
 
-Register every constraint before the configuration phase is closed:
+`besa_model_realize()` translates portable feature constraints into the CMake backend before it
+closes the configuration phase. Backend-specific devtool and test-mode constraints must still be
+registered before `besa_configure_complete()` in custom CMake code.
 
-```cmake
-besa_register_feature_constraint(FUNCTION no_cuda_and_hip)
-besa_register_devtool_constraint(FUNCTION no_asan_with_coverage)
-besa_register_test_mode_constraint(FUNCTION no_commit_with_nightly)
-
-besa_configure_complete()
-```
-
-If a callback sets its output variable to false, BESA reports the callback-provided error with
-`message(FATAL_ERROR)`. A false result with no error text still rejects the configuration with a
-generic constraint diagnostic.
+A rejected configuration stops configuration before compiler-dependent project structure is
+realized.

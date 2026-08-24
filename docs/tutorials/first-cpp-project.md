@@ -15,7 +15,8 @@ cd ~/software/example/main
 ```
 
 The generator creates the default `main` checkout directory, copies the C++ template, substitutes the
-project name, and installs the current BESA CMake module under `cmake/besa`. Use `--directory` when a
+project name, writes the declarative `besa.toml` project model, and installs the current BESA CMake
+backend under `cmake/besa`. Use `--directory` when a
 different checkout-directory name is desired. Add `--nvim-ycm` when local Neovim and YouCompleteMe
 configuration should also be provisioned; those two local files are gitignored.
 
@@ -25,9 +26,9 @@ configuration should also be provisioned; those two local files are gitignored.
 cmake --workflow --preset gcc --fresh
 ```
 
-The default feature set contains `build-source` and `toolchain-cpp`. The project begins with
-`LANGUAGES NONE`; `besa_configure_complete()` resolves those features and enables `CXX` before the
-source tree is processed.
+The default feature set in `besa.toml` contains `build-source` and `toolchain-cpp`. The CMake
+bootstrap begins with `LANGUAGES NONE`; `besa_model_realize()` loads the model and BESA resolves those
+features before enabling `CXX` and processing the source prefix.
 
 ## Build with Clang
 

@@ -1,0 +1,103 @@
+# SPDX-License-Identifier: Apache-2.0
+
+schema = 1
+
+[project]
+name = "vorlage"
+version = "0.1.0"
+
+[features.build-source]
+default = true
+kind = "build"
+
+[features.toolchain-cpp]
+default = true
+kind = "toolchain"
+
+[features.toolchain-cuda]
+default = false
+kind = "toolchain"
+
+[features.toolchain-hip]
+default = false
+kind = "toolchain"
+
+[features.user-docs]
+default = false
+kind = "documentation"
+
+[features.project-kosha25]
+default = false
+kind = "project"
+
+[features.showcase-hello]
+default = false
+kind = "showcase"
+
+[features.build-testing]
+default = false
+kind = "testing"
+
+[test-modes.ci-commit]
+default = true
+
+[api.profiles.cpu]
+features = ["build-source", "toolchain-cpp"]
+
+[api.profiles.cuda]
+features = ["build-source", "toolchain-cpp", "toolchain-cuda"]
+predefined = ["__CUDACC__=1"]
+
+[api.profiles.hip]
+features = ["build-source", "toolchain-cpp", "toolchain-hip"]
+predefined = ["__HIPCC__=1"]
+
+[[dependencies]]
+name = "Catch2"
+version = "3"
+kind = "dev"
+provider = "cmake"
+when = { all = ["build-testing"] }
+
+[[dependencies]]
+name = "Threads"
+kind = "dev"
+provider = "cmake"
+when = { all = ["build-testing"] }
+
+[[dependencies]]
+name = "Doxygen"
+kind = "dev"
+provider = "cmake"
+when = { all = ["user-docs"] }
+
+[[sources]]
+name = "cpp"
+path = "src/cpp"
+language = "CXX"
+api = "public"
+when = { all = ["build-source", "toolchain-cpp"] }
+
+[[directories]]
+name = "project-kosha25"
+path = "project/kosha25"
+api = "none"
+when = { all = ["project-kosha25"] }
+
+[[directories]]
+name = "showcase-hello"
+path = "showcases/hello"
+api = "none"
+when = { all = ["showcase-hello"] }
+
+[[directories]]
+name = "user-docs"
+path = "docs"
+api = "none"
+when = { all = ["user-docs"] }
+
+[[directories]]
+name = "tests"
+path = "test"
+api = "none"
+when = { all = ["build-testing"] }

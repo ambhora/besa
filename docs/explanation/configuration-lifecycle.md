@@ -4,10 +4,10 @@
 
 BESA deliberately separates configuration selection from project construction.
 
-Before `besa_configure_complete()`, the project declares the configuration sets which it owns:
-features, default features, test modes, and default test modes. It may also register feature,
-devtool, and test-mode constraints. Devtool and warning capability names themselves are supplied by
-BESA, so projects select them but do not redeclare their allow-lists.
+The portable project-owned configuration model lives in `besa.toml`: features and their defaults,
+test modes, API profiles, dependencies, project topology, and portable feature constraints. The CMake
+backend loads that model and translates it into BESA's internal registries. Devtool and warning
+capability names remain backend capabilities supplied by BESA rather than project declarations.
 
 `besa_configure_complete()` then resolves four independent families:
 
@@ -16,13 +16,13 @@ BESA, so projects select them but do not redeclare their allow-lists.
 3. `TEST_MODES` over the project's test-mode defaults;
 4. `PROJECT_WARNINGS` over BESA's supported warning policies.
 
-Duplicate or unknown selections are rejected first. Project constraints run against the fully
-resolved feature/devtool/test-mode sets next. Only after every constraint succeeds does BESA publish
+Duplicate or unknown selections are rejected first. Portable feature constraints and any backend-specific
+devtool/test-mode constraints run against the fully resolved sets next. Only after every constraint succeeds does BESA publish
 the resolved booleans, enable compiler languages implied by `toolchain-*`, and create any
 compiler-dependent instrumentation policy.
 
-After this phase boundary, dependencies, directories, targets, and tests are processed against a
-frozen configuration. This prevents a dependency or subdirectory from implicitly changing the
+After this phase boundary, model-declared dependencies and source/directory prefixes, plus any
+backend-specific targets and tests, are processed against a frozen configuration. This prevents a dependency or subdirectory from implicitly changing the
 meaning of configuration selection halfway through a configure run.
 
 Project-wide packaging and instrumentation reporting need the final target/dependency graph. BESA

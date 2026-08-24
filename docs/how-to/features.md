@@ -2,50 +2,40 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Configure features
 
-Declare every supported feature before the configuration phase closes:
+Declare project features and defaults in `besa.toml`:
 
-```cmake
-besa_features_add(
-  FEATURES
-    build-source
-    toolchain-cpp
-    toolchain-cuda
-    toolchain-hip
-    toolchain-asm
-    user-docs
-)
+```toml
+[features.build-source]
+default = true
+kind = "build"
 
-besa_features_default(
-  FEATURES
-    build-source
-    toolchain-cpp
-)
+[features.toolchain-cpp]
+default = true
+kind = "toolchain"
 
-besa_configure_complete()
+[features.toolchain-cuda]
+default = false
+kind = "toolchain"
+
+[features.user-docs]
+default = false
+kind = "documentation"
 ```
 
-`PROJECT_FEATURES` is an override set applied to the defaults:
+Every selectable project capability is a feature. `kind` is metadata; selection still uses one
+feature namespace.
+
+The CMake backend receives feature overrides through `PROJECT_FEATURES`:
 
 ```console
-cmake -S . -B build/cuda \
+cmake -S . -B workspace/build \
   -DPROJECT_FEATURES='toolchain-cuda;~toolchain-cpp'
 ```
 
 Positive entries enable a feature. `~feature` disables a default feature. Each underlying feature may
-appear at most once in `PROJECT_FEATURES`; contradictory or repeated entries are rejected.
+appear at most once; contradictory or repeated entries are rejected.
 
-Features beginning with `toolchain-` are special. BESA currently maps:
-
-- `toolchain-c` to CMake language `C`;
-- `toolchain-cpp` to `CXX`;
-- `toolchain-cuda` to `CUDA`;
-- `toolchain-hip` to `HIP`;
-- `toolchain-fortran` to `Fortran`;
-- `toolchain-asm` to `ASM`.
-
-BESA enables `ASM` after all other selected toolchain languages. This follows CMake's recommendation
-that assembly support be enabled last so an enabled C or C++ compiler can be considered for assembly
-sources.
-
-A project may declare another `toolchain-*` name, but enabling it is an error until the installed BESA
-version knows how to map it to a CMake language.
+Features with `kind = "toolchain"` are compilation-context features. BESA's CMake backend maps the
+reserved `toolchain-*` names it supports to CMake languages and enables those languages only after
+the complete feature configuration has been resolved. Toolchain-specific compiler options and
+architecture choices remain toolchain/backend configuration rather than fields in `besa.toml`.

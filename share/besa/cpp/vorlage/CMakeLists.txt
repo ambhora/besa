@@ -9,9 +9,18 @@
 
 cmake_minimum_required(VERSION 3.26.1)
 
+# besa.toml is the authoritative project declaration.  The tiny bootstrap reader is usable before
+# project() so even project identity is not duplicated in CMake.
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/besa/model.cmake")
+besa_model_bootstrap(FILE "${CMAKE_CURRENT_SOURCE_DIR}/besa.toml")
+
 # No compiler language is enabled here.  Enabled `toolchain-*` features are resolved first and
 # besa_configure_complete() enables the corresponding CMake languages afterwards.
-project(vorlage VERSION 0.1.0 LANGUAGES NONE)
+project(
+  "${BESA_MODEL_PROJECT_NAME}"
+  VERSION "${BESA_MODEL_PROJECT_VERSION}"
+  LANGUAGES NONE
+)
 
 # Always emit compile_commands.json for editor, analysis, and developer tooling.
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -105,101 +114,10 @@ set(PKGBUILDER_ID "vanilla" CACHE STRING "Package builder identifier")
 set(PKGBUILDER_REVISION "1" CACHE STRING "Package builder revision")
 
 # --------------------------------------------------------------------------------------------------
-# FEATURE / TEST-MODE DECLARATION AND CONFIGURATION
+# DECLARATIVE PROJECT MODEL
 # --------------------------------------------------------------------------------------------------
 
-# `build-source` is a normal feature and is enabled by default.  `toolchain-*` is a reserved feature
-# prefix: when such a feature survives resolution BESA enables the corresponding CMake language
-# before any dependency or source directory is processed.
-besa_features_add(
-  FEATURES
-    build-source
-    toolchain-cpp
-    user-docs
-    project-kosha25
-    showcase-hello
-)
-
-besa_features_default(
-  FEATURES
-    build-source
-    toolchain-cpp
-)
-
-# Test modes are project-defined, unlike warning policies and devtools which are capabilities owned
-# by BESA.  The starter template has one mode only; projects can add their own modes later without
-# requiring any BESA change.
-besa_test_modes_add(
-  MODES
-    ci-commit
-)
-
-besa_test_modes_default(
-  MODES
-    ci-commit
-)
-
-# Project-specific feature/devtool/test-mode constraints, if any, are registered before this call.
-# This is the explicit phase boundary: after it, configuration sets are frozen and dependencies,
-# directories, targets, and tests may be declared.
-besa_configure_complete()
-
-# --------------------------------------------------------------------------------------------------
-# DEPENDENCIES
-# --------------------------------------------------------------------------------------------------
-
-# Development dependencies never appear in the generated vorlageConfig.cmake.  Normal dependencies
-# declared with KIND NORMAL do; build-only dependencies do not.
-if(BUILD_TESTING)
-  besa_dependency_add(
-    NAME Catch2
-    VERSION 3
-    KIND DEV
-    PROVIDER CMAKE
-  )
-  besa_dependency_add(
-    NAME Threads
-    KIND DEV
-    PROVIDER CMAKE
-  )
-endif()
-
-# Doxygen is discovered as a CMake development dependency. ProperDocs, Sphinx, Breathe, and
-# sphinx-multiversion are documentation executables/modules validated by the documentation helpers
-# and are provided by the development environment rather than exported as package dependencies.
-besa_dependency_add(
-  NAME Doxygen
-  KIND DEV
-  PROVIDER CMAKE
-  WHEN ALL_OF user-docs
-)
-
-# --------------------------------------------------------------------------------------------------
-# PROJECT STRUCTURE
-# --------------------------------------------------------------------------------------------------
-
-besa_add_directory(
-  NAME src
-  WHEN ALL_OF build-source
-)
-
-# Regex selectors allow a parent directory to participate whenever at least one feature in its
-# namespace is enabled.  Individual children make the final, explicit feature decision themselves.
-besa_add_directory(
-  NAME project
-  WHEN REGEX "^project-"
-)
-
-besa_add_directory(
-  NAME showcases
-  WHEN REGEX "^showcase-"
-)
-
-besa_add_directory(
-  NAME docs
-  WHEN ALL_OF user-docs
-)
-
-if(BUILD_TESTING)
-  add_subdirectory(test)
-endif()
+# CMake supplies the selected build configuration (PROJECT_FEATURES, BUILD_TESTING, devtools,
+# warnings, test modes, and the toolchain).  besa.toml declares what the project can contain.
+# BESA validates/resolves that model and realizes the selected configuration through this backend.
+besa_model_realize(FILE "${PROJECT_SOURCE_DIR}/besa.toml")

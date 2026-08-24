@@ -153,6 +153,7 @@ function(_besa_version_resolve)
 
 namespace @PROJECT_NAMESPACE@::meta {
 
+/** Release channel represented by this generated artifact. */
 enum class release_type {
   development,
   release,
@@ -161,6 +162,7 @@ enum class release_type {
   release_candidate,
 };
 
+/** Semantic project version embedded in this generated artifact. */
 struct semantic_version {
   std::uint32_t major;
   std::uint32_t minor;
@@ -168,16 +170,19 @@ struct semantic_version {
   std::uint32_t tweak;
 };
 
+/** Release-channel metadata embedded in this generated artifact. */
 struct release_info {
   release_type type;
   std::uint32_t revision;
 };
 
+/** Packaging provenance for this generated artifact. */
 struct package_info {
   std::string_view builder;
   std::string_view revision;
 };
 
+/** Compiler, platform, and configuration metadata for this generated artifact. */
 struct build_info {
   std::string_view compiler;
   std::string_view compiler_version;
@@ -186,37 +191,65 @@ struct build_info {
   std::string_view build_type;
 };
 
+/** Returns the semantic project version represented by this artifact. */
 [[nodiscard]] inline constexpr semantic_version version() noexcept
 {
-  return {@VERSION_MAJOR@, @VERSION_MINOR@, @VERSION_PATCH@, @VERSION_TWEAK@};
-}
-
-[[nodiscard]] inline constexpr release_info release() noexcept
-{
-  return {release_type::@RELEASE_ENUM@, @RELEASE_REVISION_VALUE@};
-}
-
-[[nodiscard]] inline constexpr package_info package() noexcept
-{
-  return {"@PKGBUILDER_ID_VALUE@", "@PKGBUILDER_REVISION_VALUE@"};
-}
-
-[[nodiscard]] inline constexpr build_info build() noexcept
-{
   return {
-    "@BUILD_COMPILER@",
-    "@BUILD_COMPILER_VERSION@",
-    "@BUILD_SYSTEM@",
-    "@BUILD_PROCESSOR@",
-    "@BUILD_TYPE@",
+    @VERSION_MAJOR@, // Project major version generated for this artifact.
+    @VERSION_MINOR@, // Project minor version generated for this artifact.
+    @VERSION_PATCH@, // Project patch version generated for this artifact.
+    @VERSION_TWEAK@, // Project tweak version generated for this artifact.
   };
 }
 
-[[nodiscard]] inline constexpr std::string_view to_string(semantic_version) noexcept
+/** Returns release-channel metadata represented by this artifact. */
+[[nodiscard]] inline constexpr release_info release() noexcept
 {
-  return "@PROJECT_VERSION_STRING@";
+  return {
+    release_type::@RELEASE_ENUM@, // Release channel generated for this artifact.
+    @RELEASE_REVISION_VALUE@,     // Release revision generated for this artifact.
+  };
 }
 
+/**
+ * Returns packaging provenance for this artifact.
+ *
+ * The values are supplied by the packaging process and may differ between installations of the
+ * same project version.
+ */
+[[nodiscard]] inline constexpr package_info package() noexcept
+{
+  return {
+    "@PKGBUILDER_ID_VALUE@",       // Package builder recorded for this artifact.
+    "@PKGBUILDER_REVISION_VALUE@", // Packaging revision recorded for this artifact.
+  };
+}
+
+/**
+ * Returns compiler, platform, and configuration metadata for this artifact.
+ *
+ * These values describe this particular build and are not properties of the project version.
+ */
+[[nodiscard]] inline constexpr build_info build() noexcept
+{
+  return {
+    "@BUILD_COMPILER@",         // Compiler used for this build.
+    "@BUILD_COMPILER_VERSION@", // Compiler version used for this build.
+    "@BUILD_SYSTEM@",           // Target system recorded for this build.
+    "@BUILD_PROCESSOR@",        // Target processor recorded for this build.
+    "@BUILD_TYPE@",             // Build configuration recorded for this build.
+  };
+}
+
+/** Returns the conventional textual form of a semantic project version. */
+// BESA-API-RELATES-TO: semantic_version
+[[nodiscard]] inline constexpr std::string_view to_string(semantic_version) noexcept
+{
+  return "@PROJECT_VERSION_STRING@"; // Generated project version text for this artifact.
+}
+
+/** Returns the conventional textual name of a release channel. */
+// BESA-API-RELATES-TO: release_type
 [[nodiscard]] inline constexpr std::string_view to_string(release_type value) noexcept
 {
   switch (value) {
@@ -234,20 +267,29 @@ struct build_info {
   return "unknown";
 }
 
+/** Returns a human-readable representation of release metadata for this artifact. */
+// BESA-API-RELATES-TO: release_info
 [[nodiscard]] inline constexpr std::string_view to_string(release_info) noexcept
 {
-  return "@RELEASE_STRING@";
+  return "@RELEASE_STRING@"; // Generated release text for this artifact.
 }
 
+/**
+ * Returns a human-readable representation of build metadata.
+ *
+ * The result is intended for diagnostics and is not a stable serialization format.
+ */
+// BESA-API-RELATES-TO: build_info
 [[nodiscard]] inline constexpr std::string_view to_string(build_info) noexcept
 {
-  return "@BUILD_STRING@";
+  return "@BUILD_STRING@"; // Generated diagnostic build string for this artifact.
 }
 
 } // namespace @PROJECT_NAMESPACE@::meta
 
 #endif // @HEADER_GUARD@
 ]=])
+
   set(PROJECT_NAMESPACE "${_namespace}")
   set(HEADER_GUARD "${_header_guard}")
   set(VERSION_MAJOR "${_version_MAJOR}")

@@ -103,7 +103,9 @@ function(_besa_resolve_features OUTPUT_VARIABLE)
   get_property(_declared GLOBAL PROPERTY BESA_DECLARED_FEATURES)
   get_property(_defaults GLOBAL PROPERTY BESA_DEFAULT_FEATURES)
 
-  set(_enabled ${_defaults})
+  get_property(_backend_features GLOBAL PROPERTY BESA_BACKEND_FEATURES)
+  set(_enabled ${_defaults} ${_backend_features})
+  list(REMOVE_DUPLICATES _enabled)
   set(_seen)
 
   foreach(_entry IN LISTS PROJECT_FEATURES)
@@ -269,6 +271,21 @@ macro(besa_configure_complete)
   _besa_require_config_open("besa_configure_complete")
 
   _besa_resolve_features(_enabled_features)
+  if(DEFINED BESA_API_PROFILE AND NOT "${BESA_API_PROFILE}" STREQUAL "")
+    _besa_api_profile_get("${BESA_API_PROFILE}" _api_profile_features _api_profile_predefined)
+
+    # API profiles are compilation contexts, not complete project configurations.  Preserve the
+    # selected project features, replace the toolchain context, then force profile prerequisites on.
+    get_property(_declared_features GLOBAL PROPERTY BESA_DECLARED_FEATURES)
+    foreach(_feature IN LISTS _declared_features)
+      get_property(_kind GLOBAL PROPERTY "BESA_FEATURE_KIND_${_feature}")
+      if(_kind STREQUAL "toolchain")
+        list(REMOVE_ITEM _enabled_features "${_feature}")
+      endif()
+    endforeach()
+    list(APPEND _enabled_features ${_api_profile_features})
+    list(REMOVE_DUPLICATES _enabled_features)
+  endif()
   _besa_devtools_resolve(_enabled_devtools)
   _besa_resolve_test_modes(_enabled_test_modes)
   _besa_warnings_resolve(_enabled_warnings)
@@ -277,6 +294,7 @@ macro(besa_configure_complete)
   # language probing or instrumentation target creation.  Invalid configurations therefore fail
   # before compiler/tool side effects occur.
   _besa_run_feature_constraints("${_enabled_features}")
+  _besa_api_profiles_validate()
   _besa_run_devtool_constraints("${_enabled_devtools}")
   _besa_run_test_mode_constraints("${_enabled_test_modes}")
 
@@ -285,8 +303,10 @@ macro(besa_configure_complete)
   _besa_publish_feature_booleans("${_enabled_features}")
   _besa_publish_test_modes("${_enabled_test_modes}")
 
-  _besa_enable_toolchain_languages(_enabled_features)
-  _besa_devtools_activate()
+  if(NOT BESA_API_DISCOVERY_ONLY)
+    _besa_enable_toolchain_languages(_enabled_features)
+    _besa_devtools_activate()
+  endif()
   _besa_version_resolve()
 
   _besa_configuration_summary(
@@ -300,7 +320,13 @@ macro(besa_configure_complete)
 
   # Packaging and project-wide instrumentation need the complete target/dependency graph, so they
   # are finalized only after all project CMakeLists.txt files have been processed.
-  cmake_language(EVAL CODE
-    "cmake_language(DEFER DIRECTORY [[${PROJECT_SOURCE_DIR}]] CALL _besa_project_finalize)"
-  )
+  if(BESA_API_DISCOVERY_ONLY)
+    cmake_language(EVAL CODE
+      "cmake_language(DEFER DIRECTORY [[${PROJECT_SOURCE_DIR}]] CALL _besa_api_manifest_finalize)"
+    )
+  else()
+    cmake_language(EVAL CODE
+      "cmake_language(DEFER DIRECTORY [[${PROJECT_SOURCE_DIR}]] CALL _besa_project_finalize)"
+    )
+  endif()
 endmacro()

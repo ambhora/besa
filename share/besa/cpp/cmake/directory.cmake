@@ -5,15 +5,34 @@
 include_guard(GLOBAL)
 include("${CMAKE_CURRENT_LIST_DIR}/internal.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/selector.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/api.cmake")
 
 function(besa_add_directory)
   _besa_require_config_complete("besa_add_directory")
-  cmake_parse_arguments(ARG "" "NAME" "WHEN" ${ARGN})
+  cmake_parse_arguments(ARG "" "NAME;PATH;API" "WHEN" ${ARGN})
   _besa_require_no_unparsed("besa_add_directory" "${ARG_UNPARSED_ARGUMENTS}")
   _besa_require_value("besa_add_directory" "NAME" "${ARG_NAME}")
+  _besa_api_classification_parse("besa_add_directory" "${ARG_API}" "NONE" _api)
   _besa_selector_evaluate("directory:${ARG_NAME}" "${ARG_WHEN}" _selected)
+
+  if(ARG_PATH)
+    set(_path "${PROJECT_SOURCE_DIR}/${ARG_PATH}")
+    set(_relative_path "${ARG_PATH}")
+  else()
+    set(_path "${CMAKE_CURRENT_SOURCE_DIR}/${ARG_NAME}")
+    file(RELATIVE_PATH _relative_path "${PROJECT_SOURCE_DIR}" "${_path}")
+  endif()
   if(_selected)
-    add_subdirectory("${ARG_NAME}")
+    _besa_api_register(
+      KIND directory NAME "${ARG_NAME}" PATH "${_relative_path}" BASE source
+      API "${_api}" SELECTED
+    )
+    add_subdirectory("${_path}" "${PROJECT_BINARY_DIR}/besa/directories/${ARG_NAME}")
+  else()
+    _besa_api_register(
+      KIND directory NAME "${ARG_NAME}" PATH "${_relative_path}" BASE source
+      API "${_api}"
+    )
   endif()
 endfunction()
 
@@ -32,7 +51,7 @@ endfunction()
 #   <name>/include/        public headers
 #   <name>/lib/<library>/  library implementation sources grouped by logical library
 #   <name>/bin/            one executable source per file (file stem becomes target name)
-#   <name>/mod/            reserved for Fortran module-oriented source organization
+#   <name>/mod/            module-oriented sources/artifacts consumed by the library
 #
 # Multiple language roots may contribute to the same `lib<project>` target. The template keeps that
 # target's sources under `lib/<project>/`. BESA currently collects all files below `lib/` into
@@ -40,13 +59,34 @@ endfunction()
 # source-directory support is introduced.
 function(besa_add_source_directory)
   _besa_require_config_complete("besa_add_source_directory")
-  cmake_parse_arguments(ARG "" "NAME;LANGUAGE" "WHEN" ${ARGN})
+  cmake_parse_arguments(ARG "" "NAME;PATH;LANGUAGE;API" "WHEN" ${ARGN})
   _besa_require_no_unparsed("besa_add_source_directory" "${ARG_UNPARSED_ARGUMENTS}")
   _besa_require_value("besa_add_source_directory" "NAME" "${ARG_NAME}")
   _besa_require_value("besa_add_source_directory" "LANGUAGE" "${ARG_LANGUAGE}")
+  _besa_api_classification_parse("besa_add_source_directory" "${ARG_API}" "PUBLIC" _api)
 
   _besa_selector_evaluate("source-directory:${ARG_NAME}" "${ARG_WHEN}" _selected)
-  if(NOT _selected)
+  if(ARG_PATH)
+    set(_root "${PROJECT_SOURCE_DIR}/${ARG_PATH}")
+    set(_relative_path "${ARG_PATH}")
+  else()
+    set(_root "${CMAKE_CURRENT_SOURCE_DIR}/${ARG_NAME}")
+    file(RELATIVE_PATH _relative_path "${PROJECT_SOURCE_DIR}" "${_root}")
+  endif()
+  if(_selected)
+    _besa_api_register(
+      KIND source-directory NAME "${ARG_NAME}" PATH "${_relative_path}" BASE source LANGUAGE "${ARG_LANGUAGE}"
+      API "${_api}" SELECTED
+    )
+  else()
+    _besa_api_register(
+      KIND source-directory NAME "${ARG_NAME}" PATH "${_relative_path}" BASE source LANGUAGE "${ARG_LANGUAGE}"
+      API "${_api}"
+    )
+    return()
+  endif()
+
+  if(BESA_API_DISCOVERY_ONLY)
     return()
   endif()
 
@@ -58,26 +98,27 @@ function(besa_add_source_directory)
     )
   endif()
 
-  set(_root "${CMAKE_CURRENT_SOURCE_DIR}/${ARG_NAME}")
   if(NOT IS_DIRECTORY "${_root}")
     _besa_fatal("besa_add_source_directory" "directory does not exist: ${_root}")
   endif()
 
   set(_library "lib${PROJECT_NAME}")
   file(GLOB_RECURSE _library_sources LIST_DIRECTORIES FALSE CONFIGURE_DEPENDS "${_root}/lib/*")
+  file(GLOB_RECURSE _module_sources LIST_DIRECTORIES FALSE CONFIGURE_DEPENDS "${_root}/mod/*")
   file(GLOB_RECURSE _headers LIST_DIRECTORIES FALSE CONFIGURE_DEPENDS "${_root}/include/*")
 
   # Template source roots use hidden marker files to keep intentionally empty directories in source
   # control. They are project metadata, not source/header inputs.
   list(FILTER _library_sources EXCLUDE REGEX "/\\.[^/]+$")
+  list(FILTER _module_sources EXCLUDE REGEX "/\\.[^/]+$")
   list(FILTER _headers EXCLUDE REGEX "/\\.[^/]+$")
 
-  if(_library_sources OR _headers)
+  if(_library_sources OR _module_sources OR _headers)
     if(NOT TARGET "${_library}")
       besa_add_library(NAME "${_library}")
     endif()
-    if(_library_sources)
-      target_sources("${_library}" PRIVATE ${_library_sources})
+    if(_library_sources OR _module_sources)
+      target_sources("${_library}" PRIVATE ${_library_sources} ${_module_sources})
     endif()
     if(_headers)
       target_sources(

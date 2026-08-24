@@ -18,8 +18,8 @@ A semicolon-separated set of explicit feature overrides. `foo` enables a declare
 `~foo` disables a default feature. The same underlying feature may not occur twice, so
 `foo;~foo` and `foo;foo` are configuration errors.
 
-The project declares available/default features with `besa_features_add()` and
-`besa_features_default()`.
+The project declares available/default features in `besa.toml`. The CMake backend maps this model
+onto BESA's internal feature registry before applying `PROJECT_FEATURES`.
 
 ## `PROJECT_DEVTOOLS`
 
@@ -62,19 +62,11 @@ A semicolon-separated set of explicit overrides to the project's default test mo
 the same override model as features: `ci-merge` enables a declared mode and `~ci-commit` disables a
 default mode. The same underlying mode may not appear more than once.
 
-Test-mode names are **project-defined and semantically opaque to BESA**. The starter C++ template
-currently declares only `ci-commit`:
+Test-mode names are **project-defined and semantically opaque to BESA**. The starter C++ template currently declares only `ci-commit` in `besa.toml`:
 
-```cmake
-besa_test_modes_add(
-  MODES
-    ci-commit
-)
-
-besa_test_modes_default(
-  MODES
-    ci-commit
-)
+```toml
+[test-modes.ci-commit]
+default = true
 ```
 
 A project can later add `ci-merge`, `nightly`, `system`, or any other workflow without changing
@@ -114,7 +106,7 @@ maintainers are not restricted to numeric revision schemes. Changing it does not
 `PROJECT_SEMVER`.
 
 BESA writes the resolved semantic version to `PROJECT_SEMVER`, generates
-`<binary>/generated/meta/include/<project>/version.hpp`, and writes the same resolved string into the
+`<workspace>/codegen/meta/include/<project>/version.hpp`, and writes the same resolved string into the
 installed package configuration. The generated header exposes structured `project::meta`
 constexpr metadata for the base version, release information, downstream package information, and
 CMake-derived build information, with explicit `to_string(...)` conversion helpers where a canonical

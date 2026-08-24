@@ -47,6 +47,7 @@ nav:
       - Versioning: reference/versioning.md
       - Release process: reference/release-process.md
       - Configuration variables: reference/configuration.md
+      - Project model: reference/project-model.md
       - Project layout: reference/project-layout.md
       - Test conventions: reference/testing.md
   - Explanation:

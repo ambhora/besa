@@ -1,16 +1,62 @@
 <!-- SPDX-FileCopyrightText: 2026 BESA developers -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
-{# BESA API navigation. Keep the global section navigation intentionally limited to namespaces;
-   detailed API entities are reached from each namespace's recursive member tree. #}
-<nav class="bd-docs-nav bd-links" aria-label="{{ _('Section Navigation') }}">
-  <p class="bd-links__title" role="heading" aria-level="1">{{ _("Section Navigation") }}</p>
-  <div class="bd-toc-item navbar-nav">
-    <ul class="nav bd-sidenav">
-      {% for namespace in besa_api_sidebar_namespaces %}
-      <li class="toctree-l1{% if besa_api_sidebar_current == namespace.document %} current active{% endif %}">
-        <a class="reference internal{% if besa_api_sidebar_current == namespace.document %} current{% endif %}"
-           href="{{ pathto(namespace.document) }}">Namespace {{ namespace.name }}</a>
+{# BESA API outline. Namespace disclosure and namespace navigation are deliberately separate:
+   the boxed +/- control expands/collapses, while the namespace name remains an ordinary link. #}
+{% macro render_namespace(namespace) -%}
+  {% set expanded = besa_api_sidebar_current in namespace.documents %}
+  {% set has_children = namespace.children or namespace.entities %}
+  <li class="besa-api-outline-namespace{% if expanded %} current{% endif %}">
+    <div class="besa-api-outline-row">
+      <span class="besa-api-outline-kind" aria-hidden="true">{% if not namespace.group %}N{% endif %}</span>
+      {% if namespace.group and not namespace.document %}
+      <span class="besa-api-outline-link besa-api-outline-group-label">{{ namespace.name }}</span>
+      {% else %}
+      <a
+        class="reference internal besa-api-outline-link{% if besa_api_sidebar_current == namespace.document %} current{% endif %}"
+        href="{{ pathto(namespace.document) }}"
+      >{{ namespace.name }}</a>
+      {% endif %}
+
+      {% if has_children %}
+      <button
+        type="button"
+        class="besa-api-outline-toggle"
+        aria-expanded="{{ 'true' if expanded else 'false' }}"
+        aria-controls="{{ namespace.dom_id }}"
+        aria-label="{{ _('Collapse') if expanded else _('Expand') }} {{ namespace.qualified_name }}"
+        data-besa-api-outline-name="{{ namespace.qualified_name }}"
+      ></button>
+      {% endif %}
+    </div>
+
+    {% if has_children %}
+    <ul id="{{ namespace.dom_id }}" class="besa-api-outline-children"{% if not expanded %} hidden{% endif %}>
+      {% for child in namespace.children %}
+        {{ render_namespace(child) }}
+      {% endfor %}
+
+      {% for entity in namespace.entities %}
+      <li class="besa-api-outline-entity{% if besa_api_sidebar_current == entity.document %} current{% endif %}">
+        <div class="besa-api-outline-row">
+          <span class="besa-api-outline-kind" aria-hidden="true">{{ entity.marker }}</span>
+          <a
+            class="reference internal besa-api-outline-link{% if besa_api_sidebar_current == entity.document %} current{% endif %}"
+            href="{{ pathto(entity.document) }}"
+          >{{ entity.name }}</a>
+        </div>
       </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </li>
+{%- endmacro %}
+
+<nav class="bd-docs-nav bd-links besa-api-outline-nav" aria-label="{{ _('API outline') }}">
+  <p class="bd-links__title" role="heading" aria-level="1">{{ _("Outline") }}</p>
+  <div class="bd-toc-item navbar-nav">
+    <ul class="nav besa-api-outline">
+      {% for namespace in besa_api_sidebar_tree %}
+        {{ render_namespace(namespace) }}
       {% endfor %}
     </ul>
   </div>

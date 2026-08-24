@@ -38,7 +38,7 @@ def test_generated_cpp_project_builds_with_multiple_compilers(
         pytest.skip(f"CMake and {compiler} are required")
     project = cpp_generate(tmp_path, f"example_{preset}")
     _run(["cmake", "--workflow", "--preset", preset, "--fresh"], project)
-    assert (project / "build" / preset / "src" / f"example_{preset}").exists()
+    assert (project / "build" / preset / f"example_{preset}").exists()
 
     if preset == "clang":
         compile_commands = (project / "build" / preset / "compile_commands.json").read_text(
@@ -60,8 +60,12 @@ def test_generated_cpp_project_groups_library_sources_by_library(tmp_path: Path)
 
     root_cmake = (project / "CMakeLists.txt").read_text(encoding="utf-8")
     assert "set(CMAKE_EXPORT_COMPILE_COMMANDS ON)" in root_cmake
-    for feature in ("toolchain-c", "toolchain-hip", "toolchain-asm", "toolchain-cuda"):
-        assert f"    {feature}\n" not in root_cmake
+    assert "besa_model_realize" in root_cmake
+    model = (project / "besa.toml").read_text(encoding="utf-8")
+    for feature in ("toolchain-cpp", "toolchain-cuda", "toolchain-hip"):
+        assert f"[features.{feature}]" in model
+    for feature in ("toolchain-c", "toolchain-asm"):
+        assert f"[features.{feature}]" not in model
 
     dev_env = (
         project / "spack" / "spack_repo" / "dev" / "packages" / "dev_env" / "package.py"
@@ -78,6 +82,9 @@ def test_generated_cpp_project_vendors_and_builds_prova_support(tmp_path: Path) 
     project = cpp_generate(tmp_path, "example_prova")
     base = project / "test" / "base"
     assert (base / "CMakeLists.txt").is_file()
+    cuda_profile = base / "cuda" / "include" / "testexample_prova" / "cuda_profile.hpp"
+    assert cuda_profile.is_file()
+    assert "cuda_profile_only" in cuda_profile.read_text(encoding="utf-8")
     catch_main = base / "cpp" / "include" / "testexample_prova" / "prova" / "catch_main.hpp"
     assert catch_main.is_file()
     catch_main_text = catch_main.read_text(encoding="utf-8")
@@ -396,7 +403,7 @@ def test_release_version_is_written_to_generated_header(tmp_path: Path) -> None:
         ],
         project,
     )
-    version_header = project / "build" / "version" / "generated" / "meta" / "include" / "example_version" / "version.hpp"
+    version_header = project / "build" / "codegen" / "meta" / "include" / "example_version" / "version.hpp"
     version_text = version_header.read_text(encoding="utf-8")
     assert "#ifndef EXAMPLE_VERSION_VERSION_HPP" in version_text
     assert "#define EXAMPLE_VERSION_VERSION_HPP" in version_text
@@ -406,9 +413,12 @@ def test_release_version_is_written_to_generated_header(tmp_path: Path) -> None:
     assert "struct release_info" in version_text
     assert "struct package_info" in version_text
     assert "struct build_info" in version_text
-    assert "return {0, 1, 0, 0};" in version_text
-    assert 'return {release_type::release_candidate, 3};' in version_text
-    assert 'return {"spack", "7"};' in version_text
+    assert "Project major version generated for this artifact" in version_text
+    assert "Project tweak version generated for this artifact" in version_text
+    assert 'release_type::release_candidate, // Release channel generated for this artifact.' in version_text
+    assert '3,     // Release revision generated for this artifact.' in version_text
+    assert '"spack",       // Package builder recorded for this artifact.' in version_text
+    assert '"7", // Packaging revision recorded for this artifact.' in version_text
     assert 'return "0.1.0";' in version_text
     assert 'return "rc.3";' in version_text
 
@@ -439,17 +449,13 @@ add_custom_target(
 )
 
 """
-    text = text.replace(
-        "# --------------------------------------------------------------------------------------------------\n# PROJECT STRUCTURE\n",
-        insertion
-        + "# --------------------------------------------------------------------------------------------------\n# PROJECT STRUCTURE\n",
-    )
+    text += "\n" + insertion
     cmake.write_text(text, encoding="utf-8")
 
     _run(["cmake", "-S", ".", "-B", "build/generated"], project)
 
-    meta_root = project / "build" / "generated" / "generated" / "meta" / "include"
-    schema_root = project / "build" / "generated" / "generated" / "schema" / "include"
+    meta_root = project / "build" / "codegen" / "meta" / "include"
+    schema_root = project / "build" / "codegen" / "schema" / "include"
     assert (meta_root / "example_generated" / "version.hpp").is_file()
     assert not (schema_root / "example_generated" / "schema.hpp").exists()
 
@@ -769,756 +775,111 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     import importlib.util
-    from types import SimpleNamespace
 
     project = cpp_generate(tmp_path, "example_docs")
     docs = project / "docs"
     api_docs = project / "api-docs"
 
-    # ProperDocs owns the checked-in documentation information architecture.
+    # ProperDocs owns the prose site; the versioned API is a separate Sphinx tree mounted below it.
     assert (project / "properdocs.yml").is_file()
-    multiversion_config = project / "properdocs.multiversion.yml"
-    assert multiversion_config.is_file()
-    multiversion_config_text = multiversion_config.read_text(encoding="utf-8")
-    assert "INHERIT: properdocs.yml" in multiversion_config_text
-    config_text = (project / "properdocs.yml").read_text(encoding="utf-8")
-    assert "site_dir: ../build/properdocs/site" in config_text
-    assert "besa_api_version: main" in config_text
-    assert "besa_api_versions: all" in config_text
-    assert "  - test/base" in config_text
-    assert "  - .git/refs" in config_text
-    assert "  - properdocs_multiversion_hook.py" in config_text
+    assert (project / "properdocs.multiversion.yml").is_file()
     assert (project / "properdocs_multiversion_hook.py").is_file()
     assert (docs / "index.md").is_file()
     reference_landing = docs / "reference" / "index.md"
     assert reference_landing.is_file()
-    assert not (docs / "reference" / "api.md").exists()
-    reference_text = reference_landing.read_text(encoding="utf-8")
-    assert "## Versioned API" in reference_text
-    assert 'new URL("api/", window.location.href)' in reference_text
-    assert 'new URL("versions.json", apiRoot)' in reference_text
-    assert 'href="api/main/"' in reference_text
-    assert "API reference: reference/api.md" not in config_text
-    assert "  - Reference: reference/index.md" in config_text
-    assert "  - assets/stylesheets/ambhora.css" in config_text
-    assert "copyright: Copyright &copy; example_docs developers &middot; Apache-2.0" in config_text
-    assert "generator: false" in config_text
-    assert "custom_dir: overrides" in config_text
-    assert "# repo_url:" in config_text
-    actions_template = project / "overrides" / "partials" / "actions.html"
-    not_found_template = project / "overrides" / "404.html"
-    assert actions_template.is_file()
-    assert not_found_template.is_file()
-    actions_text = actions_template.read_text(encoding="utf-8")
-    assert "besa_source_url" in actions_text
-    assert "View this page's source" in actions_text
-    not_found_text = not_found_template.read_text(encoding="utf-8")
-    assert "This documentation page isn't here." in not_found_text
-    assert "besa_issue_url" in not_found_text
-    assert "Report a documentation issue" in not_found_text
-    brand_css = docs / "assets" / "stylesheets" / "ambhora.css"
-    assert brand_css.is_file()
-    brand_text = brand_css.read_text(encoding="utf-8")
-    assert "#3B97C4" in brand_text
-    assert "#97C43B" in brand_text
-    assert "#C43B97" in brand_text
-    assert ".md-header {" in brand_text
-    assert "background: var(--ambhora-blue)" in brand_text
-    assert "border-bottom: 0.2rem solid var(--ambhora-green)" not in brand_text
-    assert "min-height: 2.1rem" in brand_text
-    assert "height: 1.8rem" in brand_text
-    assert "border-bottom: 0.12rem solid var(--ambhora-green)" in brand_text
-    assert ".besa-404" in brand_text
-    assert ".besa-404__actions" in brand_text
+    assert "## Versioned API" in reference_landing.read_text(encoding="utf-8")
 
-    # Sphinx/Breathe/Exhale/Doxygen is a separate API-only source tree. Exhale owns the generated
-    # entity pages; the project does not maintain a hand-selected doxygenindex list.
-    assert (api_docs / "conf.py").is_file()
-    assert (api_docs / "besa_exhale_compat.py").is_file()
-    compat_text = (api_docs / "besa_exhale_compat.py").read_text(encoding="utf-8")
-    assert '"cpp:parent_key"' in compat_text
-    assert 'node.attributes.pop("cpp:parent_key")' in compat_text
-    assert 'node.pop("cpp:parent_key")' not in compat_text
-    assert "except AssertionError" in compat_text
-    assert 'getattr(original, "_besa_parent_key_retry", False)' in compat_text
-    assert (api_docs / "Doxyfile.in").is_file()
-    assert (api_docs / "index.rst").is_file()
-    assert (api_docs / "_static" / "css" / "besa-api.css").is_file()
-    project_links = api_docs / "_templates" / "project-links.html"
-    version_script = api_docs / "_static" / "js" / "besa-api-version.js"
-    presentation_script = api_docs / "_static" / "js" / "besa-api-presentation.js"
-    assert project_links.is_file()
-    assert not (api_docs / "_templates" / "versioning.html").exists()
-    assert version_script.is_file()
-    assert presentation_script.is_file()
-    project_links_text = project_links.read_text(encoding="utf-8")
-    assert "← Project documentation" in project_links_text
-    assert "API version" in project_links_text
-    assert "data-besa-api-root" in project_links_text
-    assert "data-besa-api-page" in project_links_text
-    version_script_text = version_script.read_text(encoding="utf-8")
-    assert 'fetch(new URL("versions.json", apiRoot))' in version_script_text
-    assert "version.pages.includes(page)" in version_script_text
-    assert "return root.href" in version_script_text
-    assert 'document.readyState === "loading"' in version_script_text
-    assert 'document.addEventListener("DOMContentLoaded", initializeAll' in version_script_text
-    presentation_script_text = presentation_script.read_text(encoding="utf-8")
-    assert '"inline"' in presentation_script_text
-    assert '"constexpr"' in presentation_script_text
-    assert "noexcept" in presentation_script_text
-    assert 'className = "besa-api-qualifiers"' in presentation_script_text
-    assert 'label.textContent = "Properties"' in presentation_script_text
-    assert 'description.prepend(row)' in presentation_script_text
-    assert 'document.addEventListener("DOMContentLoaded", initialize' in presentation_script_text
-    assert not (docs / "conf.py").exists()
+    # besa.toml is the generated project's authoritative declaration, including compilation-context
+    # profiles. CMake only selects and realizes one configuration from this model.
+    model = (project / "besa.toml").read_text(encoding="utf-8")
+    assert "schema = 1" in model
+    assert '[project]\nname = "example_docs"\nversion = "0.1.0"' in model
+    for profile in ("cpu", "cuda", "hip"):
+        assert f"[api.profiles.{profile}]" in model
+    assert 'path = "src/cpp"' in model
+    assert 'api = "public"' in model
+    assert 'name = "Doxygen"' in model
+    assert 'when = { all = ["user-docs"] }' in model
 
-    conf_text = (api_docs / "conf.py").read_text(encoding="utf-8")
-    assert '"besa_exhale_compat"' in conf_text
-    assert conf_text.index('"besa_exhale_compat"') < conf_text.index('"exhale"')
-    assert "sys.path.insert(0, str(CONFIG_DIRECTORY))" in conf_text
-    assert '"breathe"' in conf_text
-    assert '"exhale"' in conf_text
-    assert '"sphinx_multiversion"' in conf_text
-    assert 'html_theme = "pydata_sphinx_theme"' in conf_text
-    assert 'html_title = f"{project} documentation"' in conf_text
-    assert "html_short_title = html_title" in conf_text
-    assert '"show_prev_next": False' in conf_text
-    assert 'html_js_files = ["js/besa-api-version.js", "js/besa-api-presentation.js"]' in conf_text
-    assert '"kindsWithContentsDirectives": ["namespace", "file"]' in conf_text
-    assert '"navbar_align": "right"' in conf_text
-    assert '"navbar_center": []' in conf_text
-    assert '"navbar_persistent": []' in conf_text
-    assert '"search-button-field"' in conf_text
-    assert '"**": ["api-sidebar.html"]' in conf_text
-    assert '"sidebar-collapse"' not in conf_text
-    api_sidebar = (api_docs / "_templates" / "api-sidebar.html").read_text(encoding="utf-8")
-    assert "besa_api_sidebar_namespaces" in api_sidebar
-    assert "generate_toctree_html" not in api_sidebar
-    assert "Namespace {{ namespace.name }}" in api_sidebar
-    assert '"primary_sidebar_end"' not in conf_text
-    assert '"containmentFolder": "./generated"' in conf_text
-    assert '"rootFileName": "library_root.rst"' in conf_text
-    assert 'smv_branch_whitelist = os.environ.get("BESA_SMV_BRANCH_WHITELIST", r"^main$")' in conf_text
-    assert 'smv_tag_whitelist = os.environ.get("BESA_SMV_TAG_WHITELIST", r"^.*$")' in conf_text
-    assert 'smv_outputdir_format = r"{ref.name}"' in conf_text
-    assert "_selected_smv_refs" not in conf_text
-    assert "packaging.version" not in conf_text
-    assert "cpp_maximum_signature_line_length = 122" in conf_text
-    assert "_mark_template_specializations_no_link" in conf_text
-    assert ":no-link:" in conf_text
-    assert "BESA_PROPERDOCS_ROOT_DEPTH" in conf_text
-    assert "BESA_API_PROJECT_SOURCE_DIRECTORY" in conf_text
-    assert "_configured_doxyfile" in conf_text
-    assert "Path(app.srcdir).resolve()" in conf_text
-    assert "_compile_database_cxx_standard" in conf_text
-    assert "_cmake_default_cxx_standard" in conf_text
-    assert "_clang_resource_directory" in conf_text
-    assert "-print-resource-dir" in conf_text
-    api_index_text = (api_docs / "index.rst").read_text(encoding="utf-8")
-    assert "doxygenindex" not in api_index_text
-    assert "|projectdocs|_" in api_index_text
-    assert ".. include:: generated/api_landing.rst.include" in api_index_text
-    assert "generated/library_root" not in api_index_text
-    assert ".. _projectdocs:" in conf_text
-    assert "_write_api_symbol_aliases" in conf_text
-    assert "projectdocs{{1}}" in conf_text
-    assert "projectdocs{{2}}" in conf_text
+    # The API source carries the complete documentation presentation and discovery
+    # machinery: multi-profile Doxygen union, source-backed listings, overload consolidation,
+    # inheritance/related-entity sections, availability metadata, and the hierarchical Outline.
+    conf_path = api_docs / "conf.py"
+    assert conf_path.is_file()
+    conf_text = conf_path.read_text(encoding="utf-8")
+    for needle in (
+        '"sphinx.ext.graphviz"',
+        'graphviz_output_format = "svg"',
+        'html_title = f"{project} API documentation"',
+        '"css/besa-api-desktop.css"',
+        '"js/besa-api-source-locations.js"',
+        '"EXAMPLE_DOCS_HOST_DEVICE"',
+        "def _configure_api_discovery(",
+        "def _merge_profile_xml(",
+        "def _write_profile_availability_sections(",
+        "def _write_profile_variant_sections(",
+        "def _write_api_configuration_page(",
+        "def _write_overload_pages(",
+        "def _write_inheritance_graph_sections(",
+        "def _write_related_operator_sections(",
+        "def _write_related_function_sections(",
+        "def _restore_program_listings_from_sources(",
+        "def _api_global_macros(",
+        "besa_api_sidebar_tree",
+    ):
+        assert needle in conf_text
 
-    project_cmake = (project / "CMakeLists.txt").read_text(encoding="utf-8")
-    assert 'set(CMAKE_EXPORT_COMPILE_COMMANDS ON)' in project_cmake
-    assert '"${PROJECT_SOURCE_DIR}/api-docs/Doxyfile.in"' in project_cmake
-    assert '"${PROJECT_BINARY_DIR}/api-docs/Doxyfile"' in project_cmake
+    # Sphinx's C++ parser must accept the generated project's portability qualifier macros.
+    for qualifier in ("HOST", "DEVICE", "GLOBAL", "HOST_DEVICE"):
+        assert f'"EXAMPLE_DOCS_{qualifier}"' in conf_text
 
-    userdocs_cmake = (project / "cmake" / "besa" / "userdocs.cmake").read_text(encoding="utf-8")
-    assert 'set(_besa_current_sphinx_source "${PROJECT_BINARY_DIR}/doc/work/sphinx-current")' in userdocs_cmake
-    assert '"BESA_API_PROJECT_SOURCE_DIRECTORY=${PROJECT_SOURCE_DIR}"' in userdocs_cmake
-    assert '"${_besa_current_sphinx_source}" "${ARG_OUTPUT_DIRECTORY}"' in userdocs_cmake
-    assert 'userdocs/multiversion.py' in userdocs_cmake
-    assert '"--sphinx-multiversion" "${_besa_sphinx_multiversion}"' in userdocs_cmake
-    multiversion_driver = project / "cmake" / "besa" / "userdocs" / "multiversion.py"
-    assert multiversion_driver.is_file()
-    driver_text = multiversion_driver.read_text(encoding="utf-8")
-    assert 'environment["BESA_API_VERSIONS"] = "all"' in driver_text
-    assert 'environment["BESA_SMV_BRANCH_WHITELIST"] = branch_pattern' in driver_text
-    assert 'environment["BESA_SMV_TAG_WHITELIST"] = tag_pattern' in driver_text
+    doxyfile = (api_docs / "Doxyfile.in").read_text(encoding="utf-8")
+    for setting in (
+        "XML_PROGRAMLISTING     = YES",
+        "ENABLE_PREPROCESSING   = YES",
+        "MACRO_EXPANSION        = YES",
+        "EXPAND_ONLY_PREDEF     = YES",
+    ):
+        assert setting in doxyfile
+    assert "CLANG_ASSISTED_PARSING" in doxyfile
 
-    doxyfile_text = (api_docs / "Doxyfile.in").read_text(encoding="utf-8")
-    assert "EXTRACT_ALL            = YES" in doxyfile_text
-    assert "synthetic public-header tree" in doxyfile_text
-    assert "CLANG_ASSISTED_PARSING = YES" in doxyfile_text
-    assert "CLANG_ADD_INC_PATHS    = YES" in doxyfile_text
-    assert 'CLANG_DATABASE_PATH    = "@CMAKE_BINARY_DIR@"' in doxyfile_text
-    assert "EXCLUDE_PATTERNS" not in doxyfile_text
-
-    css = (api_docs / "_static" / "css" / "besa-api.css").read_text(encoding="utf-8")
-    assert ".bd-page-width" in css
-    assert "max-width: 135rem" in css
-    assert "min-width: 13rem" in css
-    assert ".navbar-header-items__end" in css
-    assert "margin-inline-start: auto" in css
-    assert ".besa-api-project-links" in css
-    assert "gap: 1.25rem" in css
-    assert ".besa-api-version-select" in css
-    assert ".breathe-sectiondef-title" in css
-    assert ".api-kind" in css
-    assert ".besa-api-qualifiers" in css
-    assert ".besa-api-qualifier" in css
-    assert "border-top: 0.24rem solid var(--pst-color-primary)" in css
-    assert ".besa-api-properties-label" in css
-    assert "dt.besa-multiline-signature .sig-return-type" in css
-    assert "display: block" in css
-    assert "font-size: 0.84rem" in css
-    assert "font-size: 0.68rem" in css
-    assert "font-style: normal" in css
-
-    project_links = (api_docs / "_templates" / "project-links.html").read_text(
+    api_css = (api_docs / "_static" / "css" / "besa-api.css").read_text(encoding="utf-8")
+    desktop_css = (api_docs / "_static" / "css" / "besa-api-desktop.css").read_text(
         encoding="utf-8"
     )
-    assert 'class="navbar-item besa-api-project-links"' in project_links
+    assert ".besa-api-outline-toggle" in api_css
+    assert ".api-kind" in api_css
+    assert "@media" in desktop_css
+    assert "bd-main" in desktop_css
 
-    # Load conf.py without Sphinx installed. Extensions are strings; Doxygen runs only from the
-    # builder callback and each real build gets its source checkout from app.srcdir.
-    doxygen_base = tmp_path / "doxygen-xml"
-    monkeypatch.setenv("BESA_DOXYGEN_BASE_DIRECTORY", str(doxygen_base))
-    monkeypatch.setenv("BESA_PROPERDOCS_ROOT_DEPTH", "3")
-    spec = importlib.util.spec_from_file_location("example_docs_conf", api_docs / "conf.py")
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    presentation_script = (api_docs / "_static" / "js" / "besa-api-presentation.js").read_text(
+        encoding="utf-8"
+    )
+    assert 'className = "besa-api-qualifiers"' in presentation_script
+    assert "description.prepend(metadata)" in presentation_script
+    assert "besa-api-outline-toggle" in presentation_script
 
-    assert module.project == "example_docs"
-    assert module.release == "0.1.0"
-    assert module.breathe_default_project == "example_docs"
-    assert module.html_context["besa_properdocs_root_depth"] == 3
-    assert module._rst_role_title("tag_result< Tag, Args... >") == "tag_result\\< Tag, Args... >"
-    assert module._rst_role_title("operator<()") == "operator\\<()"
+    sidebar = (api_docs / "_templates" / "api-sidebar.html").read_text(encoding="utf-8")
+    assert "Outline" in sidebar
+    assert "besa_api_sidebar_tree" in sidebar
+    assert "besa-api-outline-toggle" in sidebar
+    assert "pathto(namespace.document)" in sidebar
 
-    staged_api = tmp_path / "external-work" / "api-docs"
+    not_found = (project / "overrides" / "404.html").read_text(encoding="utf-8")
+    assert 'href="{{ base_url }}"' in not_found
+
+    # Importing conf.py without a Sphinx build must resolve project identity/version from besa.toml;
+    # this also covers historical fallback plumbing without executing Doxygen.
     monkeypatch.setenv("BESA_API_PROJECT_SOURCE_DIRECTORY", str(project))
-    assert module._api_project_root(staged_api) == project.resolve()
-    monkeypatch.delenv("BESA_API_PROJECT_SOURCE_DIRECTORY")
-
-    events: dict[str, list[tuple[object, int]]] = {}
-
-    class FakeApp:
-        def __init__(self, srcdir: Path) -> None:
-            self.srcdir = str(srcdir)
-            self.config = SimpleNamespace(
-                version=None,
-                release=None,
-                breathe_projects=None,
-                breathe_default_project=None,
-                exhale_args=dict(module.exhale_args),
-            )
-
-        def connect(self, event: str, callback: object, priority: int = 500) -> None:
-            events.setdefault(event, []).append((callback, priority))
-
-    current_app = FakeApp(api_docs)
-    module.setup(current_app)
-    builder_callbacks = events["builder-inited"]
-    assert (module._prepare_api, 100) in builder_callbacks
-    assert (module._prepare_api_landing, 900) in builder_callbacks
-    assert (module._mark_multiline_signatures, 500) in events["doctree-read"]
-    assert (module._api_sidebar_context, 500) in events["html-page-context"]
-    assert (module._write_api_symbol_aliases, 500) in events["build-finished"]
-    assert "env-before-read-docs" not in events
-
-    explicit_standard_build = tmp_path / "explicit-standard-build"
-    explicit_standard_build.mkdir()
-    (explicit_standard_build / "compile_commands.json").write_text(
-        '[{"directory":".","command":"c++ -std=c++26 -c example.cpp","file":"example.cpp"}]',
-        encoding="utf-8",
-    )
-    assert module._compile_database_cxx_standard(explicit_standard_build) == "-std=c++26"
-
-    fake_resource = tmp_path / "clang-resource"
-    fake_resource.mkdir()
-    monkeypatch.setenv("BESA_CLANG_RESOURCE_DIRECTORY", str(fake_resource))
-
-    fake_doxygen = tmp_path / "fake-doxygen"
-    fake_doxygen.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
-    fake_doxygen.chmod(0o755)
-    monkeypatch.setenv("BESA_DOXYGEN_EXECUTABLE", str(fake_doxygen))
-    module._prepare_api(current_app)
-
-    current_output = module._doxygen_output_for(project)
-    generated = current_output / "Doxyfile"
-    generated_text = generated.read_text(encoding="utf-8")
-    assert 'GENERATE_XML           = YES' in generated_text
-    assert 'GENERATE_HTML          = NO' in generated_text
-    assert 'PROJECT_NUMBER = "0.1.0"' in generated_text
-    current_configured_build = current_output / "project-build"
-    assert f'CLANG_DATABASE_PATH    = "{current_configured_build}"' in generated_text
-    current_standard = module._cmake_default_cxx_standard(current_configured_build) or "-std=c++20"
-    current_public = current_output / "public-include"
-    assert (
-        f'CLANG_OPTIONS += "{current_standard}" "-resource-dir={fake_resource}" '
-        f'"-I{str(current_public).replace(chr(92), "/")}"'
-    ) in generated_text
-    assert str(current_public).replace("\\", "/") in generated_text
-    assert str(project / "src").replace("\\", "/") not in generated_text
-    assert (current_public / "example_docs" / "example_docs.hpp").is_file()
-    test_base_header = current_public / "testexample_docs" / "prova" / "cmdline.hpp"
-    assert test_base_header.is_file()
-    test_base_text = test_base_header.read_text(encoding="utf-8")
-    assert "@projectdocs" in test_base_text
-    assert "@projectdocs{reference/testing,the testing reference}" in test_base_text
-    assert 'ALIASES += "projectdocs=' in generated_text
-    assert 'ALIASES += "projectdocs{1}=' in generated_text
-    assert 'ALIASES += "projectdocs{2}=' in generated_text
-    assert '../../../../\\1/' in generated_text
-    current_version = current_public / "example_docs" / "version.hpp"
-    assert current_version.is_file()
-    assert "namespace example_docs::meta" in current_version.read_text(encoding="utf-8")
-    assert current_app.config.release == "0.1.0"
-    assert current_app.config.breathe_projects == {
-        "example_docs": str(current_output / "xml")
-    }
-    assert current_app.config.exhale_args["containmentFolder"] == str(api_docs / "generated")
-    assert current_app.config.exhale_args["doxygenStripFromPath"] == str(current_public)
-
-    # Exhale generates all detailed pages, then BESA writes a compact synopsis fragment included by
-    # index.rst. Overloads are intentionally collapsed by name on this page.
-    xml_dir = current_output / "xml"
-    xml_dir.mkdir(parents=True, exist_ok=True)
-    (xml_dir / "index.xml").write_text(
-        """\
-<doxygenindex>
-  <compound kind="namespace" refid="namespaceexample__docs">
-    <name>example_docs</name>
-  </compound>
-  <compound kind="namespace" refid="namespaceexample__docs_1_1meta">
-    <name>example_docs::meta</name>
-    <member kind="function" refid="function1"><name>to_string</name></member>
-    <member kind="function" refid="function2"><name>to_string</name></member>
-    <member kind="function" refid="function3"><name>version</name></member>
-    <member kind="function" refid="function4"><name>to_static_array</name></member>
-    <member kind="function" refid="guide1"><name>box</name></member>
-    <member kind="function" refid="function5"><name>operator&lt;</name></member>
-    <member kind="enum" refid="enum1"><name>release_type</name></member>
-    <member kind="concept" refid="conceptexample__docs_1_1meta_1asortable"><name>sortable</name></member>
-  </compound>
-  <compound kind="struct" refid="struct1">
-    <name>example_docs::meta::semantic_version</name>
-  </compound>
-  <compound kind="struct" refid="struct2">
-    <name>example_docs::meta::box</name>
-  </compound>
-  <compound kind="struct" refid="struct3">
-    <name>example_docs::meta::tag_result&lt; Tag, Args... &gt;</name>
-  </compound>
-  <compound kind="concept" refid="conceptexample__docs_1_1meta_1asortable">
-    <name>example_docs::meta::sortable</name>
-  </compound>
-</doxygenindex>
-""",
-        encoding="utf-8",
-    )
-    (xml_dir / "namespaceexample__docs_1_1meta.xml").write_text(
-        """\
-<doxygen>
-  <compounddef id="namespaceexample__docs_1_1meta" kind="namespace">
-    <sectiondef kind="func">
-      <memberdef kind="function" id="function1">
-        <type>std::string_view</type>
-        <name>to_string</name>
-        <qualifiedname>example_docs::meta::to_string</qualifiedname>
-        <param><type>semantic_version</type><declname>value</declname></param>
-      </memberdef>
-      <memberdef kind="function" id="function2">
-        <type>std::string_view</type>
-        <name>to_string</name>
-        <qualifiedname>example_docs::meta::to_string</qualifiedname>
-        <param><type>release_type</type><declname>value</declname></param>
-      </memberdef>
-      <memberdef kind="function" id="function3">
-        <type>semantic_version</type>
-        <name>version</name>
-        <qualifiedname>example_docs::meta::version</qualifiedname>
-      </memberdef>
-      <memberdef kind="function" id="function4">
-        <type>static_array&lt;T, sizeof...(Args)&gt;</type>
-        <name>to_static_array</name>
-        <qualifiedname>example_docs::meta::to_static_array</qualifiedname>
-        <param><type>Args &amp;&amp;...</type><declname>args</declname></param>
-      </memberdef>
-      <memberdef kind="function" id="guide1">
-        <type></type>
-        <name>box</name>
-        <qualifiedname>example_docs::meta::box</qualifiedname>
-        <param><type>int</type><declname>value</declname></param>
-      </memberdef>
-      <memberdef kind="function" id="function5">
-        <type>bool</type>
-        <name>operator&lt;</name>
-        <qualifiedname>example_docs::meta::operator&lt;</qualifiedname>
-        <param><type>box const &amp;</type><declname>left</declname></param>
-        <param><type>box const &amp;</type><declname>right</declname></param>
-      </memberdef>
-    </sectiondef>
-  </compounddef>
-</doxygen>
-""",
-        encoding="utf-8",
-    )
-    generated_api = api_docs / "generated"
-    generated_api.mkdir(parents=True, exist_ok=True)
-    (generated_api / "library_root.rst").write_text("old noisy root\n", encoding="utf-8")
-    (generated_api / "namespaceexample__docs.rst").write_text(
-        ".. doxygennamespace:: example_docs\n", encoding="utf-8"
-    )
-    (generated_api / "namespaceexample__docs_1_1meta.rst").write_text(
-        """\
-.. doxygennamespace:: example_docs::meta
-
-Classes
--------
-
-- :ref:`Struct semantic_version <exhale_struct_struct1>`
-
-Enums
------
-
-- :ref:`Enum release_type <exhale_enum_enum1>`
-
-Functions
----------
-
-- :ref:`Function example_docs::meta::version <exhale_function_function1>`
-""",
-        encoding="utf-8",
-    )
-    (generated_api / "file_view_hierarchy.rst.include").write_text(
-        "* Directory example_docs\n", encoding="utf-8"
-    )
-    (generated_api / "unabridged_api.rst.include").write_text(
-        """\
-.. toctree::
-   :maxdepth: 1
-
-   namespaceexample__docs.rst
-   namespaceexample__docs_1_1meta.rst
-   struct1.rst
-   enum1.rst
-   function1.rst
-   function_overload1.rst
-   function_overload2.rst
-   function_unique.rst
-   function_guide.rst
-   function_operator.rst
-   define1.rst
-""",
-        encoding="utf-8",
-    )
-    (generated_api / "struct1.rst").write_text(
-        """\
-.. _exhale_struct_struct1:
-
-Struct example_docs::meta::semantic_version
-===========================================
-
-Struct Documentation
---------------------
-
-.. doxygenstruct:: example_docs::meta::semantic_version
-""",
-        encoding="utf-8",
-    )
-    (generated_api / "enum1.rst").write_text(
-        """\
-.. _exhale_enum_enum1:
-
-Enum example_docs::meta::release_type
-=====================================
-
-Enum Documentation
-------------------
-
-.. doxygenenum:: example_docs::meta::release_type
-""",
-        encoding="utf-8",
-    )
-    (generated_api / "function1.rst").write_text(
-        """\
-.. _exhale_function_function3:
-
-Function example_docs::meta::version
-====================================
-
-Function Documentation
-----------------------
-
-.. doxygenfunction:: example_docs::meta::version
-""",
-        encoding="utf-8",
-    )
-    (generated_api / "function_overload1.rst").write_text(
-        """\
-.. _exhale_function_function1:
-
-Function example_docs::meta::to_string
-======================================
-
-.. doxygenfunction:: example_docs::meta::to_string(semantic_version)
-""",
-        encoding="utf-8",
-    )
-    (generated_api / "function_overload2.rst").write_text(
-        """\
-.. _exhale_function_function2:
-
-Function example_docs::meta::to_string
-======================================
-
-.. doxygenfunction:: example_docs::meta::to_string(release_type)
-""",
-        encoding="utf-8",
-    )
-    (generated_api / "function_unique.rst").write_text(
-        """\
-.. _exhale_function_function4:
-
-Function example_docs::meta::to_static_array
-============================================
-
-Function Documentation
-----------------------
-
-.. doxygenfunction:: example_docs::meta::to_static_array(Args&&...)
-""",
-        encoding="utf-8",
-    )
-    (generated_api / "function_guide.rst").write_text(
-        """\
-.. _exhale_function_guide1:
-
-Function example_docs::meta::box
-================================
-
-Function Documentation
-----------------------
-
-.. doxygenfunction:: example_docs::meta::box(int)
-""",
-        encoding="utf-8",
-    )
-    (generated_api / "function_operator.rst").write_text(
-        """\
-.. _exhale_function_function5:
-
-Function example_docs::meta::operator<
-======================================
-
-Function Documentation
-----------------------
-
-.. doxygenfunction:: example_docs::meta::operator<(box const&, box const&)
-""",
-        encoding="utf-8",
-    )
-    (generated_api / "define1.rst").write_text(
-        """\
-.. _exhale_define_define1:
-
-Define TESTEXAMPLE_DOCS_FEATURE
-===============================
-
-Define Documentation
---------------------
-
-.. doxygendefine:: TESTEXAMPLE_DOCS_FEATURE
-""",
-        encoding="utf-8",
-    )
-    sidebar_namespaces = module._api_sidebar_namespaces(current_app)
-    assert sidebar_namespaces == [
-        {"name": "example_docs", "document": "generated/namespaceexample__docs"},
-        {"name": "example_docs::meta", "document": "generated/namespaceexample__docs_1_1meta"},
-    ]
-    sidebar_context: dict[str, object] = {}
-    module._api_sidebar_context(
-        current_app,
-        "generated/namespaceexample__docs_1_1meta",
-        "page.html",
-        sidebar_context,
-        None,
-    )
-    assert sidebar_context["besa_api_sidebar_namespaces"] == sidebar_namespaces
-    assert sidebar_context["besa_api_sidebar_current"] == "generated/namespaceexample__docs_1_1meta"
-
-    module._prepare_api_landing(current_app)
-    overview_text = (generated_api / "api_namespace_overview.rst.include").read_text(
-        encoding="utf-8"
-    )
-    assert ":api-kind:`N` :ref:`example_docs <namespace_example_docs>`" in overview_text
-    assert ":api-kind:`N` :ref:`meta <namespace_example_docs__meta>`" in overview_text
-    assert "* :api-kind:`N` :ref:`example_docs <namespace_example_docs>`\n\n  * :api-kind:`N`" in overview_text
-    assert "  * :api-kind:`N` :ref:`meta <namespace_example_docs__meta>`\n\n    * :api-kind:`" in overview_text
-    assert overview_text.count("to_string()") == 1
-    assert ":api-kind:`F` :doc:`to_string() </generated/api_overload_example_docs_meta_to_string>`" in overview_text
-    overload_text = (generated_api / "api_overload_example_docs_meta_to_string.rst").read_text(
-        encoding="utf-8"
-    )
-    assert overload_text.startswith("to_string\n=========\n")
-    assert "Function example_docs::meta::to_string" not in overload_text
-    assert ":ref:`to_string(semantic_version) <exhale_function_function1>`" in overload_text
-    assert ":ref:`to_string(release_type) <exhale_function_function2>`" in overload_text
-    assert ":api-kind:`F` :ref:`version() <exhale_function_function3>`" in overview_text
-    assert ":api-kind:`S` :ref:`semantic_version <exhale_struct_struct1>`" in overview_text
-    assert ":api-kind:`E` :ref:`release_type <exhale_enum_enum1>`" in overview_text
-    assert ":api-kind:`K` :ref:`sortable <besa_concept_conceptexample__docs_1_1meta_1asortable>`" in overview_text
-    assert ":api-kind:`S` :ref:`tag_result\\< Tag, Args... > <exhale_struct_struct3>`" in overview_text
-    assert ":api-kind:`F` :ref:`operator\\<() <exhale_function_function5>`" in overview_text
-    assert ":api-kind:`S` :ref:`box <exhale_struct_struct2>`" in overview_text
-    assert ":api-kind:`F` :ref:`box() <exhale_function_guide1>`" not in overview_text
-    landing_text = (generated_api / "api_landing.rst.include").read_text(encoding="utf-8")
-    assert "Namespace hierarchy" in landing_text
-    assert "Class Hierarchy" not in landing_text
-    assert "Full API" not in landing_text
-    assert landing_text.count("/generated/file_view_hierarchy.rst.include") == 1
-    assert "   :hidden:" in landing_text
-    assert "   /generated/namespaceexample__docs" in landing_text
-    root_text = (generated_api / "library_root.rst").read_text(encoding="utf-8")
-    assert root_text == ":orphan:\n"
-    unique_function_page = (generated_api / "function_unique.rst").read_text(encoding="utf-8")
-    assert ".. doxygenfunction:: example_docs::meta::to_static_array\n" in unique_function_page
-    assert "Args&&..." not in unique_function_page
-    guide_page = (generated_api / "function_guide.rst").read_text(encoding="utf-8")
-    assert ".. _exhale_function_guide1:" in guide_page
-    assert ".. doxygenfunction::" not in guide_page
-    assert "Class template deduction guide" in guide_page
-    assert "/generated/function_guide" in landing_text
-    concept_page = generated_api / "besa_concept_conceptexample__docs_1_1meta_1asortable.rst"
-    assert concept_page.is_file()
-    concept_text = concept_page.read_text(encoding="utf-8")
-    assert ".. doxygenconcept:: example_docs::meta::sortable" in concept_text
-    assert "/generated/besa_concept_conceptexample__docs_1_1meta_1asortable" in landing_text
-
-    # Historical refs from before the landing-page merge still point index.rst at library_root.rst.
-    # Current BESA configuration must continue to render those old refs without changing their source.
-    (api_docs / "index.rst").write_text(
-        "API reference\n=============\n\n.. toctree::\n\n   generated/library_root\n",
-        encoding="utf-8",
-    )
-    (generated_api / "library_root.rst").write_text("old noisy root\n", encoding="utf-8")
-    module._prepare_api_landing(current_app)
-    legacy_root = (generated_api / "library_root.rst").read_text(encoding="utf-8")
-    assert legacy_root.startswith("example_docs API\n================\n")
-    assert "Namespace hierarchy" in legacy_root
-    assert "api_landing.rst.include" not in legacy_root
-
-    struct_page = (generated_api / "struct1.rst").read_text(encoding="utf-8")
-    enum_page = (generated_api / "enum1.rst").read_text(encoding="utf-8")
-    function_page = (generated_api / "function1.rst").read_text(encoding="utf-8")
-    assert struct_page.startswith(".. _exhale_struct_struct1:\n\nsemantic_version\n================")
-    assert enum_page.startswith(".. _exhale_enum_enum1:\n\nrelease_type\n============")
-    assert function_page.startswith(".. _exhale_function_function3:\n\nversion\n=======")
-    assert "Documentation\n" not in struct_page
-    assert "Documentation\n" not in enum_page
-    assert "Documentation\n" not in function_page
-    assert ".. doxygenstruct:: example_docs::meta::semantic_version" in struct_page
-    assert ".. doxygenenum:: example_docs::meta::release_type" in enum_page
-    assert ".. doxygenfunction:: example_docs::meta::version" in function_page
-    root_namespace_page = (generated_api / "namespaceexample__docs.rst").read_text(
-        encoding="utf-8"
-    )
-    assert "Members\n-------" in root_namespace_page
-    assert ":api-kind:`N` :ref:`meta <namespace_example_docs__meta>`" in root_namespace_page
-    assert ":api-kind:`S` :ref:`semantic_version <exhale_struct_struct1>`" in root_namespace_page
-    assert ":api-kind:`E` :ref:`release_type <exhale_enum_enum1>`" in root_namespace_page
-    assert ":api-kind:`F` :ref:`version() <exhale_function_function3>`" in root_namespace_page
-
-    namespace_page = (generated_api / "namespaceexample__docs_1_1meta.rst").read_text(
-        encoding="utf-8"
-    )
-    assert "Members\n-------" in namespace_page
-    assert ":api-kind:`S` :ref:`semantic_version <exhale_struct_struct1>`" in namespace_page
-    assert ":api-kind:`E` :ref:`release_type <exhale_enum_enum1>`" in namespace_page
-    assert ":api-kind:`F` :ref:`version() <exhale_function_function3>`" in namespace_page
-    assert ":api-kind:`K` :ref:`sortable <besa_concept_conceptexample__docs_1_1meta_1asortable>`" in namespace_page
-    assert ":api-kind:`S` :ref:`tag_result\\< Tag, Args... > <exhale_struct_struct3>`" in namespace_page
-    assert ":api-kind:`F` :ref:`box() <exhale_function_guide1>`" not in namespace_page
-    assert "Struct semantic_version" not in namespace_page
-    assert "Enum release_type" not in namespace_page
-    assert "Function example_docs::meta::version" not in namespace_page
-
-    define_page = (generated_api / "define1.rst").read_text(encoding="utf-8")
-    assert define_page.startswith(
-        ".. _exhale_define_define1:\n\nTESTEXAMPLE_DOCS_FEATURE\n========================"
-    )
-    assert "Define TESTEXAMPLE_DOCS_FEATURE" not in define_page
-    assert "Define Documentation" not in define_page
-    assert ".. doxygendefine:: TESTEXAMPLE_DOCS_FEATURE" in define_page
-
-    # Reproduce sphinx-multiversion's important shape: conf.py remains in the current checkout while
-    # app.srcdir points at a different checkout. The generated Doxyfile must use only that checkout.
-    historical = tmp_path / "historical"
-    historical_api = historical / "api-docs"
-    historical_api.mkdir(parents=True)
-    historical_header = historical / "src" / "cpp" / "include" / "example_docs" / "historical.hpp"
-    historical_header.parent.mkdir(parents=True)
-    historical_header.write_text("#ifndef EXAMPLE_DOCS_HISTORICAL_HPP\n#define EXAMPLE_DOCS_HISTORICAL_HPP\n#endif\n", encoding="utf-8")
-    shutil.copytree(project / "cmake" / "besa", historical / "cmake" / "besa")
-    (historical / "CMakeLists.txt").write_text(
-        """\
-cmake_minimum_required(VERSION 3.26.1)
-project(example_docs VERSION 9.8.7 LANGUAGES NONE)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-file(MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/api-docs")
-configure_file(
-  "${PROJECT_SOURCE_DIR}/api-docs/Doxyfile.in"
-  "${PROJECT_BINARY_DIR}/api-docs/Doxyfile"
-  @ONLY
-)
-list(PREPEND CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/besa")
-find_package(besa CONFIG REQUIRED)
-set(PROJECT_FEATURES "" CACHE STRING "")
-set(PROJECT_DEVTOOLS "none" CACHE STRING "")
-set(PROJECT_WARNINGS "essential" CACHE STRING "")
-set(TEST_MODES "" CACHE STRING "")
-set(BUILD_TESTING OFF CACHE BOOL "")
-set(RELEASE_TYPE "release" CACHE STRING "")
-set(RELEASE_REVISION "1" CACHE STRING "")
-besa_features_add(FEATURES user-docs)
-besa_configure_complete()
-besa_generated_include_add(NAME schema OUTPUT_VARIABLE SCHEMA_INCLUDE)
-file(MAKE_DIRECTORY "${SCHEMA_INCLUDE}/example_docs")
-file(WRITE "${SCHEMA_INCLUDE}/example_docs/schema.hpp" "#ifndef EXAMPLE_DOCS_SCHEMA_HPP\n#define EXAMPLE_DOCS_SCHEMA_HPP\n#endif\n")
-""",
-        encoding="utf-8",
-    )
-    (historical_api / "Doxyfile.in").write_text(
-        (api_docs / "Doxyfile.in").read_text(encoding="utf-8"), encoding="utf-8"
-    )
-
-    historical_app = FakeApp(historical_api)
-    module._prepare_api(historical_app)
-    historical_output = module._doxygen_output_for(historical)
-    historical_text = (historical_output / "Doxyfile").read_text(encoding="utf-8")
-    assert 'PROJECT_NUMBER = "9.8.7"' in historical_text
-    historical_configured_build = historical_output / "project-build"
-    assert f'CLANG_DATABASE_PATH    = "{historical_configured_build}"' in historical_text
-    assert f'"-resource-dir={fake_resource}"' in historical_text
-    historical_public = historical_output / "public-include"
-    assert str(historical_public).replace("\\", "/") in historical_text
-    assert f'"-I{str(historical_public).replace(chr(92), "/")}"' in historical_text
-    assert str(historical / "src").replace("\\", "/") not in historical_text
-    assert str(project / "src").replace("\\", "/") not in historical_text
-    assert (historical_public / "example_docs" / "historical.hpp").is_file()
-    historical_version = historical_public / "example_docs" / "version.hpp"
-    assert historical_version.is_file()
-    assert 'return "9.8.7";' in historical_version.read_text(encoding="utf-8")
-    assert (historical_public / "example_docs" / "schema.hpp").is_file()
-    assert historical_app.config.release == "9.8.7"
-    assert historical_app.config.breathe_projects == {
-        "example_docs": str(historical_output / "xml")
-    }
-    assert historical_app.config.exhale_args["containmentFolder"] == str(
-        historical_api / "generated"
-    )
-    assert historical_app.config.exhale_args["doxygenStripFromPath"] == str(historical_public)
-    assert str(project / "api-docs" / "generated") not in historical_app.config.exhale_args.values()
+    module_name = "besa_generated_api_conf"
+    spec = importlib.util.spec_from_file_location(module_name, conf_path)
+    assert spec is not None and spec.loader is not None
+    conf = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(conf)
+    assert conf.project == "example_docs"
+    assert conf.release == "0.1.0"
+    assert conf._profile_reference_label("cuda") == "besa-api-profile-cuda"
+    assert "EXAMPLE_DOCS_HOST_DEVICE" in conf.cpp_id_attributes
 
 
 @pytest.mark.cpp

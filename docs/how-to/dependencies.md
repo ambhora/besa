@@ -2,40 +2,34 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Add dependencies
 
-Declare a CMake-resolved normal dependency with:
+Declare dependencies in `besa.toml`. For example, the TOML equivalent of a development-only CMake
+provider dependency is:
 
-```cmake
-besa_dependency_add(
-  NAME fmt
-  KIND NORMAL
-  PROVIDER CMAKE
-  VISIBILITY PRIVATE
-)
+```toml
+[[dependencies]]
+name = "Catch2"
+version = "3"
+kind = "dev"
+provider = "cmake"
 ```
 
-Declare a development-only dependency with:
+A conditional documentation dependency is:
 
-```cmake
-besa_dependency_add(
-  NAME Catch2
-  VERSION 3
-  KIND DEV
-  PROVIDER CMAKE
-)
+```toml
+[[dependencies]]
+name = "Doxygen"
+kind = "dev"
+provider = "cmake"
+when = { all = ["user-docs"] }
 ```
 
-Conditional dependencies use the same selector grammar as directories:
+Supported dependency kinds are `normal`, `build`, and `dev`; providers are `cmake` and `pkgconfig`.
+`visibility` and `components` may also be supplied when required.
 
-```cmake
-besa_dependency_add(
-  NAME Doxygen
-  KIND DEV
-  PROVIDER CMAKE
-  WHEN ALL_OF user-docs
-)
-```
-
-For pkg-config metadata use `PROVIDER PKGCONFIG`.
-
-`NORMAL` dependencies are recorded in the generated `<project>Config.cmake`. `BUILD` and `DEV`
+`normal` dependencies are recorded in the generated `<project>Config.cmake`. `build` and `dev`
 dependencies are intentionally absent from consumer package metadata.
+
+This model does not integrate with Spack. A Spack development environment declares and resolves its
+own dependency set independently, including any package-name differences. `provider = "cmake"`
+describes how the CMake backend resolves this project dependency; it is not a package-manager
+identity shared with Spack.
