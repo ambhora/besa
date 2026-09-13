@@ -24,8 +24,9 @@ from urllib.parse import quote, urlparse
 PROJECT_ROOT = Path(__file__).resolve().parent
 PROPERDOCS_WORK_DIRECTORY = PROJECT_ROOT.parent / "build" / "properdocs"
 BUILD_DIRECTORY = PROPERDOCS_WORK_DIRECTORY / "cmake"
-CURRENT_API_BUILD_DIRECTORY = BUILD_DIRECTORY / "doc" / "api" / "current"
-MULTIVERSION_API_BUILD_DIRECTORY = BUILD_DIRECTORY / "doc" / "api" / "multiversion"
+DOCS_BUILD_DIRECTORY = PROPERDOCS_WORK_DIRECTORY / "docs"
+CURRENT_API_BUILD_DIRECTORY = DOCS_BUILD_DIRECTORY / "api" / "current"
+MULTIVERSION_API_BUILD_DIRECTORY = DOCS_BUILD_DIRECTORY / "api" / "multiversion"
 API_PUBLIC_PATH = Path("reference") / "api"
 
 _APIDOCS_REFERENCE = re.compile(
@@ -95,6 +96,7 @@ def _configure() -> None:
             "-B",
             str(BUILD_DIRECTORY),
             "-DPROJECT_FEATURES=user-docs",
+            f"-DBESA_WORKSPACE={PROPERDOCS_WORK_DIRECTORY}",
         ],
         cwd=PROJECT_ROOT,
         check=True,

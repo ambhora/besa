@@ -20,7 +20,8 @@ from typing import Iterable
 PROJECT_ROOT = Path(__file__).resolve().parent
 PROPERDOCS_WORK_DIRECTORY = PROJECT_ROOT.parent / "build" / "properdocs"
 BUILD_DIRECTORY = PROPERDOCS_WORK_DIRECTORY / "cmake"
-API_BUILD_DIRECTORY = BUILD_DIRECTORY / "doc" / "api" / "current"
+DOCS_BUILD_DIRECTORY = PROPERDOCS_WORK_DIRECTORY / "docs"
+API_BUILD_DIRECTORY = DOCS_BUILD_DIRECTORY / "api" / "current"
 API_PUBLIC_PATH = Path("reference") / "api" / "main"
 
 _serve_active = False
@@ -58,6 +59,7 @@ def _build_current_api() -> None:
             "-B",
             str(BUILD_DIRECTORY),
             "-DPROJECT_FEATURES=user-docs",
+            f"-DBESA_WORKSPACE={PROPERDOCS_WORK_DIRECTORY}",
         ],
         cwd=PROJECT_ROOT,
         check=True,

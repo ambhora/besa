@@ -1362,6 +1362,11 @@ def test_generated_properdocs_serve_hook_rebuilds_current_api_without_env_config
 
     assert module.PROPERDOCS_WORK_DIRECTORY == project.parent / "build" / "properdocs"
     assert module.BUILD_DIRECTORY == project.parent / "build" / "properdocs" / "cmake"
+    assert module.DOCS_BUILD_DIRECTORY == project.parent / "build" / "properdocs" / "docs"
+    assert (
+        module.API_BUILD_DIRECTORY
+        == project.parent / "build" / "properdocs" / "docs" / "api" / "current"
+    )
 
     commands: list[list[str]] = []
 
@@ -1372,6 +1377,7 @@ def test_generated_properdocs_serve_hook_rebuilds_current_api_without_env_config
     monkeypatch.setattr(module.subprocess, "run", fake_run)
     module._build_current_api()
     assert any("-DPROJECT_FEATURES=user-docs" in item for item in commands[0])
+    assert f"-DBESA_WORKSPACE={module.PROPERDOCS_WORK_DIRECTORY}" in commands[0]
     assert commands[1][-1] == "user.docs.api"
 
     fake_api = tmp_path / "current-api"
@@ -1419,6 +1425,11 @@ def test_generated_properdocs_hook_fingerprints_api_inputs(tmp_path: Path, monke
 
     assert module.PROPERDOCS_WORK_DIRECTORY == project.parent / "build" / "properdocs"
     assert module.BUILD_DIRECTORY == project.parent / "build" / "properdocs" / "cmake"
+    assert module.DOCS_BUILD_DIRECTORY == project.parent / "build" / "properdocs" / "docs"
+    assert (
+        module.API_BUILD_DIRECTORY
+        == project.parent / "build" / "properdocs" / "docs" / "api" / "current"
+    )
 
     fake_api = tmp_path / "current-api"
     fake_api.mkdir()
@@ -1458,6 +1469,15 @@ def test_generated_properdocs_multiversion_serve_hook_overlays_live_main(
 
     assert module.PROPERDOCS_WORK_DIRECTORY == project.parent / "build" / "properdocs"
     assert module.BUILD_DIRECTORY == project.parent / "build" / "properdocs" / "cmake"
+    assert module.DOCS_BUILD_DIRECTORY == project.parent / "build" / "properdocs" / "docs"
+    assert (
+        module.CURRENT_API_BUILD_DIRECTORY
+        == project.parent / "build" / "properdocs" / "docs" / "api" / "current"
+    )
+    assert (
+        module.MULTIVERSION_API_BUILD_DIRECTORY
+        == project.parent / "build" / "properdocs" / "docs" / "api" / "multiversion"
+    )
 
     commands: list[list[str]] = []
 
@@ -1470,6 +1490,7 @@ def test_generated_properdocs_multiversion_serve_hook_overlays_live_main(
     module._build("user.docs.multiversion")
     module._build("user.docs.api")
     assert any("-DPROJECT_FEATURES=user-docs" in item for item in commands[0])
+    assert f"-DBESA_WORKSPACE={module.PROPERDOCS_WORK_DIRECTORY}" in commands[0]
     assert commands[1][-1] == "user.docs.multiversion"
     assert commands[2][-1] == "user.docs.api"
 
