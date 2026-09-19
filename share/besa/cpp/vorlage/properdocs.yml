@@ -4,7 +4,8 @@ site_name: vorlage
 site_description: Documentation for vorlage
 site_dir: ../build/properdocs/site
 
-# Set this to the canonical Git repository to enable per-page source links and the 404 issue action.
+# Set this to the canonical Git repository to enable per-page edit/source links and the 404 issue
+# action. BESA derives the correct source path and current human Git ref; no edit_uri is required.
 # GitHub and GitLab repository URLs are supported directly; other/self-hosted layouts can set
 # extra.besa_repo_provider explicitly.
 # repo_url: https://github.com/example/vorlage
@@ -38,6 +39,7 @@ theme:
       primary: custom
       accent: custom
   features:
+    - content.action.edit
     - content.code.copy
     - navigation.indexes
     - navigation.sections
@@ -65,4 +67,5 @@ hooks:
 
 nav:
   - Home: index.md
+  - How to contribute: contributing.md
   - Reference: reference/index.md

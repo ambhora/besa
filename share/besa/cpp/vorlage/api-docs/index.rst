@@ -4,8 +4,8 @@
 ..
     SPDX-License-Identifier: Apache-2.0
 
-API reference
-=============
+API Documentation Home
+======================
 
 This site is the complete generated C/C++ API reference for this version of ``vorlage``, including
 the public library interface and developer-facing test support. For tutorials, how-to guides,

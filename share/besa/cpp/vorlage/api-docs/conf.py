@@ -450,7 +450,7 @@ def _read_api_manifest(build_directory: Path) -> dict[str, object] | None:
 
 
 def _configure_api_discovery(
-    project_root: Path, build_directory: Path, *, profile: str | None = None
+    project_root: Path, build_directory: Path, *, variant: str | None = None
 ) -> dict[str, object] | None:
     """Configure one compiler-free BESA API-discovery build and return its manifest when supported."""
 
@@ -468,47 +468,47 @@ def _configure_api_discovery(
         "-DPROJECT_WARNINGS=none",
         "-DRELEASE_TYPE=release",
     ]
-    if profile:
-        command.append(f"-DBESA_API_PROFILE={profile}")
+    if variant:
+        command.append(f"-DBESA_API_VARIANT={variant}")
     subprocess.run(command, cwd=project_root, check=True)
     return _read_api_manifest(build_directory)
 
 
-def _api_profile_catalog(
+def _api_variant_catalog(
     project_root: Path, doxygen_output: Path, configured_build: Path
 ) -> dict[str, object]:
-    """Return profile declarations without requiring the current build to have been reconfigured."""
+    """Return variant declarations without requiring the current build to have been reconfigured."""
 
     manifest = _read_api_manifest(configured_build)
-    if manifest is not None and manifest.get("profiles"):
+    if manifest is not None and manifest.get("variants"):
         return manifest
-    discovered = _configure_api_discovery(project_root, doxygen_output / "profile-catalog")
-    return discovered or {"schema_version": 0, "profiles": [], "registrations": []}
+    discovered = _configure_api_discovery(project_root, doxygen_output / "variant-catalog")
+    return discovered or {"schema_version": 0, "variants": [], "registrations": []}
 
 
-def _profile_public_include_tree(
+def _variant_public_include_tree(
     project_root: Path,
-    profile_build: Path,
+    variant_build: Path,
     doxygen_output: Path,
-    profile_name: str,
+    variant_name: str,
     manifest: dict[str, object],
 ) -> Path:
-    """Stage only API-classified roots selected by one API profile."""
+    """Stage only API-classified roots selected by one API variant."""
 
-    public_include = doxygen_output / "profiles" / profile_name / "public-include"
+    public_include = doxygen_output / "variants" / variant_name / "public-include"
     shutil.rmtree(public_include, ignore_errors=True)
     public_include.mkdir(parents=True)
 
     registrations = manifest.get("registrations", [])
     if not isinstance(registrations, list):
-        raise RuntimeError(f"Invalid registrations in API profile {profile_name!r}")
+        raise RuntimeError(f"Invalid registrations in API variant {variant_name!r}")
 
     if not registrations:
-        # Compatibility for historical refs predating API classifications/profiles.
+        # Compatibility for historical refs predating API classifications/variants.
         for source_include in sorted(project_root.glob("src/*/include")):
             if source_include.is_dir():
                 shutil.copytree(source_include, public_include, dirs_exist_ok=True)
-        for generated_include in _generated_include_directories(profile_build):
+        for generated_include in _generated_include_directories(variant_build):
             shutil.copytree(generated_include, public_include, dirs_exist_ok=True)
 
     for registration in registrations:
@@ -521,18 +521,18 @@ def _profile_public_include_tree(
         base = registration.get("base")
         if not isinstance(relative, str) or base not in {"source", "binary"}:
             continue
-        root = (project_root if base == "source" else profile_build) / relative
+        root = (project_root if base == "source" else variant_build) / relative
         if kind in {"source-directory", "directory"}:
             root = root / "include"
         if root.is_dir():
             shutil.copytree(root, public_include, dirs_exist_ok=True)
 
     # The generated project exposes developer-facing test support as part of the reference today. Treat each
-    # ``test/base/<toolchain>/include`` tree like the corresponding toolchain feature so profile
+    # ``test/base/<toolchain>/include`` tree like the corresponding toolchain feature so variant
     # fixtures can exercise configuration-specific API discovery without leaking into every
-    # profile. For example, ``test/base/cuda/include`` is visible only when ``toolchain-cuda`` is
-    # enabled, while ``test/base/cpp/include`` is visible in CPU, CUDA, and HIP profiles because
-    # all three profiles include ``toolchain-cpp``. Historical manifests without feature data keep
+    # variant. For example, ``test/base/cuda/include`` is visible only when ``toolchain-cuda`` is
+    # enabled, while ``test/base/cpp/include`` is visible in CPU, CUDA, and HIP variants because
+    # all three variants include ``toolchain-cpp``. Historical manifests without feature data keep
     # the old include-everything behavior.
     active_features_value = manifest.get("active_features", [])
     active_features = (
@@ -552,14 +552,14 @@ def _profile_public_include_tree(
     return public_include
 
 
-def _profile_predefined(profile: dict[str, object]) -> list[str]:
-    values = profile.get("predefined", [])
+def _variant_predefined(variant: dict[str, object]) -> list[str]:
+    values = variant.get("predefined", [])
     if not isinstance(values, list):
         return []
     return [str(value) for value in values if str(value)]
 
 
-def _profile_clang_defines(predefined: list[str]) -> list[str]:
+def _variant_clang_defines(predefined: list[str]) -> list[str]:
     options = [f"-D{value}" for value in predefined]
     names = {value.split("=", 1)[0] for value in predefined}
     if "__CUDACC__" in names or "__HIPCC__" in names:
@@ -578,37 +578,37 @@ def _projectdocs_aliases() -> str:
     )
 
 
-def _run_doxygen_profile(
+def _run_doxygen_variant(
     *,
     project_root: Path,
     configured_build: Path,
     base_config: str,
     doxygen_output: Path,
     checkout_version: str,
-    profile: dict[str, object],
-    profile_manifest: dict[str, object],
-    profile_build: Path,
+    variant: dict[str, object],
+    variant_manifest: dict[str, object],
+    variant_build: Path,
 ) -> Path:
-    """Run Doxygen for one API profile and return its XML directory."""
+    """Run Doxygen for one API variant and return its XML directory."""
 
-    profile_name = str(profile["name"])
-    profile_output = doxygen_output / "profiles" / profile_name
-    public_include = _profile_public_include_tree(
-        project_root, profile_build, doxygen_output, profile_name, profile_manifest
+    variant_name = str(variant["name"])
+    variant_output = doxygen_output / "variants" / variant_name
+    public_include = _variant_public_include_tree(
+        project_root, variant_build, doxygen_output, variant_name, variant_manifest
     )
-    predefined = _profile_predefined(profile)
+    predefined = _variant_predefined(variant)
 
     clang_options = _clang_options(configured_build)
     clang_options.append(f"-I{str(public_include).replace(chr(92), '/')}")
-    clang_options.extend(_profile_clang_defines(predefined))
+    clang_options.extend(_variant_clang_defines(predefined))
 
-    generated_config = profile_output / "Doxyfile"
+    generated_config = variant_output / "Doxyfile"
     generated_config.parent.mkdir(parents=True, exist_ok=True)
     additions = [
         "",
         f"CLANG_OPTIONS += {_doxygen_list(clang_options)}",
         f'PROJECT_NUMBER = "{checkout_version}"',
-        f"OUTPUT_DIRECTORY = {_doxygen_quote(profile_output)}",
+        f"OUTPUT_DIRECTORY = {_doxygen_quote(variant_output)}",
         f"INPUT = {_doxygen_quote(public_include)}",
         f"STRIP_FROM_PATH = {_doxygen_quote(public_include)}",
         f"STRIP_FROM_INC_PATH = {_doxygen_quote(public_include)}",
@@ -620,10 +620,10 @@ def _run_doxygen_profile(
         encoding="utf-8",
     )
 
-    shutil.rmtree(profile_output / "xml", ignore_errors=True)
+    shutil.rmtree(variant_output / "xml", ignore_errors=True)
     executable = os.environ.get("BESA_DOXYGEN_EXECUTABLE", "doxygen")
     subprocess.run([executable, str(generated_config)], cwd=project_root, check=True)
-    return profile_output / "xml"
+    return variant_output / "xml"
 
 
 def _xml_child_key(element: ET.Element) -> tuple[str, str, str]:
@@ -635,7 +635,7 @@ def _xml_child_key(element: ET.Element) -> tuple[str, str, str]:
 
 
 def _merge_compound_xml(target_root: ET.Element, source_root: ET.Element) -> None:
-    """Merge members/relationships from one profile's compound XML into another."""
+    """Merge members/relationships from one variant's compound XML into another."""
 
     target = target_root.find("compounddef")
     source = source_root.find("compounddef")
@@ -680,19 +680,19 @@ def _merge_compound_xml(target_root: ET.Element, source_root: ET.Element) -> Non
             existing_children.add(key)
 
 
-def _collect_profile_metadata(profile_xml: dict[str, Path]) -> dict[str, object]:
-    """Collect per-profile entity availability and macro spellings before XML unioning."""
+def _collect_variant_metadata(variant_xml: dict[str, Path]) -> dict[str, object]:
+    """Collect per-variant entity availability and macro spellings before XML unioning."""
 
     availability: dict[str, list[str]] = {}
     define_variants: dict[str, dict[str, str]] = {}
     define_names: dict[str, str] = {}
 
-    for profile, xml_directory in profile_xml.items():
+    for variant, xml_directory in variant_xml.items():
         index = ET.parse(xml_directory / "index.xml").getroot()
         for compound in index.findall("compound"):
             refid = compound.get("refid", "")
             if refid:
-                availability.setdefault(refid, []).append(profile)
+                availability.setdefault(refid, []).append(variant)
             compound_xml = xml_directory / f"{refid}.xml"
             if not refid or not compound_xml.is_file():
                 continue
@@ -700,33 +700,33 @@ def _collect_profile_metadata(profile_xml: dict[str, Path]) -> dict[str, object]
             for member in root.findall(".//memberdef"):
                 member_id = member.get("id", "")
                 if member_id:
-                    availability.setdefault(member_id, []).append(profile)
+                    availability.setdefault(member_id, []).append(variant)
                 if member.get("kind") != "define" or not member_id:
                     continue
                 define_names[member_id] = member.findtext("name") or member_id
                 value = _xml_text(member.find("initializer")) or "<empty>"
-                define_variants.setdefault(member_id, {})[profile] = value
+                define_variants.setdefault(member_id, {})[variant] = value
 
     return {
-        "profiles": list(profile_xml),
+        "variants": list(variant_xml),
         "availability": availability,
         "define_variants": define_variants,
         "define_names": define_names,
     }
 
 
-def _merge_profile_xml(profile_xml: dict[str, Path], union_xml: Path) -> dict[str, object]:
-    """Merge Doxygen XML from all API profiles into one Breathe/Exhale inventory."""
+def _merge_variant_xml(variant_xml: dict[str, Path], union_xml: Path) -> dict[str, object]:
+    """Merge Doxygen XML from all API variants into one Breathe/Exhale inventory."""
 
-    if not profile_xml:
-        raise RuntimeError("No API profiles were available for Doxygen")
+    if not variant_xml:
+        raise RuntimeError("No API variants were available for Doxygen")
 
-    metadata = _collect_profile_metadata(profile_xml)
-    first_xml = next(iter(profile_xml.values()))
+    metadata = _collect_variant_metadata(variant_xml)
+    first_xml = next(iter(variant_xml.values()))
     shutil.rmtree(union_xml, ignore_errors=True)
     shutil.copytree(first_xml, union_xml)
 
-    index_roots = [ET.parse(path / "index.xml").getroot() for path in profile_xml.values()]
+    index_roots = [ET.parse(path / "index.xml").getroot() for path in variant_xml.values()]
     union_index = copy.deepcopy(index_roots[0])
     compounds = {compound.get("refid", ""): compound for compound in union_index.findall("compound")}
 
@@ -753,7 +753,7 @@ def _merge_profile_xml(profile_xml: dict[str, Path], union_xml: Path) -> dict[st
     ET.ElementTree(union_index).write(union_xml / "index.xml", encoding="utf-8", xml_declaration=True)
 
     for refid in sorted(refids):
-        sources = [path / f"{refid}.xml" for path in profile_xml.values() if (path / f"{refid}.xml").is_file()]
+        sources = [path / f"{refid}.xml" for path in variant_xml.values() if (path / f"{refid}.xml").is_file()]
         if not sources:
             continue
         merged = ET.parse(sources[0]).getroot()
@@ -764,8 +764,8 @@ def _merge_profile_xml(profile_xml: dict[str, Path], union_xml: Path) -> dict[st
     return metadata
 
 
-def _write_profile_metadata(doxygen_output: Path, metadata: dict[str, object]) -> None:
-    (doxygen_output / "api-profile-metadata.json").write_text(
+def _write_variant_metadata(doxygen_output: Path, metadata: dict[str, object]) -> None:
+    (doxygen_output / "api-variant-metadata.json").write_text(
         json.dumps(metadata, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
 
@@ -829,47 +829,47 @@ def _prepare_api(app) -> None:
     base_config = _configured_doxyfile(api_docs_directory, configured_build).read_text(
         encoding="utf-8"
     )
-    catalog = _api_profile_catalog(project_root, doxygen_output, configured_build)
-    profiles = catalog.get("profiles", [])
-    if not isinstance(profiles, list) or not profiles:
-        # Historical refs created before explicit profiles retain their previous single-build API.
-        profiles = [{"name": "default", "features": catalog.get("active_features", []), "predefined": []}]
+    catalog = _api_variant_catalog(project_root, doxygen_output, configured_build)
+    variants = catalog.get("variants", [])
+    if not isinstance(variants, list) or not variants:
+        # Historical refs created before explicit variants retain their previous single-build API.
+        variants = [{"name": "default", "features": catalog.get("active_features", []), "predefined": []}]
 
-    profile_xml: dict[str, Path] = {}
-    profile_manifests: dict[str, dict[str, object]] = {}
+    variant_xml: dict[str, Path] = {}
+    variant_manifests: dict[str, dict[str, object]] = {}
     primary_public_include: Path | None = None
-    for profile in profiles:
-        if not isinstance(profile, dict) or not profile.get("name"):
+    for variant in variants:
+        if not isinstance(variant, dict) or not variant.get("name"):
             continue
-        profile_name = str(profile["name"])
-        profile_build = doxygen_output / "profiles" / profile_name / "project-build"
-        if profile_name == "default":
-            profile_manifest = catalog
-            profile_build = configured_build
+        variant_name = str(variant["name"])
+        variant_build = doxygen_output / "variants" / variant_name / "project-build"
+        if variant_name == "default":
+            variant_manifest = catalog
+            variant_build = configured_build
         else:
-            profile_manifest = _configure_api_discovery(
-                project_root, profile_build, profile=profile_name
+            variant_manifest = _configure_api_discovery(
+                project_root, variant_build, variant=variant_name
             )
-            if profile_manifest is None:
-                raise RuntimeError(f"API profile {profile_name!r} did not produce a BESA API manifest")
-        profile_manifests[profile_name] = profile_manifest
-        xml_directory = _run_doxygen_profile(
+            if variant_manifest is None:
+                raise RuntimeError(f"API variant {variant_name!r} did not produce a BESA API manifest")
+        variant_manifests[variant_name] = variant_manifest
+        xml_directory = _run_doxygen_variant(
             project_root=project_root,
             configured_build=configured_build,
             base_config=base_config,
             doxygen_output=doxygen_output,
             checkout_version=checkout_version,
-            profile=profile,
-            profile_manifest=profile_manifest,
-            profile_build=profile_build,
+            variant=variant,
+            variant_manifest=variant_manifest,
+            variant_build=variant_build,
         )
-        profile_xml[profile_name] = xml_directory
+        variant_xml[variant_name] = xml_directory
         if primary_public_include is None:
-            primary_public_include = doxygen_output / "profiles" / profile_name / "public-include"
+            primary_public_include = doxygen_output / "variants" / variant_name / "public-include"
 
-    metadata = _merge_profile_xml(profile_xml, doxygen_output / "xml")
+    metadata = _merge_variant_xml(variant_xml, doxygen_output / "xml")
     metadata["catalog"] = catalog
-    metadata["profile_manifests"] = profile_manifests
+    metadata["variant_manifests"] = variant_manifests
     metadata["documentation_inputs"] = [
         {
             "path": str(path.relative_to(project_root)).replace(chr(92), "/"),
@@ -880,9 +880,9 @@ def _prepare_api(app) -> None:
         for path in sorted(project_root.glob("test/base/*/include"))
         if path.is_dir()
     ]
-    _write_profile_metadata(doxygen_output, metadata)
+    _write_variant_metadata(doxygen_output, metadata)
     if primary_public_include is None:
-        raise RuntimeError("No API profile produced a public include tree")
+        raise RuntimeError("No API variant produced a public include tree")
 
     # These values are consumed after builder-inited, so update Sphinx's live configuration rather
     # than module globals. In a sphinx-multiversion build this is what prevents old refs from reading
@@ -1483,51 +1483,51 @@ def _write_overload_pages(
     return result
 
 
-_PROFILE_AVAILABILITY_BEGIN = ".. besa-profile-availability-begin"
-_PROFILE_AVAILABILITY_END = ".. besa-profile-availability-end"
+_VARIANT_AVAILABILITY_BEGIN = ".. besa-variant-availability-begin"
+_VARIANT_AVAILABILITY_END = ".. besa-variant-availability-end"
 
 
-def _profile_display_name(profile: str) -> str:
-    """Return a compact human-facing API profile name."""
+def _variant_display_name(variant: str) -> str:
+    """Return a compact human-facing API variant name."""
 
-    return profile.upper()
-
-
-def _profile_reference_label(profile: str) -> str:
-    """Return the stable label used by one profile on the API configuration page."""
-
-    slug = re.sub(r"[^A-Za-z0-9_-]+", "-", profile).strip("-").lower()
-    return f"besa-api-profile-{slug or 'profile'}"
+    return variant.upper()
 
 
-def _profile_reference(profile: str) -> str:
-    """Return an RST link to one API profile's detailed configuration entry."""
+def _variant_reference_label(variant: str) -> str:
+    """Return the stable label used by one variant on the API configuration page."""
 
-    return f":ref:`{_profile_display_name(profile)} <{_profile_reference_label(profile)}>`"
+    slug = re.sub(r"[^A-Za-z0-9_-]+", "-", variant).strip("-").lower()
+    return f"besa-api-variant-{slug or 'variant'}"
 
 
-def _profile_availability_block(refid: str, profiles: list[str]) -> str:
+def _variant_reference(variant: str) -> str:
+    """Return an RST link to one API variant's detailed configuration entry."""
+
+    return f":ref:`{_variant_display_name(variant)} <{_variant_reference_label(variant)}>`"
+
+
+def _variant_availability_block(refid: str, variants: list[str]) -> str:
     """Return one small availability block for an API entity."""
 
     return "\n".join(
         [
-            f"{_PROFILE_AVAILABILITY_BEGIN} {refid}",
+            f"{_VARIANT_AVAILABILITY_BEGIN} {refid}",
             "",
             ".. rubric:: Availability",
             "",
             " · ".join(
                 [
-                    *(_profile_reference(profile) for profile in profiles),
-                    ":doc:`API configuration </generated/api_configuration>`",
+                    *(_variant_reference(variant) for variant in variants),
+                    ":doc:`API variants and features </generated/api_configuration>`",
                 ]
             ),
             "",
-            f"{_PROFILE_AVAILABILITY_END} {refid}",
+            f"{_VARIANT_AVAILABILITY_END} {refid}",
         ]
     )
 
 
-def _profile_entity_documents(index_xml: Path, generated: Path) -> dict[str, str]:
+def _variant_entity_documents(index_xml: Path, generated: Path) -> dict[str, str]:
     """Map Doxygen entity ids to their canonical generated documents."""
 
     labels = _generated_label_documents(generated)
@@ -1583,25 +1583,25 @@ def _insert_overload_availability(text: str, refid: str, block: str) -> str:
     return result
 
 
-def _write_profile_availability_sections(doxygen_output: Path, generated: Path) -> None:
-    """Annotate every generated API entity with the profiles in which it exists."""
+def _write_variant_availability_sections(doxygen_output: Path, generated: Path) -> None:
+    """Annotate every generated API entity with the variants in which it exists."""
 
-    metadata_path = doxygen_output / "api-profile-metadata.json"
+    metadata_path = doxygen_output / "api-variant-metadata.json"
     index_xml = doxygen_output / "xml" / "index.xml"
     if not metadata_path.is_file() or not index_xml.is_file():
         return
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-    profiles = [str(value) for value in metadata.get("profiles", [])]
+    variants = [str(value) for value in metadata.get("variants", [])]
     availability = metadata.get("availability", {})
-    if not profiles or not isinstance(availability, dict):
+    if not variants or not isinstance(availability, dict):
         return
 
-    documents = _profile_entity_documents(index_xml, generated)
-    for refid, profile_values in availability.items():
-        if not isinstance(profile_values, list):
+    documents = _variant_entity_documents(index_xml, generated)
+    for refid, variant_values in availability.items():
+        if not isinstance(variant_values, list):
             continue
-        present = {str(value) for value in profile_values}
-        available = [profile for profile in profiles if profile in present]
+        present = {str(value) for value in variant_values}
+        available = [variant for variant in variants if variant in present]
         if not available:
             continue
         document = documents.get(str(refid))
@@ -1611,7 +1611,7 @@ def _write_profile_availability_sections(doxygen_output: Path, generated: Path) 
         if not page.is_file():
             continue
 
-        block = _profile_availability_block(str(refid), available)
+        block = _variant_availability_block(str(refid), available)
         text = page.read_text(encoding="utf-8")
         if document.startswith("api_overload_"):
             text = _insert_overload_availability(text, str(refid), block)
@@ -1619,10 +1619,10 @@ def _write_profile_availability_sections(doxygen_output: Path, generated: Path) 
             continue
 
         # Keep availability subordinate to the entity documentation but ahead of supplementary
-        # inheritance/relationship/profile-variant sections when those are present.
+        # inheritance/relationship/variant-definition sections when those are present.
         insertion = len(text)
         for marker in (
-            _PROFILE_VARIANTS_BEGIN,
+            _DEFINE_VARIANTS_BEGIN,
             _INHERITANCE_BEGIN,
             _RELATED_OPERATORS_BEGIN,
             _RELATED_FUNCTIONS_BEGIN,
@@ -1638,27 +1638,27 @@ def _write_profile_availability_sections(doxygen_output: Path, generated: Path) 
         page.write_text(result, encoding="utf-8")
 
 
-_PROFILE_VARIANTS_BEGIN = ".. besa-profile-variants-begin"
-_PROFILE_VARIANTS_END = ".. besa-profile-variants-end"
+_DEFINE_VARIANTS_BEGIN = ".. besa-define-variants-begin"
+_DEFINE_VARIANTS_END = ".. besa-define-variants-end"
 
 
-def _write_profile_variant_sections(doxygen_output: Path, generated: Path) -> None:
-    """Show profile-dependent macro spellings on the macro's canonical page."""
+def _write_define_variant_sections(doxygen_output: Path, generated: Path) -> None:
+    """Show variant-dependent macro spellings on the macro's canonical page."""
 
-    metadata_path = doxygen_output / "api-profile-metadata.json"
+    metadata_path = doxygen_output / "api-variant-metadata.json"
     if not metadata_path.is_file():
         return
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-    profiles = [str(value) for value in metadata.get("profiles", [])]
-    variants = metadata.get("define_variants", {})
-    if not isinstance(variants, dict):
+    variant_names = [str(value) for value in metadata.get("variants", [])]
+    define_variants = metadata.get("define_variants", {})
+    if not isinstance(define_variants, dict):
         return
 
     labels = _generated_label_documents(generated)
-    for refid, profile_values in variants.items():
-        if not isinstance(profile_values, dict):
+    for refid, variant_values in define_variants.items():
+        if not isinstance(variant_values, dict):
             continue
-        values = {str(profile_values.get(profile, "<unavailable>")) for profile in profiles}
+        values = {str(variant_values.get(variant, "<unavailable>")) for variant in variant_names}
         if len(values) <= 1:
             continue
         document = labels.get(f"exhale_define_{refid}")
@@ -1669,46 +1669,46 @@ def _write_profile_variant_sections(doxygen_output: Path, generated: Path) -> No
             continue
 
         text = page.read_text(encoding="utf-8")
-        if _PROFILE_VARIANTS_BEGIN in text:
-            before, remainder = text.split(_PROFILE_VARIANTS_BEGIN, 1)
-            if _PROFILE_VARIANTS_END in remainder:
-                _old, after = remainder.split(_PROFILE_VARIANTS_END, 1)
+        if _DEFINE_VARIANTS_BEGIN in text:
+            before, remainder = text.split(_DEFINE_VARIANTS_BEGIN, 1)
+            if _DEFINE_VARIANTS_END in remainder:
+                _old, after = remainder.split(_DEFINE_VARIANTS_END, 1)
                 text = before.rstrip() + "\n" + after.lstrip("\n")
 
         lines = [
             text.rstrip(),
             "",
-            _PROFILE_VARIANTS_BEGIN,
+            _DEFINE_VARIANTS_BEGIN,
             "",
-            ".. rubric:: Definitions by API profile",
+            ".. rubric:: Definitions by API variant",
             "",
             ".. list-table::",
             "   :header-rows: 1",
             "   :widths: 20 80",
             "",
-            "   * - Profile",
+            "   * - Variant",
             "     - Definition",
         ]
-        for profile in profiles:
-            value = str(profile_values.get(profile, "<unavailable>"))
+        for variant in variant_names:
+            value = str(variant_values.get(variant, "<unavailable>"))
             escaped = value.replace("`", "\\`")
-            lines.extend([f"   * - {profile}", f"     - ``{escaped}``"])
-        lines.extend(["", _PROFILE_VARIANTS_END, ""])
+            lines.extend([f"   * - {variant}", f"     - ``{escaped}``"])
+        lines.extend(["", _DEFINE_VARIANTS_END, ""])
         page.write_text("\n".join(lines), encoding="utf-8")
 
 
-def _manifest_profile_features(catalog: dict[str, object]) -> dict[str, list[str]]:
-    """Return declared API profile feature sets in manifest order."""
+def _manifest_variant_features(catalog: dict[str, object]) -> dict[str, list[str]]:
+    """Return declared API variant feature sets in manifest order."""
 
     result: dict[str, list[str]] = {}
-    profiles = catalog.get("profiles", [])
-    if not isinstance(profiles, list):
+    variants = catalog.get("variants", [])
+    if not isinstance(variants, list):
         return result
-    for profile in profiles:
-        if not isinstance(profile, dict) or not profile.get("name"):
+    for variant in variants:
+        if not isinstance(variant, dict) or not variant.get("name"):
             continue
-        features = profile.get("features", [])
-        result[str(profile["name"])] = (
+        features = variant.get("features", [])
+        result[str(variant["name"])] = (
             [str(value) for value in features] if isinstance(features, list) else []
         )
     return result
@@ -1726,20 +1726,20 @@ def _registration_identity(registration: dict[str, object]) -> tuple[str, ...]:
 def _write_api_configuration_page(doxygen_output: Path, generated: Path) -> str | None:
     """Generate a human-readable explanation of the complete API configuration model."""
 
-    metadata_path = doxygen_output / "api-profile-metadata.json"
+    metadata_path = doxygen_output / "api-variant-metadata.json"
     if not metadata_path.is_file():
         return None
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-    profile_names = [str(value) for value in metadata.get("profiles", [])]
+    variant_names = [str(value) for value in metadata.get("variants", [])]
     catalog_value = metadata.get("catalog", {})
     catalog = catalog_value if isinstance(catalog_value, dict) else {}
-    profile_manifests_value = metadata.get("profile_manifests", {})
-    profile_manifests = (
-        profile_manifests_value if isinstance(profile_manifests_value, dict) else {}
+    variant_manifests_value = metadata.get("variant_manifests", {})
+    variant_manifests = (
+        variant_manifests_value if isinstance(variant_manifests_value, dict) else {}
     )
-    profile_features = _manifest_profile_features(catalog)
-    if not profile_names:
-        profile_names = list(profile_features)
+    variant_features = _manifest_variant_features(catalog)
+    if not variant_names:
+        variant_names = list(variant_features)
 
     declared_value = catalog.get("declared_features", [])
     declared_features = (
@@ -1747,7 +1747,7 @@ def _write_api_configuration_page(doxygen_output: Path, generated: Path) -> str 
     )
     if not declared_features:
         declared_features = sorted(
-            {feature for features in profile_features.values() for feature in features}
+            {feature for features in variant_features.values() for feature in features}
         )
     active_value = catalog.get("active_features", [])
     active_features = (
@@ -1756,30 +1756,44 @@ def _write_api_configuration_page(doxygen_output: Path, generated: Path) -> str 
 
     project_name = str(catalog.get("project") or project)
     lines = [
-        "API configuration",
-        "=================",
+        "API Variants and Features",
+        "=========================",
         "",
-        "This page is generated from the BESA API manifests used to build this reference. The",
-        "reference is the union of all declared API profiles; an entity's ``Availability`` field",
-        "shows the profiles in which that declaration exists.",
+        "API variants describe the different forms in which an individual API entity can occur",
+        "in the source code. The same function, type, macro, or other entity may, for example,",
+        "have CPU, CUDA, and HIP variants with different declarations or annotations.",
         "",
-        "Documentation model",
-        "-------------------",
+        "Features determine which variants of an entity can be present in a particular build.",
+        "A declared variant label associates a name with the feature prerequisites and optional",
+        "parser predefinitions needed to expose that form to the C/C++ parser. The variant",
+        "belongs to the entity; the feature set is only the context used to discover it.",
+        "",
+        "The generated reference merges the declarations discovered under all variant conditions",
+        "into one site. Each entity's ``Availability`` field shows the variants in which that",
+        "entity exists, allowing feature-dependent forms to be documented together.",
+        "",
+        "Overview",
+        "--------",
         "",
         ".. list-table::",
         "   :widths: 30 70",
         "",
         "   * - Project",
         f"     - ``{project_name}``",
-        "   * - API profiles",
-        "     - " + (" · ".join(_profile_reference(name) for name in profile_names) or "none"),
+        "   * - Variant labels",
+        "     - " + (" · ".join(_variant_reference(name) for name in variant_names) or "none"),
         "   * - Reference model",
-        "     - Union of all registered API profiles",
+        "     - Combined view of all discovered entity variants",
         "   * - Manifest schema",
         f"     - ``{catalog.get('schema_version', 'unknown')}``",
         "",
-        "Feature/profile matrix",
-        "----------------------",
+        "Variant selection by feature",
+        "----------------------------",
+        "",
+        "The table below shows the feature prerequisites associated with each variant label.",
+        "``Documentation build`` marks the features active in the build that is producing this",
+        "site. The remaining columns show which features are required when discovering each",
+        "variant. Features may therefore influence which form of an individual entity is active.",
         "",
         ".. list-table::",
         "   :header-rows: 1",
@@ -1787,8 +1801,8 @@ def _write_api_configuration_page(doxygen_output: Path, generated: Path) -> str 
         "   * - Feature",
         "     - Documentation build",
     ]
-    for name in profile_names:
-        lines.append(f"     - {_profile_reference(name)}")
+    for name in variant_names:
+        lines.append(f"     - {_variant_reference(name)}")
     for feature in declared_features:
         lines.extend(
             [
@@ -1796,20 +1810,35 @@ def _write_api_configuration_page(doxygen_output: Path, generated: Path) -> str 
                 f"     - {'yes' if feature in active_features else '—'}",
             ]
         )
-        for name in profile_names:
+        for name in variant_names:
             lines.append(
-                f"     - {'yes' if feature in set(profile_features.get(name, [])) else '—'}"
+                f"     - {'yes' if feature in set(variant_features.get(name, [])) else '—'}"
             )
 
-    lines.extend(["", "API profiles", "------------", ""])
-    profile_declarations = {
+    lines.extend(
+        [
+            "",
+            "API variants",
+            "------------",
+            "",
+            "Each name below is a variant label that may occur on individual API entities. An",
+            "entity may be available in one, several, or all declared variants.",
+            "",
+            "- ``Features`` lists the feature prerequisites used to discover the variant.",
+            "- ``Parser predefinitions`` lists parser-only preprocessor symbols used to expose",
+            "  conditional declarations for that variant. They do not define a separate complete",
+            "  API surface.",
+            "",
+        ]
+    )
+    variant_declarations = {
         str(item.get("name")): item
-        for item in catalog.get("profiles", [])
+        for item in catalog.get("variants", [])
         if isinstance(item, dict) and item.get("name")
-    } if isinstance(catalog.get("profiles", []), list) else {}
-    for name in profile_names:
-        declaration = profile_declarations.get(name, {})
-        features = profile_features.get(name, [])
+    } if isinstance(catalog.get("variants", []), list) else {}
+    for name in variant_names:
+        declaration = variant_declarations.get(name, {})
+        features = variant_features.get(name, [])
         predefined_value = declaration.get("predefined", []) if isinstance(declaration, dict) else []
         predefined = (
             [str(value) for value in predefined_value]
@@ -1818,9 +1847,13 @@ def _write_api_configuration_page(doxygen_output: Path, generated: Path) -> str 
         )
         lines.extend(
             [
-                f".. _{_profile_reference_label(name)}:",
+                f".. _{_variant_reference_label(name)}:",
                 "",
-                f".. rubric:: {_profile_display_name(name)}",
+                f".. rubric:: {_variant_display_name(name)}",
+                "",
+                "This label identifies one possible form of an API entity. The feature",
+                "prerequisites and parser predefinitions below are used to discover declarations",
+                "belonging to that variant.",
                 "",
                 "Features",
                 "  " + (" · ".join(f"``{value}``" for value in features) or "none"),
@@ -1831,7 +1864,7 @@ def _write_api_configuration_page(doxygen_output: Path, generated: Path) -> str 
             ]
         )
 
-    # Merge the same registration across all profile-specific manifests, retaining which profiles
+    # Merge the same registration across all variant-specific manifests, retaining which variants
     # selected it. This is the useful mapping from the declarative project model to API topology.
     registrations: dict[tuple[str, ...], dict[str, object]] = {}
     catalog_registrations = catalog.get("registrations", [])
@@ -1839,9 +1872,9 @@ def _write_api_configuration_page(doxygen_output: Path, generated: Path) -> str 
         for item in catalog_registrations:
             if isinstance(item, dict):
                 registrations.setdefault(_registration_identity(item), dict(item))
-    selected_by_profile: dict[tuple[str, ...], list[str]] = {}
-    for name in profile_names:
-        manifest = profile_manifests.get(name, {})
+    selected_by_variant: dict[tuple[str, ...], list[str]] = {}
+    for name in variant_names:
+        manifest = variant_manifests.get(name, {})
         if not isinstance(manifest, dict):
             continue
         values = manifest.get("registrations", [])
@@ -1853,16 +1886,26 @@ def _write_api_configuration_page(doxygen_output: Path, generated: Path) -> str 
             key = _registration_identity(item)
             registrations.setdefault(key, dict(item))
             if item.get("selected"):
-                selected_by_profile.setdefault(key, []).append(name)
+                selected_by_variant.setdefault(key, []).append(name)
 
     lines.extend(
         [
             "Registered project inputs",
             "-------------------------",
             "",
-            "These registrations come directly from the BESA project model. ``API`` describes",
-            "whether the registration contributes to the public reference; ``Profiles`` shows",
-            "which API-profile configurations select it.",
+            "These registrations come directly from the BESA project model and show which project",
+            "inputs can contribute declarations to the generated API reference.",
+            "",
+            "- ``Name`` is the registration name from the project model.",
+            "- ``Kind`` describes the kind of registered input, such as a source directory or",
+            "  generated include tree.",
+            "- ``Path`` is the registered location relative to the project.",
+            "- ``API`` indicates whether that input contributes to the public API reference or is",
+            "  documentation-only/disabled for API purposes.",
+            "- ``Variants`` shows which variant-discovery passes select that input.",
+            "",
+            "This section is useful when you want to understand why a declaration appears in the",
+            "combined reference and which declared project input it came from.",
             "",
             ".. list-table::",
             "   :header-rows: 1",
@@ -1871,20 +1914,20 @@ def _write_api_configuration_page(doxygen_output: Path, generated: Path) -> str 
             "     - Kind",
             "     - Path",
             "     - API",
-            "     - Profiles",
+            "     - Variants",
         ]
     )
     for key, registration in sorted(
         registrations.items(), key=lambda item: (str(item[1].get("path", "")), str(item[1].get("name", "")))
     ):
-        selected = selected_by_profile.get(key, [])
+        selected = selected_by_variant.get(key, [])
         lines.extend(
             [
                 f"   * - ``{registration.get('name', '')}``",
                 f"     - ``{registration.get('kind', '')}``",
                 f"     - ``{registration.get('path', '')}``",
                 f"     - ``{registration.get('api', '')}``",
-                "     - " + (" · ".join(_profile_reference(name) for name in selected) or "—"),
+                "     - " + (" · ".join(_variant_reference(name) for name in selected) or "—"),
             ]
         )
 
@@ -1896,16 +1939,25 @@ def _write_api_configuration_page(doxygen_output: Path, generated: Path) -> str 
                 "Documentation-only API inputs",
                 "-----------------------------",
                 "",
-                "The generated project currently exposes these developer-facing test-support headers in the API",
-                "reference. They are staged by the documentation layer and are shown separately",
-                "because they are not yet ordinary BESA project registrations.",
+                "These inputs are added by the documentation layer rather than by ordinary BESA",
+                "project registrations. They are typically used to expose developer-facing or",
+                "test-support headers that should appear in the generated reference.",
+                "",
+                "- ``Path`` is the staged include tree or source location added by the documentation",
+                "  pipeline.",
+                "- ``Required feature`` is the feature that must be active before this input is",
+                "  included in the generated reference.",
+                "- ``Variants`` shows which variant labels satisfy that feature requirement.",
+                "",
+                "They are shown separately so it is clear that these inputs do not yet come from the",
+                "ordinary project registration model.",
                 "",
                 ".. list-table::",
                 "   :header-rows: 1",
                 "",
                 "   * - Path",
                 "     - Required feature",
-                "     - Profiles",
+                "     - Variants",
             ]
         )
         for item in documentation_inputs:
@@ -1913,13 +1965,13 @@ def _write_api_configuration_page(doxygen_output: Path, generated: Path) -> str 
                 continue
             feature = str(item.get("feature") or "")
             selected = [
-                name for name in profile_names if feature in set(profile_features.get(name, []))
+                name for name in variant_names if feature in set(variant_features.get(name, []))
             ]
             lines.extend(
                 [
                     f"   * - ``{item.get('path', '')}``",
                     f"     - ``{feature}``",
-                    "     - " + (" · ".join(_profile_reference(name) for name in selected) or "—"),
+                    "     - " + (" · ".join(_variant_reference(name) for name in selected) or "—"),
                 ]
             )
 
@@ -2814,7 +2866,7 @@ def _program_listing_source_file(doxygen_output: Path, location: str) -> Path | 
     Program listings are presentation of source, not part of the merged semantic API model.  Read
     them from the staged public include trees so whitespace, comments, preprocessor branches, and
     portability macros remain exactly as written even when the Doxygen XML came from several API
-    profiles and was round-tripped through ElementTree.
+    variants and was round-tripped through ElementTree.
     """
 
     normalized = _normalized_source_path(location)
@@ -2828,7 +2880,7 @@ def _program_listing_source_file(doxygen_output: Path, location: str) -> Path | 
     relative = Path(normalized.lstrip("/"))
 
     roots = [doxygen_output / "public-include"]
-    roots.extend(sorted(doxygen_output.glob("profiles/*/public-include")))
+    roots.extend(sorted(doxygen_output.glob("variants/*/public-include")))
     roots = [root for root in roots if root.is_dir()]
 
     for root in roots:
@@ -3269,7 +3321,7 @@ def _prepare_api_landing(app) -> None:
     _neutralize_deduction_guide_pages(index_xml, generated)
     _simplify_unique_function_directives(index_xml, generated)
     _simplify_generated_entity_pages(generated)
-    _write_profile_variant_sections(index_xml.parent.parent, generated)
+    _write_define_variant_sections(index_xml.parent.parent, generated)
     concept_documents = _write_concept_pages(index_xml, generated)
 
     overload_pages = _write_overload_pages(index_xml, generated)
@@ -3285,7 +3337,7 @@ def _prepare_api_landing(app) -> None:
         encoding="utf-8",
     )
     _rewrite_namespace_pages(index_xml, generated, overload_pages)
-    _write_profile_availability_sections(index_xml.parent.parent, generated)
+    _write_variant_availability_sections(index_xml.parent.parent, generated)
     api_configuration_document = _write_api_configuration_page(index_xml.parent.parent, generated)
 
     documents = [
@@ -3302,8 +3354,8 @@ def _prepare_api_landing(app) -> None:
 
     merged_landing = "generated/api_landing.rst.include" in index_source.read_text(encoding="utf-8")
     lines = [
-        ":doc:`API configuration </generated/api_configuration>` explains the feature/profile",
-        "matrix, public API inputs, parser predefinitions, and how this combined reference is built.",
+        ":doc:`API variants and features </generated/api_configuration>` explains how features select",
+        "entity variants, which inputs participate, and which parser predefinitions are used.",
         "",
         "API hierarchy",
         "-------------",
@@ -3543,8 +3595,8 @@ def _api_sidebar_tree(app) -> list[dict[str, object]]:
         roots.insert(
             0,
             {
-                "name": "API configuration",
-                "qualified_name": "API configuration",
+                "name": "API Variants and Features",
+                "qualified_name": "API Variants and Features",
                 "document": "generated/api_configuration",
                 "children": [],
                 "entities": [],

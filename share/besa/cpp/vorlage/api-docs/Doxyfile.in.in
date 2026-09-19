@@ -5,16 +5,18 @@
 #
 # CMake configures this template into <build>/api-docs/Doxyfile so Clang-assisted parsing can use
 # the compilation database as parser input. conf.py then runs one Doxygen pass per declared BESA API
-# profile, stages only API-classified roots selected by that profile, and merges the XML inventories
-# before Breathe/Exhale sees them. The current build therefore does not determine which supported
-# declarations appear in the reference. Repository paths never leak into the rendered file hierarchy.
+# variant label, stages the API-classified roots selected under that variant's feature prerequisites,
+# and merges the XML inventories before Breathe/Exhale sees them. The resulting reference can show
+# several feature-dependent forms of the same entity without splitting the API into separate sites.
+# Repository paths never leak into the rendered file hierarchy.
 # --------------------------------------------------------------------------------------------------
 
 PROJECT_NAME           = "vorlage"
 RECURSIVE              = YES
 
-# Document the complete API represented by each profile, including declarations which do not yet
-# carry comments. conf.py forms the union; implementation and executable trees never enter Doxygen.
+# Document every declaration visible during each variant-discovery pass, including declarations
+# which do not yet carry comments. conf.py forms the union per entity; implementation and executable
+# trees never enter Doxygen.
 EXTRACT_ALL            = YES
 
 # Sphinx/Breathe/Exhale is the presentation layer. Doxygen is used only as the C/C++ parser and XML

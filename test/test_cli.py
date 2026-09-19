@@ -88,6 +88,66 @@ def test_cpp_generate_cli_accepts_license_option(tmp_path: Path) -> None:
     assert "SPDX-License-" "Identifier: BSD-3-Clause" in header.read_text(encoding="utf-8")
 
 
+def test_cpp_generate_cli_supports_agpl_api_usage_exception(tmp_path: Path) -> None:
+    selector = "AGPL-3.0 with AGPL-3.0 API Usage Exception"
+    spdx_identifier = "LicenseRef-AGPL-3.0-API-Usage-Exception"
+    assert (
+        main(
+            [
+                "cpp",
+                "generate",
+                "--path",
+                str(tmp_path),
+                "--name",
+                "example_agpl_api",
+                "--license",
+                selector,
+            ]
+        )
+        == 0
+    )
+
+    project = tmp_path / "main"
+    header = project / "src" / "cpp" / "include" / "example_agpl_api" / "example_agpl_api.hpp"
+    header_text = header.read_text(encoding="utf-8")
+    assert f"SPDX-License-Identifier: {spdx_identifier}" in header_text
+    assert "WITH LicenseRef" not in header_text
+
+    assert (project / "LICENSES" / "AGPL-3.0-only.txt").is_file()
+    combined = project / "LICENSES" / f"{spdx_identifier}.txt"
+    combined_text = combined.read_text(encoding="utf-8")
+    assert "GNU AFFERO GENERAL PUBLIC LICENSE" in combined_text
+    assert "AGPL-3.0 API USAGE EXCEPTION" in combined_text
+    assert "Version 1.0" in combined_text
+    assert "SOURCE OBLIGATIONS FOR A COMBINED WORK" in combined_text
+    assert "The boundary is intended to be" in combined_text
+
+    api_manifest = project / "excepted.api"
+    manifest_lines = api_manifest.read_text(encoding="utf-8").splitlines()
+    assert manifest_lines[-1] == "src/cpp/include/example_agpl_api/example_agpl_api.hpp"
+    assert not any("*" in line for line in manifest_lines if not line.startswith("#"))
+    assert f"SPDX-License-Identifier: {spdx_identifier}" in Path(
+        str(api_manifest) + ".license"
+    ).read_text(encoding="utf-8")
+
+    properdocs = (project / "properdocs.yml").read_text(encoding="utf-8")
+    assert "AGPL-3.0-only with AGPL-3.0 API Usage Exception 1.0" in properdocs
+    readme = (project / "readme.md").read_text(encoding="utf-8")
+    assert "AGPL-3.0-only with AGPL-3.0 API Usage Exception 1.0" in readme
+
+
+def test_cpp_generate_agpl_api_usage_exception_rejects_custom_license_text(tmp_path: Path) -> None:
+    license_text = tmp_path / "unused.txt"
+    license_text.write_text("not used\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="--license-text is not used"):
+        cpp_generate(
+            tmp_path,
+            "example_agpl_custom_text",
+            "AGPL-3.0 with AGPL-3.0 API Usage Exception",
+            license_text=license_text,
+        )
+
+
 def test_cpp_generate_cli_defaults_to_main_and_apache_without_stdin(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

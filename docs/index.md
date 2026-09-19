@@ -10,7 +10,7 @@ their BESA CMake module and build independently afterwards.
 The current command surface is deliberately small:
 
 ```console
-besa cpp generate --path <project-root> --name <project-name> [--directory main] [--license Apache-2.0] [--license-text PATH]
+besa cpp generate --path <project-root> --name <project-name> [--directory main] [--license 'AGPL-3.0 with AGPL-3.0 API Usage Exception'] [--license-text PATH]
 besa cpp update --project <project-root> [--module-path cmake/besa]
 besa python generate
 ```

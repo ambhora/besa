@@ -41,14 +41,14 @@ kind = "testing"
 [test-modes.ci-commit]
 default = true
 
-[api.profiles.cpu]
+[api.variants.cpu]
 features = ["build-source", "toolchain-cpp"]
 
-[api.profiles.cuda]
+[api.variants.cuda]
 features = ["build-source", "toolchain-cpp", "toolchain-cuda"]
 predefined = ["__CUDACC__=1"]
 
-[api.profiles.hip]
+[api.variants.hip]
 features = ["build-source", "toolchain-cpp", "toolchain-hip"]
 predefined = ["__HIPCC__=1"]
 

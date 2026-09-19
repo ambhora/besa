@@ -53,61 +53,62 @@ function(_besa_api_register)
   endforeach()
 endfunction()
 
-# An API profile is a compilation context, not a complete project configuration. FEATURES are
-# mandatory prerequisites for that context; ordinary project features remain an independent
-# configuration axis. PREDEFINED contains parser-only compiler definitions needed for API discovery.
-function(besa_api_profile_add)
-  _besa_require_config_open("besa_api_profile_add")
+# An API variant names one feature-dependent form that an individual API entity may have. FEATURES
+# are mandatory prerequisites used to discover that form; ordinary project features remain an
+# independent configuration axis. PREDEFINED contains parser-only compiler definitions needed to
+# make the corresponding declarations visible during API discovery.
+function(besa_api_variant_add)
+  _besa_require_config_open("besa_api_variant_add")
   cmake_parse_arguments(ARG "" "NAME" "FEATURES;PREDEFINED" ${ARGN})
-  _besa_require_no_unparsed("besa_api_profile_add" "${ARG_UNPARSED_ARGUMENTS}")
-  _besa_require_value("besa_api_profile_add" "NAME" "${ARG_NAME}")
+  _besa_require_no_unparsed("besa_api_variant_add" "${ARG_UNPARSED_ARGUMENTS}")
+  _besa_require_value("besa_api_variant_add" "NAME" "${ARG_NAME}")
 
   if(NOT ARG_NAME MATCHES "^[A-Za-z0-9][A-Za-z0-9_.-]*$")
     _besa_fatal(
-      "besa_api_profile_add"
+      "besa_api_variant_add"
       "NAME '${ARG_NAME}' must use letters, digits, '.', '_', or '-'"
     )
   endif()
 
-  get_property(_names GLOBAL PROPERTY BESA_API_PROFILE_NAMES)
+  get_property(_names GLOBAL PROPERTY BESA_API_VARIANT_NAMES)
   if("${ARG_NAME}" IN_LIST _names)
-    _besa_fatal("besa_api_profile_add" "profile '${ARG_NAME}' is already registered")
+    _besa_fatal("besa_api_variant_add" "variant '${ARG_NAME}' is already registered")
   endif()
 
   get_property(_declared GLOBAL PROPERTY BESA_DECLARED_FEATURES)
   foreach(_feature IN LISTS ARG_FEATURES)
     if("${_feature}" MATCHES "^~")
       _besa_fatal(
-        "besa_api_profile_add"
-        "profile features are mandatory positive prerequisites; '${_feature}' must not use '~'"
+        "besa_api_variant_add"
+        "variant features are mandatory positive prerequisites; '${_feature}' must not use '~'"
       )
     endif()
     if(NOT "${_feature}" IN_LIST _declared)
-      _besa_fatal("besa_api_profile_add" "unknown feature '${_feature}'")
+      _besa_fatal("besa_api_variant_add" "unknown feature '${_feature}'")
     endif()
   endforeach()
 
   list(REMOVE_DUPLICATES ARG_FEATURES)
   list(REMOVE_DUPLICATES ARG_PREDEFINED)
-  set_property(GLOBAL APPEND PROPERTY BESA_API_PROFILE_NAMES "${ARG_NAME}")
-  set_property(GLOBAL PROPERTY "BESA_API_PROFILE_${ARG_NAME}_FEATURES" "${ARG_FEATURES}")
-  set_property(GLOBAL PROPERTY "BESA_API_PROFILE_${ARG_NAME}_PREDEFINED" "${ARG_PREDEFINED}")
+  set_property(GLOBAL APPEND PROPERTY BESA_API_VARIANT_NAMES "${ARG_NAME}")
+  set_property(GLOBAL PROPERTY "BESA_API_VARIANT_${ARG_NAME}_FEATURES" "${ARG_FEATURES}")
+  set_property(GLOBAL PROPERTY "BESA_API_VARIANT_${ARG_NAME}_PREDEFINED" "${ARG_PREDEFINED}")
 endfunction()
 
-function(_besa_api_profile_get NAME OUTPUT_FEATURES OUTPUT_PREDEFINED)
-  get_property(_profiles GLOBAL PROPERTY BESA_API_PROFILE_NAMES)
-  if(NOT "${NAME}" IN_LIST _profiles)
-    _besa_fatal("BESA_API_PROFILE" "unknown API profile '${NAME}'. Registered profiles: ${_profiles}")
+function(_besa_api_variant_get NAME OUTPUT_FEATURES OUTPUT_PREDEFINED)
+  get_property(_variants GLOBAL PROPERTY BESA_API_VARIANT_NAMES)
+  if(NOT "${NAME}" IN_LIST _variants)
+    _besa_fatal("BESA_API_VARIANT" "unknown API variant '${NAME}'. Registered variants: ${_variants}")
   endif()
-  get_property(_features GLOBAL PROPERTY "BESA_API_PROFILE_${NAME}_FEATURES")
-  get_property(_predefined GLOBAL PROPERTY "BESA_API_PROFILE_${NAME}_PREDEFINED")
+  get_property(_features GLOBAL PROPERTY "BESA_API_VARIANT_${NAME}_FEATURES")
+  get_property(_predefined GLOBAL PROPERTY "BESA_API_VARIANT_${NAME}_PREDEFINED")
   set("${OUTPUT_FEATURES}" "${_features}" PARENT_SCOPE)
   set("${OUTPUT_PREDEFINED}" "${_predefined}" PARENT_SCOPE)
 endfunction()
 
-function(_besa_api_profiles_validate)
-  # Profile declarations are partial compilation contexts. Full feature validity is checked for
-  # concrete configurations, not by pretending a profile alone is a complete project build.
+function(_besa_api_variants_validate)
+  # Variant declarations describe entity forms and the feature prerequisites used to discover
+  # them. Full feature validity is still checked for concrete project configurations.
 endfunction()
 
 function(_besa_api_json_escape INPUT OUTPUT_VARIABLE)
@@ -161,28 +162,28 @@ function(_besa_api_manifest_finalize)
   get_property(_enabled GLOBAL PROPERTY BESA_ENABLED_FEATURES)
   _besa_api_json_array(_declared_json ${_declared})
   _besa_api_json_array(_enabled_json ${_enabled})
-  if(DEFINED BESA_API_PROFILE AND NOT "${BESA_API_PROFILE}" STREQUAL "")
-    _besa_api_json_string("${BESA_API_PROFILE}" _active_profile_json)
+  if(DEFINED BESA_API_VARIANT AND NOT "${BESA_API_VARIANT}" STREQUAL "")
+    _besa_api_json_string("${BESA_API_VARIANT}" _active_variant_json)
   else()
-    set(_active_profile_json null)
+    set(_active_variant_json null)
   endif()
 
-  set(_profile_objects)
-  get_property(_profiles GLOBAL PROPERTY BESA_API_PROFILE_NAMES)
-  foreach(_profile IN LISTS _profiles)
-    get_property(_features GLOBAL PROPERTY "BESA_API_PROFILE_${_profile}_FEATURES")
-    get_property(_predefined GLOBAL PROPERTY "BESA_API_PROFILE_${_profile}_PREDEFINED")
-    _besa_api_json_string("${_profile}" _name_json)
+  set(_variant_objects)
+  get_property(_variants GLOBAL PROPERTY BESA_API_VARIANT_NAMES)
+  foreach(_variant IN LISTS _variants)
+    get_property(_features GLOBAL PROPERTY "BESA_API_VARIANT_${_variant}_FEATURES")
+    get_property(_predefined GLOBAL PROPERTY "BESA_API_VARIANT_${_variant}_PREDEFINED")
+    _besa_api_json_string("${_variant}" _name_json)
     _besa_api_json_array(_features_json ${_features})
     _besa_api_json_array(_predefined_json ${_predefined})
-    list(APPEND _profile_objects
+    list(APPEND _variant_objects
       "    {\"name\": ${_name_json}, \"features\": ${_features_json}, \"predefined\": ${_predefined_json}}"
     )
   endforeach()
-  if(_profile_objects)
-    string(JOIN ",\n" _profiles_json ${_profile_objects})
+  if(_variant_objects)
+    string(JOIN ",\n" _variants_json ${_variant_objects})
   else()
-    set(_profiles_json "")
+    set(_variants_json "")
   endif()
 
   set(_registration_objects)
@@ -228,12 +229,12 @@ function(_besa_api_manifest_finalize)
     "{\n"
     "  \"schema_version\": 1,\n"
     "  \"project\": ${_project_json},\n"
-    "  \"active_profile\": ${_active_profile_json},\n"
+    "  \"active_variant\": ${_active_variant_json},\n"
     "  \"declared_features\": ${_declared_json},\n"
     "  \"active_features\": ${_enabled_json},\n"
     "  \"project_model\": ${_project_model_json},\n"
     "  \"api_configuration_space\": ${_configuration_space_json},\n"
-    "  \"profiles\": [\n${_profiles_json}\n  ],\n"
+    "  \"variants\": [\n${_variants_json}\n  ],\n"
     "  \"registrations\": [\n${_registrations_json}\n  ]\n"
     "}\n"
   )

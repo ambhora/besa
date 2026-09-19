@@ -7,7 +7,7 @@ what the project *can* contain. A backend supplies the requested configuration, 
 against the model, and the backend realizes the resulting targets and build actions.
 
 The generated `CMakeLists.txt` is therefore a CMake backend bootstrap rather than a second project
-description. In particular, project identity, features, test modes, API profiles, dependencies,
+description. In particular, project identity, features, test modes, API variants, dependencies,
 source roots, and conditional directories are not duplicated there.
 
 Every selectable project capability is a feature. `kind` is metadata used for presentation and
@@ -39,13 +39,15 @@ Conditions are structural and may nest `all`, `any`, and `not`:
 when = { all = ["project-foo", { any = ["toolchain-cuda", "toolchain-hip"] }] }
 ```
 
-API profiles describe compilation contexts independently of ordinary project-feature selection:
+API variants describe feature-dependent forms of individual API entities. A name such as `cpu`,
+`cuda`, or `hip` does not define a separate project-wide API surface; it defines the feature
+prerequisites and parser predefinitions used to discover that form when it exists for an entity:
 
 ```toml
-[api.profiles.cpu]
+[api.variants.cpu]
 features = ["build-source", "toolchain-cpp"]
 
-[api.profiles.cuda]
+[api.variants.cuda]
 features = ["build-source", "toolchain-cpp", "toolchain-cuda"]
 predefined = ["__CUDACC__=1"]
 ```
@@ -102,9 +104,11 @@ callback implementation, so changing the function invalidates its cache independ
 ## Derived configuration space
 
 For API discovery, BESA finds the features actually referenced by public registrations and closes
-that set over any overlapping constraint domains. It varies only that reduced feature space and
-crosses it with the declared API profiles. Unrelated features therefore do not cause a global
-power-set expansion.
+that set over any overlapping constraint domains. It varies only that reduced feature space and,
+for each declared variant label, parses the source under the feature prerequisites and parser
+predefinitions associated with that label. The resulting declarations are then merged per entity,
+so the same entity can contribute CPU, CUDA, HIP, or other variants without creating separate API
+reference sites. Unrelated features therefore do not cause a global power-set expansion.
 
 The normalized model and derived API configuration space are generated under the workspace's
 `configure_cache/` directory for diagnostics and downstream tooling. They are derived artifacts;

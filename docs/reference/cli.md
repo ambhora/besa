@@ -5,7 +5,7 @@
 ## `besa cpp generate`
 
 ```text
-besa cpp generate --path PATH --name NAME [--directory DIRECTORY] [--license SPDX-ID] [--license-text PATH] [--nvim-ycm]
+besa cpp generate --path PATH --name NAME [--directory DIRECTORY] [--license SPDX-ID|PRESET] [--license-text PATH] [--nvim-ycm]
 ```
 
 Creates `PATH/DIRECTORY` from `share/besa/cpp/vorlage`, substitutes `NAME` as the project name, and
@@ -26,16 +26,37 @@ besa cpp generate --path ~/software/dice --name dice --directory code
 
 creates `~/software/dice/code`. `DIRECTORY` must be a single relative path component.
 
-`--license` supplies the SPDX license identifier written into generated project files. It defaults to
+`--license` accepts either an SPDX license identifier or a named BESA license preset. It defaults to
 `Apache-2.0`. Generated C++ projects are REUSE-ready: project-owned files receive per-file
 `SPDX-FileCopyrightText` and `SPDX-License-Identifier` metadata, files that cannot carry comments use
 adjacent `.license` sidecars, and canonical license texts are installed below `LICENSES/`. Vendored
 `cmake/besa` files keep BESA's Apache-2.0 attribution rather than being reassigned to the generated
 project.
 
-BESA bundles the canonical `Apache-2.0` text used by the default template. When another SPDX
-identifier is selected, `--license-text PATH` supplies the corresponding canonical text that is
-copied to `LICENSES/<SPDX-ID>.txt`. Generation fails instead of silently producing an incomplete
+BESA bundles the canonical `Apache-2.0` text used by the default template. It also provides the
+license preset `AGPL-3.0 with AGPL-3.0 API Usage Exception`. This preset uses
+`AGPL-3.0-only` as the base license and writes
+`LicenseRef-AGPL-3.0-API-Usage-Exception` into project-owned source-file SPDX headers. The
+`LicenseRef` is used because current REUSE tooling does not represent a project-defined exception
+as a `WITH` expression.
+
+Selecting the preset installs both `LICENSES/AGPL-3.0-only.txt` and the complete combined terms in
+`LICENSES/LicenseRef-AGPL-3.0-API-Usage-Exception.txt`. It also creates `excepted.api` at the
+source-distribution root. That file is the authoritative licensing boundary: one exact,
+case-sensitive, source-distribution-relative file path per line, with no globs or directory entries.
+The generated manifest initially lists the project's public C++ header and should be updated whenever
+public API files are added, removed, or relocated. For example:
+
+```console
+besa cpp generate --path . --name example \
+  --license 'AGPL-3.0 with AGPL-3.0 API Usage Exception'
+```
+
+The generated README and documentation describe the license in plain language so that the opaque
+`LicenseRef` does not hide the AGPL base license from human reviewers or license-scanning reports.
+
+For other license identifiers, `--license-text PATH` supplies the corresponding canonical text that
+is copied to `LICENSES/<SPDX-ID>.txt`. Generation fails instead of silently producing an incomplete
 REUSE tree if that text is unavailable.
 
 `--nvim-ycm` installs local `.nvimrc` and `.ycm_extra_conf.py` files in the generated checkout. Both

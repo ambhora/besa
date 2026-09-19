@@ -69,8 +69,9 @@ sphinx-multiversion rebuilds the API renderer for selected Git refs. Generated d
 written below `<workspace>/docs/`, and the assembled site mounts API versions below
 `reference/api/<version>/`.
 
-API discovery uses the profiles declared in `besa.toml`, merges their Doxygen models, annotates every
-entity with profile availability, and generates an **API configuration** page describing the feature
-and profile mappings used for the reference. Program listings are restored from the real source
+API discovery uses the variant labels declared in `besa.toml` to parse feature-dependent forms of
+individual entities, merges the resulting Doxygen models, annotates each entity with the variants in
+which it exists, and generates an **API Variants and Features** page describing how features select
+those variants. Program listings are restored from the real source
 files so whitespace, comments, preprocessor branches, portability macros, and physical line numbers
 remain faithful to the checkout being documented.

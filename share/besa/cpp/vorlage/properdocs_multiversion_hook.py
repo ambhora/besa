@@ -207,6 +207,19 @@ def _source_url(repo_url: str, provider: str, ref: str, source_path: str) -> str
     return f"{base}/-/blob/{ref_part}/{path_part}"
 
 
+def _edit_url(repo_url: str, provider: str, ref: str, source_path: str) -> str:
+    """Return the repository editor URL for one documentation source file."""
+
+    base = _repository_base(repo_url)
+    ref_part = quote(ref, safe="/")
+    path_part = quote(source_path, safe="/")
+    if provider == "github":
+        return f"{base}/edit/{ref_part}/{path_part}"
+    if provider == "bitbucket":
+        return f"{base}/src/{ref_part}/{path_part}?mode=edit"
+    return f"{base}/-/edit/{ref_part}/{path_part}"
+
+
 def _default_issue_url(repo_url: str, provider: str) -> str:
     base = _repository_base(repo_url)
     if provider == "gitlab":
@@ -238,6 +251,7 @@ def on_page_context(context, page, config, nav, **_kwargs):
     ref = extra.get("besa_source_ref")
     if not repo_url or not ref:
         context["besa_source_url"] = None
+        context["besa_edit_url"] = None
         return context
 
     source = Path(page.file.abs_src_path).resolve()
@@ -245,10 +259,12 @@ def on_page_context(context, page, config, nav, **_kwargs):
         relative_source = source.relative_to(PROJECT_ROOT).as_posix()
     except ValueError:
         context["besa_source_url"] = None
+        context["besa_edit_url"] = None
         return context
 
     provider = _repository_provider(repo_url, extra)
     context["besa_source_url"] = _source_url(repo_url, provider, str(ref), relative_source)
+    context["besa_edit_url"] = _edit_url(repo_url, provider, str(ref), relative_source)
     return context
 
 

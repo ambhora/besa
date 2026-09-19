@@ -49,6 +49,8 @@ packages = ["src/besa"]
 [tool.hatch.build.targets.wheel.shared-data]
 "share" = "share"
 "LICENSES/Apache-2.0.txt" = "share/besa/licenses/Apache-2.0.txt"
+"LICENSES/AGPL-3.0-only.txt" = "share/besa/licenses/AGPL-3.0-only.txt"
+"LICENSES/LicenseRef-AGPL-3.0-API-Usage-Exception.txt" = "share/besa/licenses/LicenseRef-AGPL-3.0-API-Usage-Exception.txt"
 
 # --------------------------------------------------------------------------------------------------
 # PyTest configuration

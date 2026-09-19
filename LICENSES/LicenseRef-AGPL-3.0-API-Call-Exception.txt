@@ -1,0 +1,29 @@
+AGPL-3.0 API Call Exception
+
+This exception is an additional permission under section 7 of the GNU Affero General Public
+License version 3 (AGPL-3.0).
+
+As a special exception, using the interfaces contained in the files listed in `excepted.api`
+(the "Excepted API"), as provided with this Program, shall not, by itself, cause calling code to
+be subject to the GNU Affero General Public License version 3.
+
+1. The excepted.api file is the sole authoritative specification of the Excepted API. This exception
+   applies only to interfaces contained in files explicitly listed in excepted.api. A modified
+   version of the Program may provide its own excepted.api; the contents of that file define the
+   Excepted API for the modified version.
+
+2. This exception applies solely to calling, compiling against, or linking against the Excepted API.
+   It does not extend to direct use of other files, interfaces, implementation details, internal
+   modules, libraries, or other elements of the Program that are not listed in `excepted.api`.
+
+3. Calling, compiling against, linking against, or invoking the Excepted API may cause other parts
+   of the Program to be loaded or used transitively at build time or run time. Such transitive use
+   does not, by itself, extend the Excepted API and does not, by itself, cause the calling code to
+   become subject to the GNU Affero General Public License version 3.
+
+4. This exception grants no additional permission to copy, modify, or distribute any file of the
+   Program. Those activities remain governed by the GNU Affero General Public License version 3 and
+   any other applicable terms.
+
+5. Except for the additional permission stated above, all terms of the GNU Affero General Public
+   License version 3 continue to apply.

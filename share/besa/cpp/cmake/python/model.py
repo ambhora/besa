@@ -38,8 +38,8 @@ _TOP_KEYS = {
 _PROJECT_KEYS = {"name", "version"}
 _FEATURE_KEYS = {"default", "kind"}
 _TEST_MODE_KEYS = {"default"}
-_API_KEYS = {"profiles"}
-_PROFILE_KEYS = {"features", "predefined"}
+_API_KEYS = {"variants"}
+_VARIANT_KEYS = {"features", "predefined"}
 _DEPENDENCY_KEYS = {"name", "version", "kind", "provider", "components", "visibility", "when"}
 _SOURCE_KEYS = {"name", "path", "language", "api", "when"}
 _DIRECTORY_KEYS = {"name", "path", "api", "when"}
@@ -190,18 +190,18 @@ def load_model(path: Path) -> dict[str, Any]:
 
     api = _table(raw.get("api", {}), "api")
     _unknown_keys("api", api, _API_KEYS)
-    raw_profiles = _table(api.get("profiles", {}), "api.profiles")
-    profiles: dict[str, dict[str, Any]] = {}
-    for name, value in raw_profiles.items():
-        table = _table(value, f"api.profiles.{name}")
-        _unknown_keys(f"api.profiles.{name}", table, _PROFILE_KEYS)
-        profile_features = _string_list(table.get("features", []), f"api.profiles.{name}.features")
-        for feature in profile_features:
+    raw_variants = _table(api.get("variants", {}), "api.variants")
+    variants: dict[str, dict[str, Any]] = {}
+    for name, value in raw_variants.items():
+        table = _table(value, f"api.variants.{name}")
+        _unknown_keys(f"api.variants.{name}", table, _VARIANT_KEYS)
+        variant_features = _string_list(table.get("features", []), f"api.variants.{name}.features")
+        for feature in variant_features:
             if feature not in feature_names:
-                _fail(f"api.profiles.{name}.features: unknown feature '{feature}'")
-        profiles[name] = {
-            "features": profile_features,
-            "predefined": _string_list(table.get("predefined", []), f"api.profiles.{name}.predefined"),
+                _fail(f"api.variants.{name}.features: unknown feature '{feature}'")
+        variants[name] = {
+            "features": variant_features,
+            "predefined": _string_list(table.get("predefined", []), f"api.variants.{name}.predefined"),
         }
 
     def normalize_records(key: str, allowed: set[str]) -> list[dict[str, Any]]:
@@ -277,7 +277,7 @@ def load_model(path: Path) -> dict[str, Any]:
         "project": {"name": project_name, "version": project_version},
         "features": features,
         "test-modes": test_modes,
-        "api": {"profiles": profiles},
+        "api": {"variants": variants},
         "dependencies": dependencies,
         "sources": sources,
         "directories": directories,
@@ -403,10 +403,10 @@ def _configuration_space(model: dict[str, Any], tables: dict[str, dict[str, Any]
 
     features = model["features"]
     toolchain_features = {name for name, data in features.items() if data["kind"] == "toolchain"}
-    profiles = model["api"]["profiles"]
+    variants = model["api"]["variants"]
     configurations: list[dict[str, Any]] = []
-    for profile_name, profile in profiles.items():
-        fixed_true = set(profile["features"])
+    for variant_name, variant in variants.items():
+        fixed_true = set(variant["features"])
         variable = sorted(relevant - fixed_true - toolchain_features)
         for values in itertools.product((False, True), repeat=len(variable)):
             enabled = {name for name, data in features.items() if data["default"]}
@@ -423,7 +423,7 @@ def _configuration_space(model: dict[str, Any], tables: dict[str, dict[str, Any]
                 continue
             configurations.append(
                 {
-                    "profile": profile_name,
+                    "variant": variant_name,
                     "enabled_features": sorted(enabled),
                     "variable_features": {name: value for name, value in zip(variable, values, strict=True)},
                 }
@@ -476,12 +476,12 @@ def emit_cmake(model: dict[str, Any], tables: dict[str, dict[str, Any]]) -> str:
         lines.append(f"set_property(GLOBAL PROPERTY BESA_FEATURE_KIND_{name} {_cmake_bracket(data['kind'])})")
     lines.append("")
 
-    for name, profile in model["api"]["profiles"].items():
-        lines += ["besa_api_profile_add(", f"  NAME {_cmake_bracket(name)}", "  FEATURES"]
-        lines += [f"  {_cmake_bracket(x)}" for x in profile["features"]]
-        if profile["predefined"]:
+    for name, variant in model["api"]["variants"].items():
+        lines += ["besa_api_variant_add(", f"  NAME {_cmake_bracket(name)}", "  FEATURES"]
+        lines += [f"  {_cmake_bracket(x)}" for x in variant["features"]]
+        if variant["predefined"]:
             lines.append("  PREDEFINED")
-            lines += [f"  {_cmake_bracket(x)}" for x in profile["predefined"]]
+            lines += [f"  {_cmake_bracket(x)}" for x in variant["predefined"]]
         lines += [")", ""]
 
     modes = list(model["test-modes"])

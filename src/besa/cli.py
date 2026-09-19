@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import os
+from dataclasses import dataclass
 from datetime import date
 import re
 import shutil
@@ -27,6 +28,14 @@ _PROJECT_NAME = re.compile(r"^[a-z][a-z0-9_]*$")
 _DEFAULT_CPP_MODULE_PATH = Path("cmake/besa")
 _MANAGED_MARKER = ".besa-cmake-module"
 _DEFAULT_SPDX_LICENSE = "Apache-2.0"
+_AGPL_API_EXCEPTION_SELECTOR = "AGPL-3.0 with AGPL-3.0 API Usage Exception"
+_AGPL_API_EXCEPTION_ALIASES = {
+    _AGPL_API_EXCEPTION_SELECTOR.casefold(),
+    "AGPL-3.0-only with AGPL-3.0 API Usage Exception".casefold(),
+}
+_AGPL_API_EXCEPTION_BASE = "AGPL-3.0-only"
+_AGPL_API_EXCEPTION_ID = "LicenseRef-AGPL-3.0-API-Usage-Exception"
+_AGPL_API_EXCEPTION_DISPLAY = "AGPL-3.0-only with AGPL-3.0 API Usage Exception 1.0"
 _DEFAULT_CPP_DIRECTORY = "main"
 _EDITOR_IGNORE_ENTRIES = (".nvimrc", ".ycm_extra_conf.py")
 
@@ -48,6 +57,30 @@ _HASH_COMMENT_NAMES = {
     "Makefile",
     "makefile",
 }
+
+
+@dataclass(frozen=True)
+class _LicenseConfiguration:
+    """Resolved output form of one user-facing license selection."""
+
+    spdx_identifier: str
+    display_name: str
+    api_usage_exception: bool = False
+
+
+def _resolve_license_configuration(value: str) -> _LicenseConfiguration:
+    """Resolve a normal SPDX identifier or one of BESA's named license presets."""
+
+    value = value.strip()
+    if not value:
+        raise ValueError("License selection must not be empty")
+    if value.casefold() in _AGPL_API_EXCEPTION_ALIASES:
+        return _LicenseConfiguration(
+            spdx_identifier=_AGPL_API_EXCEPTION_ID,
+            display_name=_AGPL_API_EXCEPTION_DISPLAY,
+            api_usage_exception=True,
+        )
+    return _LicenseConfiguration(spdx_identifier=value, display_name=value)
 
 
 def share_directory() -> Path:
@@ -85,7 +118,10 @@ def _validate_project_name(name: str) -> None:
 
 
 def _render_tree(
-    destination: Path, project_name: str, spdx_license_identifier: str = _DEFAULT_SPDX_LICENSE
+    destination: Path,
+    project_name: str,
+    spdx_license_identifier: str = _DEFAULT_SPDX_LICENSE,
+    license_display_name: str | None = None,
 ) -> None:
     """Render the intentionally tiny template language used by BESA.
 
@@ -120,7 +156,9 @@ def _render_tree(
             rf"\g<1>{_project_copyright_text(project_name)}",
             rendered,
         )
-        rendered = rendered.replace("BESA_PROJECT_LICENSE", spdx_license_identifier)
+        rendered = rendered.replace(
+            "BESA_PROJECT_LICENSE", license_display_name or spdx_license_identifier
+        )
         path.write_text(rendered, encoding="utf-8")
 
     # Rename deepest paths first so include/package directories are safely renamed before parents.
@@ -241,11 +279,26 @@ def _install_reuse_license_text(
     shutil.copy2(source, destination)
 
 
+def _write_api_exception_manifest(project: Path, project_name: str) -> None:
+    """Write the authoritative API boundary for the bundled AGPL API exception."""
+
+    path = project / "excepted.api"
+    path.write_text(
+        "# Files whose interfaces form the Excepted API.\n"
+        "# Paths are relative to the root of this source distribution.\n"
+        "# One exact file path per line; wildcards and directories are not permitted.\n"
+        f"src/cpp/include/{project_name}/{project_name}.hpp\n",
+        encoding="utf-8",
+    )
+
+
 def _ensure_generated_project_reuse(
     project: Path,
     project_name: str,
     license_identifier: str,
     license_text: Path | str | None = None,
+    *,
+    api_usage_exception: bool = False,
 ) -> None:
     project_copyright = _project_copyright_text(project_name)
     besa_copyright = f"{date.today().year} BESA developers"
@@ -253,7 +306,11 @@ def _ensure_generated_project_reuse(
     # The vendored CMake module remains BESA-authored and Apache-2.0 licensed. Project-owned files
     # use the generated project's selected license and project-developer copyright attribution.
     _install_reuse_license_text(project, _DEFAULT_SPDX_LICENSE)
-    if license_identifier != _DEFAULT_SPDX_LICENSE:
+    if api_usage_exception:
+        _install_reuse_license_text(project, _AGPL_API_EXCEPTION_BASE)
+        _install_reuse_license_text(project, _AGPL_API_EXCEPTION_ID)
+        _write_api_exception_manifest(project, project_name)
+    elif license_identifier != _DEFAULT_SPDX_LICENSE:
         _install_reuse_license_text(project, license_identifier, license_text)
 
     files = [path for path in project.rglob("*") if path.is_file()]
@@ -363,9 +420,11 @@ def cpp_generate(
 ) -> Path:
     """Create a self-contained C++ project under ``path/directory``."""
 
-    license_identifier = license_identifier.strip()
-    if not license_identifier:
-        raise ValueError("SPDX license identifier must not be empty")
+    license_configuration = _resolve_license_configuration(license_identifier)
+    if license_configuration.api_usage_exception and license_text is not None:
+        raise ValueError(
+            "--license-text is not used with the bundled AGPL-3.0 API Usage Exception preset"
+        )
 
     _validate_project_name(name)
     _validate_directory_name(directory)
@@ -382,9 +441,20 @@ def cpp_generate(
     shutil.copytree(template, destination)
     if nvim_ycm:
         _install_nvim_ycm_config(destination)
-    _render_tree(destination, name, license_identifier)
+    _render_tree(
+        destination,
+        name,
+        license_configuration.spdx_identifier,
+        license_configuration.display_name,
+    )
     cpp_update(destination)
-    _ensure_generated_project_reuse(destination, name, license_identifier, license_text)
+    _ensure_generated_project_reuse(
+        destination,
+        name,
+        license_configuration.spdx_identifier,
+        license_text,
+        api_usage_exception=license_configuration.api_usage_exception,
+    )
     return destination
 
 
@@ -447,7 +517,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--license",
         dest="license_identifier",
         default=_DEFAULT_SPDX_LICENSE,
-        help=f"SPDX license identifier for generated project files (default: {_DEFAULT_SPDX_LICENSE})",
+        help=(
+            "SPDX license identifier or BESA license preset for generated project files "
+            f"(default: {_DEFAULT_SPDX_LICENSE}); bundled preset: "
+            f"'{_AGPL_API_EXCEPTION_SELECTOR}'"
+        ),
     )
     cpp_generate_parser.add_argument(
         "--license-text",

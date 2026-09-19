@@ -55,6 +55,15 @@
   <p class="bd-links__title" role="heading" aria-level="1">{{ _("Outline") }}</p>
   <div class="bd-toc-item navbar-nav">
     <ul class="nav besa-api-outline">
+      <li class="besa-api-outline-entity{% if besa_api_sidebar_current == "index" %} current{% endif %}">
+        <div class="besa-api-outline-row">
+          <span class="besa-api-outline-kind" aria-hidden="true">H</span>
+          <a
+            class="reference internal besa-api-outline-link{% if besa_api_sidebar_current == "index" %} current{% endif %}"
+            href="{{ pathto('index') }}"
+          >Home</a>
+        </div>
+      </li>
       {% for namespace in besa_api_sidebar_tree %}
         {{ render_namespace(namespace) }}
       {% endfor %}

@@ -24,6 +24,18 @@
     </a>
   {% endif %}
 {% endif %}
+{% if besa_edit_url %}
+  <a
+    href="{{ besa_edit_url }}"
+    title="Edit this page"
+    class="md-content__button md-icon"
+    target="_blank"
+    rel="noopener noreferrer"
+  >
+    {% set icon = config.theme.icon.edit or "material/file-edit-outline" %}
+    {% include ".icons/" ~ icon ~ ".svg" %}
+  </a>
+{% endif %}
 {% if besa_source_url %}
   <a
     href="{{ besa_source_url }}"

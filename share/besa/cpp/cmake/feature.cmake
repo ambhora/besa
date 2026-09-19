@@ -271,11 +271,12 @@ macro(besa_configure_complete)
   _besa_require_config_open("besa_configure_complete")
 
   _besa_resolve_features(_enabled_features)
-  if(DEFINED BESA_API_PROFILE AND NOT "${BESA_API_PROFILE}" STREQUAL "")
-    _besa_api_profile_get("${BESA_API_PROFILE}" _api_profile_features _api_profile_predefined)
+  if(DEFINED BESA_API_VARIANT AND NOT "${BESA_API_VARIANT}" STREQUAL "")
+    _besa_api_variant_get("${BESA_API_VARIANT}" _api_variant_features _api_variant_predefined)
 
-    # API profiles are compilation contexts, not complete project configurations.  Preserve the
-    # selected project features, replace the toolchain context, then force profile prerequisites on.
+    # API discovery selects one named variant at a time. Preserve ordinary project features,
+    # replace the toolchain context, then force the feature prerequisites needed to expose that
+    # variant's declarations.
     get_property(_declared_features GLOBAL PROPERTY BESA_DECLARED_FEATURES)
     foreach(_feature IN LISTS _declared_features)
       get_property(_kind GLOBAL PROPERTY "BESA_FEATURE_KIND_${_feature}")
@@ -283,7 +284,7 @@ macro(besa_configure_complete)
         list(REMOVE_ITEM _enabled_features "${_feature}")
       endif()
     endforeach()
-    list(APPEND _enabled_features ${_api_profile_features})
+    list(APPEND _enabled_features ${_api_variant_features})
     list(REMOVE_DUPLICATES _enabled_features)
   endif()
   _besa_devtools_resolve(_enabled_devtools)
@@ -294,7 +295,7 @@ macro(besa_configure_complete)
   # language probing or instrumentation target creation.  Invalid configurations therefore fail
   # before compiler/tool side effects occur.
   _besa_run_feature_constraints("${_enabled_features}")
-  _besa_api_profiles_validate()
+  _besa_api_variants_validate()
   _besa_run_devtool_constraints("${_enabled_devtools}")
   _besa_run_test_mode_constraints("${_enabled_test_modes}")
 

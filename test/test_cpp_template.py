@@ -82,9 +82,9 @@ def test_generated_cpp_project_vendors_and_builds_prova_support(tmp_path: Path) 
     project = cpp_generate(tmp_path, "example_prova")
     base = project / "test" / "base"
     assert (base / "CMakeLists.txt").is_file()
-    cuda_profile = base / "cuda" / "include" / "testexample_prova" / "cuda_profile.hpp"
-    assert cuda_profile.is_file()
-    assert "cuda_profile_only" in cuda_profile.read_text(encoding="utf-8")
+    cuda_variant = base / "cuda" / "include" / "testexample_prova" / "cuda_variant.hpp"
+    assert cuda_variant.is_file()
+    assert "cuda_variant_only" in cuda_variant.read_text(encoding="utf-8")
     catch_main = base / "cpp" / "include" / "testexample_prova" / "prova" / "catch_main.hpp"
     assert catch_main.is_file()
     catch_main_text = catch_main.read_text(encoding="utf-8")
@@ -788,21 +788,32 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     reference_landing = docs / "reference" / "index.md"
     assert reference_landing.is_file()
     assert "## Versioned API" in reference_landing.read_text(encoding="utf-8")
+    contributing = docs / "contributing.md"
+    assert contributing.is_file()
+    contributing_text = contributing.read_text(encoding="utf-8")
+    assert "## How to contribute to the docs" in contributing_text
+    assert "## How to contribute to the software" in contributing_text
+    assert "Developer Certificate of Origin (DCO) 1.1" in contributing_text
+    assert "Signed-off-by: Name <email@example.com>" in contributing_text
 
-    # besa.toml is the generated project's authoritative declaration, including compilation-context
-    # profiles. CMake only selects and realizes one configuration from this model.
+    properdocs_config = (project / "properdocs.yml").read_text(encoding="utf-8")
+    assert "- content.action.edit" in properdocs_config
+    assert "- How to contribute: contributing.md" in properdocs_config
+
+    # besa.toml is the generated project's authoritative declaration, including the named API
+    # variants used to discover feature-dependent forms of individual entities.
     model = (project / "besa.toml").read_text(encoding="utf-8")
     assert "schema = 1" in model
     assert '[project]\nname = "example_docs"\nversion = "0.1.0"' in model
-    for profile in ("cpu", "cuda", "hip"):
-        assert f"[api.profiles.{profile}]" in model
+    for variant in ("cpu", "cuda", "hip"):
+        assert f"[api.variants.{variant}]" in model
     assert 'path = "src/cpp"' in model
     assert 'api = "public"' in model
     assert 'name = "Doxygen"' in model
     assert 'when = { all = ["user-docs"] }' in model
 
     # The API source carries the complete documentation presentation and discovery
-    # machinery: multi-profile Doxygen union, source-backed listings, overload consolidation,
+    # machinery: multi-variant Doxygen union, source-backed listings, overload consolidation,
     # inheritance/related-entity sections, availability metadata, and the hierarchical Outline.
     conf_path = api_docs / "conf.py"
     assert conf_path.is_file()
@@ -815,9 +826,9 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
         '"js/besa-api-source-locations.js"',
         '"EXAMPLE_DOCS_HOST_DEVICE"',
         "def _configure_api_discovery(",
-        "def _merge_profile_xml(",
-        "def _write_profile_availability_sections(",
-        "def _write_profile_variant_sections(",
+        "def _merge_variant_xml(",
+        "def _write_variant_availability_sections(",
+        "def _write_define_variant_sections(",
         "def _write_api_configuration_page(",
         "def _write_overload_pages(",
         "def _write_inheritance_graph_sections(",
@@ -878,7 +889,7 @@ def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
     spec.loader.exec_module(conf)
     assert conf.project == "example_docs"
     assert conf.release == "0.1.0"
-    assert conf._profile_reference_label("cuda") == "besa-api-profile-cuda"
+    assert conf._variant_reference_label("cuda") == "besa-api-variant-cuda"
     assert "EXAMPLE_DOCS_HOST_DEVICE" in conf.cpp_id_attributes
 
 
@@ -1648,7 +1659,12 @@ def test_generated_properdocs_source_links_follow_human_refs_and_404_issues(
         "https://github.com/example/example_source_docs/blob/feature/docs-links/"
         "docs/reference/index.md"
     )
+    assert context["besa_edit_url"] == (
+        "https://github.com/example/example_source_docs/edit/feature/docs-links/"
+        "docs/reference/index.md"
+    )
     assert not re.search(r"/[0-9a-f]{40}/", context["besa_source_url"])
+    assert not re.search(r"/[0-9a-f]{40}/", context["besa_edit_url"])
 
     # Unknown/self-hosted repository hosts use GitLab's URL layout unless explicitly overridden.
     gitlab_config = {
@@ -1665,6 +1681,10 @@ def test_generated_properdocs_source_links_follow_human_refs_and_404_issues(
         "https://code.example.org/software/example_source_docs/-/blob/feature/docs-links/"
         "docs/reference/index.md"
     )
+    assert gitlab_context["besa_edit_url"] == (
+        "https://code.example.org/software/example_source_docs/-/edit/feature/docs-links/"
+        "docs/reference/index.md"
+    )
 
     # Explicit issue/provider configuration wins over inference.
     explicit = {
@@ -1678,6 +1698,9 @@ def test_generated_properdocs_source_links_follow_human_refs_and_404_issues(
     assert explicit["extra"]["besa_issue_url"] == "https://issues.example.org/new"
     explicit_context = hook.on_page_context({}, page, explicit, nav=None)
     assert "/src/feature/docs-links/docs/reference/index.md" in explicit_context["besa_source_url"]
+    assert explicit_context["besa_edit_url"].endswith(
+        "/src/feature/docs-links/docs/reference/index.md?mode=edit"
+    )
 
 
 @pytest.mark.cpp

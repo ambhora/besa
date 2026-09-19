@@ -66,11 +66,12 @@ The API-version landing page contains the namespace and file hierarchy directly;
 intermediate `<project> API` landing page. Historical refs created by older BESA versions retain their
 original layout when rendered.
 
-Set the standard `repo_url` in `properdocs.yml` to enable a source-file action at the top-right of every
-ProperDocs page. BESA links to a human Git tag or branch (including detached CI checkouts when the CI
-provider exposes the ref) and never falls back to a commit hash. The same repository URL supplies the
-404 page's **Report a documentation issue** action. GitHub is detected directly; other hosts default to
-the GitLab URL layout and can be overridden with `extra.besa_repo_provider`. `extra.besa_issue_url` can
+Set the standard `repo_url` in `properdocs.yml` to enable **Edit this page** and source-file actions at
+the top-right of every ProperDocs page. BESA derives the repository path from the actual Markdown
+source and links to a human Git tag or branch (including detached CI checkouts when the CI provider
+exposes the ref); an `edit_uri` is not required. The same repository URL supplies the 404 page's
+**Report a documentation issue** action. GitHub is detected directly; other hosts default to the
+GitLab URL layout and can be overridden with `extra.besa_repo_provider`. `extra.besa_issue_url` can
 override the issue-board destination.
 
 Cross-references between the two documentation surfaces use semantic targets rather than deployed hostnames:
@@ -151,3 +152,10 @@ cmake --install build --prefix <prefix>
 
 It is installed below `share/doc/<project>/`. Documentation is an optional install input, so an
 ordinary library/binary install does not require `user.docs` to have been built first.
+
+
+## License
+
+Unless a file states otherwise, project-owned material is licensed under **BESA_PROJECT_LICENSE**.
+The canonical license texts are distributed in `LICENSES/`. If this project uses the AGPL-3.0 API
+Usage Exception, `excepted.api` defines the exact public API boundary covered by that exception.
