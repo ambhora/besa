@@ -67,5 +67,13 @@ hooks:
 
 nav:
   - Home: index.md
-  - How to contribute: contributing.md
+  - Tutorials: tutorials/index.md
+  - How-To: how-to/index.md
+  - Explanations: explanations/index.md
+  - Showcases: showcases/index.md
   - Reference: reference/index.md
+  - Blog: blog/index.md
+  - Users: users.md
+  - Cite Us: cite-us.md
+  - Contributing: contributing.md
+  - About: about/index.md

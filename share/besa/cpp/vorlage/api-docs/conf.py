@@ -137,6 +137,8 @@ html_theme = "pydata_sphinx_theme"
 # release in the title even when rendering a historical ref.
 html_title = f"{project} API documentation"
 html_short_title = html_title
+copyright = f"{project} developers · License: BESA_PROJECT_LICENSE"
+html_show_copyright = True
 html_theme_options = {
     "navbar_align": "right",
     # API entities belong in the persistent left section navigation, not in the site header.
@@ -3139,9 +3141,10 @@ def _api_source_locations(
 
     if listings is None:
         listings = _program_listing_documents(generated)
-    if not listings:
-        return {}
 
+    # Signature metadata is useful even when a source listing is unavailable. Source links are
+    # optional, while Doxygen's exact type-only display signature drives overload labels in the
+    # right-hand page table of contents.
     labels = _generated_label_documents(generated)
     root = ET.parse(index_xml).getroot()
     result: dict[str, dict[str, object]] = {}
@@ -3176,6 +3179,9 @@ def _api_source_locations(
         qualifiers = _function_qualifiers(member)
         if qualifiers:
             symbol["qualifiers"] = qualifiers
+        display = _function_display_signature(member)
+        if display:
+            symbol["display"] = display
         if not symbol:
             return
         page = page_for(document)

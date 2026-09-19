@@ -146,7 +146,7 @@ code em {
 /* Dense reference presentation.  API pages should optimize for scanning declarations rather than
  * prose-sized typography; wrapping should be exceptional on normal desktop widths. */
 .bd-article {
-  font-size: 0.9rem;
+  font-size: 1.035rem;
   line-height: 1.42;
 }
 
@@ -315,6 +315,28 @@ dl.c.function > dd {
   padding-top: 0.55rem;
 }
 
+/* Availability is part of the callable, not a page-level section between two function cards. */
+.besa-api-function-availability {
+  align-items: baseline;
+  border-top: 1px solid color-mix(in srgb, var(--pst-color-border) 75%, transparent);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.55rem;
+  margin-top: 0.7rem;
+  padding-top: 0.55rem;
+}
+
+.besa-api-function-availability > .rubric {
+  border-bottom: 0;
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0;
+}
+
+.besa-api-function-availability > p:not(.rubric) {
+  margin: 0;
+}
+
 
 /* Every program-listing line number is its own permalink. Function implementation metadata uses
  * the same #L<number> fragments, so copied source URLs and API-to-source links are identical. */
@@ -463,4 +485,45 @@ dl.c.function > dd {
 
 .besa-api-outline-children[hidden] {
   display: none !important;
+}
+
+/* Keep footer metadata and generator credits on one compact line. */
+.bd-footer,
+.bd-footer-content,
+.bd-footer-content p,
+.bd-footer-content a,
+.bd-footer__inner,
+.footer-item {
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.bd-footer__inner,
+.bd-footer-content,
+.footer-items__start,
+.footer-items__center,
+.footer-items__end {
+  align-items: center;
+  display: flex;
+  flex-wrap: nowrap;
+}
+
+.bd-footer__inner,
+.bd-footer-content {
+  gap: 1rem;
+  justify-content: space-between;
+  padding-bottom: 0.28rem;
+  padding-top: 0.28rem;
+}
+
+.footer-items__start,
+.footer-items__center,
+.footer-items__end {
+  gap: 0.75rem;
+}
+
+.bd-footer p,
+.footer-item {
+  margin: 0;
+  white-space: nowrap;
 }

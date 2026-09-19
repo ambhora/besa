@@ -110,6 +110,13 @@
 }
 
 
+/* Give the prose column more room while retaining Material's centered three-column layout. */
+@media screen and (min-width: 76.25em) {
+  .md-grid {
+    max-width: 70.15rem;
+  }
+}
+
 /* Documentation 404 page --------------------------------------------------------------- */
 .besa-404 {
   max-width: 48rem;
