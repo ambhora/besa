@@ -9,7 +9,12 @@
 }
 
 .bd-main .bd-content .bd-article-container {
+  /* Scale the complete central reference surface rather than changing individual font sizes.
+   * This keeps approximately the same number of characters per line and the same typography /
+   * line-height proportions, while making the article physically smaller in both dimensions. */
+  margin-inline: auto;
   max-width: 100%;
+  zoom: 0.9;
 }
 
 /* Keep the complete interactive header cluster flush right. Search is explicitly placed in
