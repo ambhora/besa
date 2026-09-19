@@ -333,6 +333,44 @@
     window.addEventListener("hashchange", () => highlightProgramListingTarget());
   }
 
+  function initializeFooterCredits() {
+    const start = document.querySelector(".footer-items__start");
+    const center = document.querySelector(".footer-items__center");
+    const end = document.querySelector(".footer-items__end");
+    if (!start || !end) return;
+
+    const copyrightItem = Array.from(start.children).find((item) =>
+      /copyright/i.test(normalizedText(item))
+    );
+
+    const sphinxLink = start.querySelector('a[href*="sphinx-doc.org"]');
+    const themeLink = end.querySelector('a[href*="pydata-sphinx-theme"]');
+
+    start.replaceChildren();
+    if (copyrightItem) start.appendChild(copyrightItem);
+
+    const credit = document.createElement("p");
+    credit.className = "footer-item besa-api-footer-credit";
+    credit.append("Created with ");
+
+    const sphinx = document.createElement("a");
+    sphinx.href = sphinxLink ? sphinxLink.href : "https://www.sphinx-doc.org/";
+    sphinx.textContent = "Sphinx";
+    credit.appendChild(sphinx);
+    credit.append(" in the ");
+
+    const theme = document.createElement("a");
+    theme.href = themeLink
+      ? themeLink.href
+      : "https://pydata-sphinx-theme.readthedocs.io/en/stable/";
+    theme.textContent = "PyData Theme";
+    credit.appendChild(theme);
+    credit.append(".");
+
+    end.replaceChildren(credit);
+    if (center) center.replaceChildren();
+  }
+
   function initializeApiOutline() {
     for (const button of document.querySelectorAll(".besa-api-outline-toggle")) {
       const targetId = button.getAttribute("aria-controls");
@@ -376,6 +414,7 @@
     initializeApiOutline();
     initializeProgramListingAnchors();
     initializePageTocLabels();
+    initializeFooterCredits();
   }
 
   if (document.readyState === "loading") {

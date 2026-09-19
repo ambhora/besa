@@ -519,11 +519,24 @@ dl.c.function > dd {
 .footer-items__start,
 .footer-items__center,
 .footer-items__end {
+  align-items: baseline;
+  flex-direction: row !important;
   gap: 0.75rem;
+}
+
+/* PyData normally stacks the copyright and Sphinx credit in the start slot.  Keep every footer
+ * item on the same baseline so the complete footer is exactly one text line on desktop. */
+.footer-items__start .footer-item,
+.footer-items__center .footer-item,
+.footer-items__end .footer-item {
+  align-items: baseline;
+  display: inline-flex;
+  flex: 0 0 auto;
 }
 
 .bd-footer p,
 .footer-item {
+  line-height: 1;
   margin: 0;
   white-space: nowrap;
 }
