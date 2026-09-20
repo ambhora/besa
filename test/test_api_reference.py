@@ -16,9 +16,10 @@ if str(API_REFERENCE_ROOT) not in sys.path:
 
 from api_reference.clang_backend import extract_cpp_graph
 from api_reference.cpp_backend import _configuration_name, _variant_predefines
+from api_reference.html_renderer import render_html_site
 from api_reference.model import ApiEntity, ApiGraph, ApiParameter, ApiSignature, merge_graphs, stable_entity_id
 from api_reference.python_backend import build_python_graph
-from api_reference.render import entity_document, render_properdocs_source
+from api_reference.render import entity_document
 from api_reference.rust_backend import build_rust_graph
 
 
@@ -155,7 +156,7 @@ def test_cpp_backend_uses_declared_variant_labels_and_predefinitions() -> None:
     assert _variant_predefines(catalog, "cuda") == ["__CUDACC__=1"]
 
 
-def test_renderer_generates_code_oriented_properdocs_site(tmp_path: Path) -> None:
+def test_renderer_generates_standalone_code_oriented_html_site(tmp_path: Path) -> None:
     graph = ApiGraph(project="dice", version="main", language="cpp")
     namespace = ApiEntity(
         id=stable_entity_id("cpp", "namespace", "dice"),
@@ -163,6 +164,7 @@ def test_renderer_generates_code_oriented_properdocs_site(tmp_path: Path) -> Non
         kind="namespace",
         name="dice",
         qualified_name="dice",
+        documentation="Dice public API.",
     )
     function = ApiEntity(
         id=stable_entity_id("cpp", "function", "dice::foo"),
@@ -171,8 +173,14 @@ def test_renderer_generates_code_oriented_properdocs_site(tmp_path: Path) -> Non
         name="foo",
         qualified_name="dice::foo",
         parent=namespace.id,
-        signatures=[ApiSignature(parameters=(ApiParameter("value", "int"),), returns="void")],
-        documentation="Do work.\n\nBESA-API-RELATES-TO: bar",
+        signatures=[
+            ApiSignature(parameters=(ApiParameter("value", "int"),), returns="void"),
+            ApiSignature(parameters=(ApiParameter("value", "float"),), returns="void"),
+        ],
+        documentation=(
+            "Do work. See [testing guide](projectdocs:reference/testing/#fixtures) and "
+            "@projectdocs{blog/}.\n\nBESA-API-RELATES-TO: bar"
+        ),
         variants=["cpu"],
     )
     nested_namespace = ApiEntity(
@@ -182,6 +190,15 @@ def test_renderer_generates_code_oriented_properdocs_site(tmp_path: Path) -> Non
         name="meta",
         qualified_name="dice::meta",
         parent=namespace.id,
+    )
+    nested_function = ApiEntity(
+        id=stable_entity_id("cpp", "function", "dice::meta::nested"),
+        language="cpp",
+        kind="function",
+        name="nested",
+        qualified_name="dice::meta::nested",
+        parent=nested_namespace.id,
+        signatures=[ApiSignature(returns="void")],
     )
     related = ApiEntity(
         id=stable_entity_id("cpp", "class", "dice::bar"),
@@ -200,6 +217,23 @@ def test_renderer_generates_code_oriented_properdocs_site(tmp_path: Path) -> Non
         parent=related.id,
         signatures=[ApiSignature(parameters=(ApiParameter("value", "int"),), returns="void")],
     )
+    package_info = ApiEntity(
+        id=stable_entity_id("cpp", "struct", "dice::package_info"),
+        language="cpp",
+        kind="struct",
+        name="package_info",
+        qualified_name="dice::package_info",
+        parent=namespace.id,
+    )
+    package = ApiEntity(
+        id=stable_entity_id("cpp", "function", "dice::package"),
+        language="cpp",
+        kind="function",
+        name="package",
+        qualified_name="dice::package",
+        parent=namespace.id,
+        signatures=[ApiSignature(returns="package_info")],
+    )
     macro = ApiEntity(
         id=stable_entity_id("cpp", "macro", "DICE_TEST"),
         language="cpp",
@@ -209,9 +243,12 @@ def test_renderer_generates_code_oriented_properdocs_site(tmp_path: Path) -> Non
     )
     graph.add(namespace)
     graph.add(nested_namespace)
+    graph.add(nested_function)
     graph.add(function)
     graph.add(related)
     graph.add(method)
+    graph.add(package_info)
+    graph.add(package)
     graph.add(macro)
     graph.sources["dice/version.hpp"] = "#pragma once\nnamespace dice { namespace meta {} }\n"
     graph.variants["cpu"] = {"profile": "cpu", "features": ["toolchain-cpp"], "predefined": []}
@@ -233,58 +270,91 @@ def test_renderer_generates_code_oriented_properdocs_site(tmp_path: Path) -> Non
     }
     graph.rebuild_children()
 
-    template = tmp_path / "template"
-    (template / "assets" / "stylesheets").mkdir(parents=True)
-    (template / "assets" / "javascripts").mkdir(parents=True)
-    (template / "assets" / "stylesheets" / "besa-api.css").write_text("/* css */\n", encoding="utf-8")
-    (template / "assets" / "javascripts" / "besa-api.js").write_text("// js\n", encoding="utf-8")
-
-    source = tmp_path / "generated" / "source"
-    config = render_properdocs_source(
+    site = tmp_path / "site"
+    template = tmp_path / "api-docs"
+    template.mkdir()
+    (template / "index.md").write_text(
+        "# API Documentation Home\n\n"
+        "Reference for `{{ project }}` {{ version }}. See the "
+        "[project blog](projectdocs:blog/).\n",
+        encoding="utf-8",
+    )
+    render_html_site(
         graph,
-        source_directory=source,
-        output_directory=tmp_path / "site",
-        template_directory=template,
+        output_directory=site,
         project_docs_url="../../../../../",
         copyright_text="Copyright © dice developers",
+        template_directory=template,
     )
 
-    page = (source / entity_document(function)).read_text(encoding="utf-8")
-    assert '<article class="besa-api-entity-card">' in page
+    def html_page(document: Path) -> Path:
+        if document.name == "index.md":
+            return site / document.parent / "index.html"
+        return site / document.with_suffix("") / "index.html"
+
+    page = html_page(entity_document(function)).read_text(encoding="utf-8")
+    assert '<article class="api-signature-card"' in page
     assert "foo(int)" in page
     assert "API variants" in page
     assert "About API variants and features" in page
     assert "<strong>Related:</strong>" in page
+    assert "projectdocs:" not in page
+    assert "reference/testing/#fixtures" in page
+    assert ">blog</a>" in page
     assert 'class="language-cpp"' in page
-    assert (source / "_symbols" / "dice" / "foo" / "index.md").is_file()
-    class_page = (source / entity_document(related)).read_text(encoding="utf-8")
+    assert (site / "_symbols" / "dice" / "foo" / "index.html").is_file()
+    class_page = html_page(entity_document(related)).read_text(encoding="utf-8")
     assert '<code class="language-cpp">' in class_page
-    assert "## Public Functions" in class_page
-    assert "method-run/" in class_page
-    assert "## Public Functions" in class_page
-    assert entity_document(related).as_posix().endswith("class-bar/index.md")
-    namespace_page = (source / entity_document(namespace)).read_text(encoding="utf-8")
-    assert "namespace" in namespace_page
-    assert "style=" in namespace_page
-    source_page = (source / "_sources" / "dice" / "version.hpp.md").read_text(encoding="utf-8")
+    assert "Public Functions" in class_page
+    assert 'id="member-method-run"' in class_page
+    assert not html_page(entity_document(method)).is_file()
+    method_alias = (site / "_symbols" / "dice" / "bar" / "run" / "index.html").read_text(encoding="utf-8")
+    assert "#member-method-run" in method_alias
+    package_page = html_page(entity_document(package)).read_text(encoding="utf-8")
+    assert 'class="besa-api-signature-type"' in package_page
+    assert "struct-package_info/" in package_page
+    namespace_page = html_page(entity_document(namespace)).read_text(encoding="utf-8")
+    assert "Namespace dice" in namespace_page
+    assert '<section id="members"' in namespace_page
+    assert "Public Functions" not in namespace_page
+    assert "Defined in" not in namespace_page
+    assert '>foo()</a>' in namespace_page
+    assert '>nested()</a>' in namespace_page
+    assert '>run</a>' not in namespace_page
+    nested_namespace_page = html_page(entity_document(nested_namespace)).read_text(encoding="utf-8")
+    assert "groups the public API declared in this scope" in nested_namespace_page
+    source_page = (site / "_sources" / "dice" / "version.hpp" / "index.html").read_text(encoding="utf-8")
     assert 'class="language-cpp"' in source_page
-    assert "style=" in source_page
-    home_page = (source / "index.md").read_text(encoding="utf-8")
-    assert "## API hierarchy" in home_page
-    assert "## File Hierarchy" in home_page
-    assert "besa-api-legend" in home_page
+    assert "style=" in source_page or "besa-syntax-keyword" in source_page
+    home_page = (site / "index.html").read_text(encoding="utf-8")
+    assert "projectdocs:" not in home_page
+    assert 'href="../../../../../blog/"' in home_page
+    assert "Reference for <code>dice</code> main." in home_page
+    assert "API hierarchy" in home_page
+    assert "File Hierarchy" in home_page
+    assert "api-legend" in home_page
     assert "DICE_TEST" in home_page
     assert "Directory dice" in home_page
     assert "File version.hpp" in home_page
-    assert (source / "macros.md").is_file()
-    variants_page = (source / "api-variants.md").read_text(encoding="utf-8")
-    assert "## Registered project inputs" in variants_page
-    assert "## Variant selection by feature" in variants_page
-    assert "### CPU" in variants_page
-    config_text = config.read_text(encoding="utf-8")
-    assert 'site_name: "dice API documentation"' in config_text
-    assert "assets/stylesheets/besa-api.css" in config_text
-    assert '"foo": "api/dice/function-foo.md"' in config_text
-    assert "foo(int)" not in config_text
-    assert '  - "meta":' in config_text
-    assert '  - "Macros":' in config_text
+    assert (site / "macros" / "index.html").is_file()
+    variants_page = (site / "api-variants" / "index.html").read_text(encoding="utf-8")
+    assert "Registered project inputs" in variants_page
+    assert "Variant selection by feature" in variants_page
+    assert "CPU" in variants_page
+    assert 'class="api-variant-grid"' in variants_page
+    assert 'class="api-variant-card"' in variants_page
+    assert (site / "assets" / "besa-api.css").is_file()
+    assert (site / "assets" / "besa-api.js").is_file()
+    assert "api-outline-children" in home_page
+    assert ">run</a>" not in home_page
+    assert home_page.count(">foo()</a>") == 2
+    assert page.count('class="api-signature-card"') == 2
+    class_toc = class_page.split('<aside class="api-toc">', 1)[1]
+    assert "run(int)" in class_toc
+    css = (site / "assets" / "besa-api.css").read_text(encoding="utf-8")
+    assert "grid-template-columns: 20.5rem minmax(0, 1fr) 24rem" in css
+    assert "width: min(80%, 80rem)" in css
+    assert "--api-tree-indent: 2.45rem" in css
+    assert '.api-outline-toggle::before { content: "+"' in css
+    assert "border: 1px solid var(--api-border)" in css
+    assert '"dice::foo"' in (site / "symbols.json").read_text(encoding="utf-8")

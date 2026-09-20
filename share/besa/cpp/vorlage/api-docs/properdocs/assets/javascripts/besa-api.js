@@ -84,6 +84,10 @@
     const root = document.querySelector(".md-sidebar--primary .md-nav--primary");
     if (!root) return;
 
+    const config = window.BESA_API_CONFIG || {};
+    const embeddedMembers = config.embeddedMembers || {};
+    const currentVersionRoot = versionRoot();
+
     const lists = Array.from(root.querySelectorAll("ul.md-nav__list"));
     lists.forEach((list, index) => {
       list.classList.add("besa-api-outline-list");
@@ -101,6 +105,22 @@
       }
       const name = row.querySelector(".md-ellipsis");
       if (name) name.classList.add("besa-api-outline-name");
+
+      if (row.tagName === "A") {
+        const absolute = new URL(row.href, window.location.href);
+        if (absolute.href.startsWith(currentVersionRoot.href)) {
+          const relative = absolute.href
+            .slice(currentVersionRoot.href.length)
+            .split(/[?#]/, 1)[0];
+          const target = embeddedMembers[relative];
+          if (target && target.url) {
+            row.href = new URL(
+              `${target.url}${target.anchor ? `#${target.anchor}` : ""}`,
+              currentVersionRoot,
+            ).href;
+          }
+        }
+      }
     });
 
     root.querySelectorAll(".md-nav__item--nested").forEach((item) => {
@@ -109,6 +129,9 @@
       const icon = row ? row.querySelector(".md-nav__icon") : null;
       if (!toggle || !icon) return;
 
+      // Material uses md-nav__icon/md-icon to paint a chevron. Remove those classes completely;
+      // the API outline deliberately uses the old Doxygen-style boxed +/- control instead.
+      icon.classList.remove("md-nav__icon", "md-icon");
       icon.classList.add("besa-api-outline-toggle");
       let symbol = icon.querySelector(".besa-api-outline-toggle-symbol");
       if (!symbol) {

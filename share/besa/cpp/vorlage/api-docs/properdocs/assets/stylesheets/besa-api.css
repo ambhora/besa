@@ -3,6 +3,7 @@
 
 :root {
   --besa-api-border: color-mix(in srgb, var(--md-default-fg-color) 18%, transparent);
+  --besa-api-tree-line: color-mix(in srgb, var(--md-default-fg-color) 34%, transparent);
   --besa-api-muted: color-mix(in srgb, var(--md-default-fg-color) 66%, transparent);
   --besa-api-accent: var(--md-primary-fg-color);
 }
@@ -100,7 +101,8 @@
 }
 
 .md-nav--primary .besa-api-outline-children {
-  margin: 0.12rem 0 0.22rem 0.72rem;
+  border-left: 1px solid var(--besa-api-tree-line);
+  margin: 0 0 0 0.72rem;
   padding-left: 1rem;
 }
 
@@ -109,46 +111,50 @@
   padding: 0;
 }
 
-/* Match the old Doxygen/Sphinx outline: one compact row per entity with explicit tree connectors. */
+/* Match the old Doxygen/Sphinx outline: one compact, evenly spaced row per entity with explicit
+ * tree connectors. */
 .md-nav--primary .besa-api-outline-children > .besa-api-outline-item {
   position: relative;
 }
 
-.md-nav--primary .besa-api-outline-children > .besa-api-outline-item::before {
-  border-left: 1px solid var(--besa-api-border);
-  bottom: -0.22rem;
-  content: "";
-  left: -1rem;
-  position: absolute;
-  top: -0.12rem;
-}
-
 .md-nav--primary .besa-api-outline-children > .besa-api-outline-item::after {
-  border-top: 1px solid var(--besa-api-border);
+  border-top: 1px solid var(--besa-api-tree-line);
   content: "";
   left: -1rem;
   position: absolute;
-  top: 0.78rem;
-  width: 1.18rem;
+  top: 0.72rem;
+  width: 1rem;
 }
 
+/* Stop the vertical branch exactly at the centre of the last child, matching the old Doxygen
+ * tree instead of leaving a dangling line below the final entry. */
 .md-nav--primary .besa-api-outline-children > .besa-api-outline-item:last-child::before {
-  bottom: auto;
-  height: 0.9rem;
+  background: var(--md-default-bg-color);
+  bottom: 0;
+  content: "";
+  left: -1.04rem;
+  position: absolute;
+  top: 0.74rem;
+  width: 0.08rem;
 }
 
 .md-nav--primary .besa-api-outline-row {
+  align-items: center;
+  box-sizing: border-box;
+  display: flex;
   gap: 0.42rem;
-  line-height: 1.2;
+  height: 1.44rem;
+  line-height: 1;
   margin: 0;
   min-height: 0;
-  padding: 0.08rem 0.15rem;
+  padding: 0 0.15rem;
 }
 
 .md-nav--primary .besa-api-outline-entity-row {
   align-items: center;
   display: grid;
   grid-template-columns: 1.15rem minmax(0, max-content) 1.5rem;
+  height: 1.44rem;
   max-width: 100%;
   min-width: 0;
   width: fit-content;
@@ -182,11 +188,18 @@
   font-family: var(--md-code-font-family);
   font-size: 1.05em;
   font-weight: 750;
-  height: 1.4rem;
+  height: 1.05rem;
   justify-content: center;
   margin-left: auto;
   padding: 0;
-  width: 1.4rem;
+  width: 1.05rem;
+}
+
+.md-nav--primary .besa-api-outline-toggle::before,
+.md-nav--primary .besa-api-outline-toggle::after,
+.md-nav--primary .besa-api-outline-toggle svg {
+  content: none !important;
+  display: none !important;
 }
 
 .md-nav--primary .besa-api-outline-toggle-symbol {
@@ -271,7 +284,7 @@
   border-top: 0.2rem solid var(--besa-api-accent);
   margin: 0.4rem 0 1.15rem;
   overflow: hidden;
-  padding: 0.58rem 0.72rem 0.68rem;
+  padding: 0.5rem 0.62rem 0.58rem;
 }
 
 .besa-api-declaration {
@@ -281,18 +294,37 @@
   font-size: 0.78rem;
   margin: 0;
   overflow-x: auto;
-  padding: 0 0 0.5rem;
+  padding: 0 0 0.42rem;
 }
 
 .besa-api-declaration code {
   background: transparent;
   color: var(--md-code-fg-color);
+  display: block;
   font-weight: 650;
-  padding: 0;
+  margin: 0;
+  padding: 0 !important;
+  text-indent: 0;
 }
 
 .besa-api-declaration code span {
   font-weight: inherit;
+}
+
+.besa-api-signature-name {
+  color: #a922a0;
+  font-weight: 700;
+}
+
+.besa-api-signature-type {
+  color: var(--md-typeset-a-color);
+  text-decoration: underline;
+  text-decoration-thickness: 0.06em;
+  text-underline-offset: 0.1em;
+}
+
+.besa-api-signature-type:hover {
+  color: var(--md-accent-fg-color);
 }
 
 .besa-api-meta-row {
@@ -363,6 +395,15 @@
 .besa-api-member-list {
   border-top: 1px solid var(--besa-api-border);
   margin-bottom: 0.85rem;
+}
+
+.besa-api-member-cards {
+  margin-bottom: 0.85rem;
+}
+
+.besa-api-member-card {
+  margin-bottom: 0.42rem;
+  margin-top: 0;
 }
 
 .besa-api-member-detail {
@@ -483,4 +524,50 @@
 
 .besa-api-source-code span[data-line]:target {
   background: color-mix(in srgb, var(--besa-api-accent) 12%, transparent);
+}
+
+/* Deterministic fallback highlighting for API extraction environments where Pygments is not
+ * importable by the BESA renderer.  When Pygments is present, its inline token colours win. */
+.besa-syntax-comment {
+  color: #6a737d;
+  font-style: italic;
+}
+
+.besa-syntax-keyword,
+.besa-syntax-preprocessor {
+  color: #005cc5;
+  font-weight: 650;
+}
+
+.besa-syntax-string {
+  color: #a31515;
+}
+
+.besa-syntax-number {
+  color: #098658;
+}
+
+.besa-syntax-name {
+  color: #24292e;
+}
+
+[data-md-color-scheme="slate"] .besa-syntax-comment {
+  color: #8b949e;
+}
+
+[data-md-color-scheme="slate"] .besa-syntax-keyword,
+[data-md-color-scheme="slate"] .besa-syntax-preprocessor {
+  color: #79c0ff;
+}
+
+[data-md-color-scheme="slate"] .besa-syntax-string {
+  color: #ffa657;
+}
+
+[data-md-color-scheme="slate"] .besa-syntax-number {
+  color: #7ee787;
+}
+
+[data-md-color-scheme="slate"] .besa-syntax-name {
+  color: #c9d1d9;
 }

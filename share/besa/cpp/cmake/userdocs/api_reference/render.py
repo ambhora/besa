@@ -85,6 +85,72 @@ def _pygments_lexer(language: str):
     return lexer_type() if lexer_type is not None else None
 
 
+_FALLBACK_KEYWORDS = {
+    "cpp": {
+        "alignas", "alignof", "asm", "auto", "bool", "break", "case", "catch", "char",
+        "char8_t", "char16_t", "char32_t", "class", "concept", "const", "consteval",
+        "constexpr", "constinit", "const_cast", "continue", "co_await", "co_return",
+        "co_yield", "decltype", "default", "delete", "do", "double", "dynamic_cast",
+        "else", "enum", "explicit", "export", "extern", "false", "float", "for", "friend",
+        "goto", "if", "inline", "int", "long", "mutable", "namespace", "new", "noexcept",
+        "nullptr", "operator", "private", "protected", "public", "register", "reinterpret_cast",
+        "requires", "return", "short", "signed", "sizeof", "static", "static_assert",
+        "static_cast", "struct", "switch", "template", "this", "thread_local", "throw", "true",
+        "try", "typedef", "typeid", "typename", "union", "unsigned", "using", "virtual", "void",
+        "volatile", "wchar_t", "while",
+    },
+    "python": {
+        "and", "as", "assert", "async", "await", "break", "class", "continue", "def", "del",
+        "elif", "else", "except", "False", "finally", "for", "from", "global", "if", "import",
+        "in", "is", "lambda", "None", "nonlocal", "not", "or", "pass", "raise", "return",
+        "True", "try", "while", "with", "yield",
+    },
+    "rust": {
+        "as", "async", "await", "break", "const", "continue", "crate", "dyn", "else", "enum",
+        "extern", "false", "fn", "for", "if", "impl", "in", "let", "loop", "match", "mod",
+        "move", "mut", "pub", "ref", "return", "self", "Self", "static", "struct", "super",
+        "trait", "true", "type", "unsafe", "use", "where", "while",
+    },
+}
+
+
+_FALLBACK_TOKEN = re.compile(
+    r"//[^\n]*|/\*.*?\*/|#[^\n]*|\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'|"
+    r"\b(?:0[xX][0-9A-Fa-f]+|\d+(?:\.\d+)?)\b|\b[A-Za-z_]\w*\b|\s+|.",
+    re.DOTALL,
+)
+
+
+def _fallback_lex(code: str, language: str) -> list[tuple[str, str]]:
+    """Small built-in highlighter used when Pygments is unavailable at render time."""
+
+    keywords = _FALLBACK_KEYWORDS.get(language, set())
+    values: list[tuple[str, str]] = []
+    for match in _FALLBACK_TOKEN.finditer(code):
+        token = match.group(0)
+        if language == "cpp" and token.startswith("#"):
+            kind = "preprocessor"
+        elif token.startswith("//") or token.startswith("/*") or (language == "python" and token.startswith("#")):
+            kind = "comment"
+        elif token.startswith(('"', "'")):
+            kind = "string"
+        elif re.fullmatch(r"(?:0[xX][0-9A-Fa-f]+|\d+(?:\.\d+)?)", token):
+            kind = "number"
+        elif re.fullmatch(r"[A-Za-z_]\w*", token):
+            kind = "keyword" if token in keywords else "name"
+        else:
+            kind = "plain"
+        values.append((kind, token))
+    return values
+
+
+def _fallback_token_html(kind: str, value: str) -> str:
+    escaped = html.escape(value)
+    if kind == "plain" or not value.strip():
+        return escaped
+    return f'<span class="besa-syntax-{kind}">{escaped}</span>'
+
+
 def _token_style(formatter: HtmlFormatter, token_type) -> str:
     style = formatter.style.style_for_token(token_type)
     values: list[str] = []
@@ -103,13 +169,23 @@ def _token_style(formatter: HtmlFormatter, token_type) -> str:
 
 def _highlight_source_lines(content: str, language: str) -> list[str]:
     if lex is None or HtmlFormatter is None:
-        return [html.escape(value) or " " for value in content.splitlines()]
+        rendered: list[list[str]] = [[]]
+        for kind, value in _fallback_lex(content, language):
+            parts = value.split("\n")
+            for index, part in enumerate(parts):
+                if part:
+                    rendered[-1].append(_fallback_token_html(kind, part))
+                if index + 1 < len(parts):
+                    rendered.append([])
+        if content.endswith("\n") and rendered and not rendered[-1]:
+            rendered.pop()
+        return ["".join(parts) or " " for parts in rendered]
 
     lexer = _pygments_lexer(language)
     if lexer is None:
         return [html.escape(value) or " " for value in content.splitlines()]
 
-    formatter = HtmlFormatter(noclasses=True)
+    formatter = HtmlFormatter(noclasses=True, style="friendly")
     rendered: list[list[str]] = [[]]
     for token_type, value in lex(content, lexer):
         style = _token_style(formatter, token_type)
@@ -150,13 +226,17 @@ def _source_page(source_path: str, content: str) -> str:
     return "\n".join(lines)
 
 
-def _source_href(entity: ApiEntity, graph: ApiGraph) -> str | None:
+def _source_href_from(entity: ApiEntity, graph: ApiGraph, document_path: Path) -> str | None:
     if entity.source is None or entity.source.path not in graph.sources:
         return None
-    value = _relative_link(entity_document(entity), _source_document(entity.source.path))
+    value = _relative_link(document_path, _source_document(entity.source.path))
     if entity.source.line:
         value += f"#L{entity.source.line}"
     return value
+
+
+def _source_href(entity: ApiEntity, graph: ApiGraph) -> str | None:
+    return _source_href_from(entity, graph, entity_document(entity))
 
 
 def _signature_label(entity: ApiEntity, signature: ApiSignature) -> str:
@@ -179,6 +259,118 @@ def _highlight_code(code: str, language: str) -> str:
     # is mounted below another site's URL prefix.
     formatter = HtmlFormatter(nowrap=True, noclasses=True)
     return highlight(code, lexer_type(), formatter)
+
+
+_TYPE_LIKE_KINDS = {
+    "class",
+    "struct",
+    "union",
+    "enum",
+    "trait",
+    "protocol",
+    "type_alias",
+    "concept",
+}
+
+_CLASS_LIKE_KINDS = {"class", "struct", "union", "trait", "protocol"}
+
+
+def _preferred_type_target(name: str, entity: ApiEntity, graph: ApiGraph) -> ApiEntity | None:
+    candidates = [
+        candidate
+        for candidate in graph.entities.values()
+        if candidate.kind in _TYPE_LIKE_KINDS and candidate.name == name
+    ]
+    if not candidates:
+        return None
+    if entity.parent:
+        same_parent = [candidate for candidate in candidates if candidate.parent == entity.parent]
+        if len(same_parent) == 1:
+            return same_parent[0]
+    return candidates[0] if len(candidates) == 1 else None
+
+
+def _embedded_member_parent(entity: ApiEntity, graph: ApiGraph) -> ApiEntity | None:
+    if not entity.parent or entity.parent not in graph.entities:
+        return None
+    parent = graph.entities[entity.parent]
+    return parent if parent.kind in _CLASS_LIKE_KINDS else None
+
+
+def _member_anchor(entity: ApiEntity) -> str:
+    return f"member-{_slug(entity.kind)}-{_slug(entity.name)}"
+
+
+def _entity_href(document_path: Path, entity: ApiEntity, graph: ApiGraph) -> str:
+    parent = _embedded_member_parent(entity, graph)
+    if parent is not None:
+        return _relative_link(document_path, entity_document(parent)) + f"#{_member_anchor(entity)}"
+    return _relative_link(document_path, entity_document(entity))
+
+
+def _highlight_declaration(
+    code: str,
+    language: str,
+    *,
+    entity: ApiEntity,
+    graph: ApiGraph,
+    document_path: Path,
+) -> str:
+    """Highlight a declaration and add semantic links to known API types."""
+
+    if lex is None or HtmlFormatter is None:
+        values: list[str] = []
+        for kind, value in _fallback_lex(code, language):
+            token_html = _fallback_token_html(kind, value)
+            stripped = value.strip()
+            if kind == "name" and stripped:
+                target = _preferred_type_target(stripped, entity, graph)
+                if target is not None and target.id != entity.id:
+                    href = _entity_href(document_path, target, graph)
+                    token_html = (
+                        f'<a class="besa-api-signature-type" href="{html.escape(href)}">'
+                        + token_html
+                        + "</a>"
+                    )
+                elif stripped == entity.name:
+                    token_html = f'<span class="besa-api-signature-name">{token_html}</span>'
+            values.append(token_html)
+        return "".join(values)
+
+    lexer = _pygments_lexer(language)
+    if lexer is None:
+        return html.escape(code)
+
+    formatter = HtmlFormatter(noclasses=True, style="friendly")
+    values: list[str] = []
+    tokens = list(lex(code, lexer))
+    if tokens and tokens[-1][1] == "\n":
+        tokens.pop()
+    for token_type, value in tokens:
+        if not value:
+            continue
+        style = _token_style(formatter, token_type)
+        escaped = html.escape(value)
+        token_html = (
+            f'<span style="{html.escape(style, quote=True)}">{escaped}</span>'
+            if style
+            else escaped
+        )
+
+        stripped = value.strip()
+        if stripped and re.fullmatch(r"[A-Za-z_]\w*", stripped):
+            target = _preferred_type_target(stripped, entity, graph)
+            if target is not None and target.id != entity.id:
+                href = _entity_href(document_path, target, graph)
+                token_html = (
+                    f'<a class="besa-api-signature-type" href="{html.escape(href)}">'
+                    + token_html
+                    + "</a>"
+                )
+            elif stripped == entity.name:
+                token_html = f'<span class="besa-api-signature-name">{token_html}</span>'
+        values.append(token_html)
+    return "".join(values)
 
 
 def _parameter_spelling(signature: ApiSignature, language: str) -> str:
@@ -443,21 +635,96 @@ def _member_sections(entity: ApiEntity, graph: ApiGraph, document_path: Path) ->
         children = groups.get(title)
         if not children:
             continue
-        lines.extend([f"## {title}", "", '<div class="besa-api-member-list">'])
+        lines.extend([f"## {title}", ""])
+        if title == "Public Functions":
+            lines.append('<div class="besa-api-member-cards">')
+            for child in children:
+                signatures = child.signatures or [ApiSignature()]
+                for index, signature in enumerate(signatures):
+                    anchor = _member_anchor(child) if index == 0 else f"{_member_anchor(child)}-{index + 1}"
+                    declaration = _member_signature_spelling(child, signature)
+                    lines.append(
+                        f'<article class="besa-api-entity-card besa-api-member-card" id="{html.escape(anchor)}">'
+                    )
+                    lines.append(
+                        '<pre class="besa-api-declaration"><code class="language-'
+                        + html.escape(child.language)
+                        + '">'
+                        + _highlight_declaration(
+                            declaration,
+                            child.language,
+                            entity=child,
+                            graph=graph,
+                            document_path=document_path,
+                        )
+                        + "</code></pre>"
+                    )
+                    properties = list(dict.fromkeys([*child.properties, *signature.qualifiers]))
+                    if properties:
+                        lines.append(
+                            '<div class="besa-api-meta-row"><strong>Properties</strong><span>'
+                            + _badges(properties)
+                            + "</span></div>"
+                        )
+                    if child.source:
+                        location = child.source.path
+                        if child.source.line:
+                            location += f":{child.source.line}"
+                        source_href = _source_href_from(child, graph, document_path)
+                        definition = (
+                            f'<a href="{html.escape(source_href)}"><code>{html.escape(location)}</code></a>'
+                            if source_href
+                            else f"<code>{html.escape(location)}</code>"
+                        )
+                        lines.append(
+                            '<div class="besa-api-meta-row"><strong>Implementation</strong>'
+                            + definition
+                            + "</div>"
+                        )
+                    description_html, related = _documentation_blocks(child, graph)
+                    if child.documentation.strip() or related:
+                        lines.append('<div class="besa-api-description">' + description_html + "</div>")
+                    if related:
+                        values = []
+                        for text, target in related:
+                            if target is None:
+                                values.append(f"<code>{html.escape(text)}</code>")
+                            else:
+                                href = _entity_href(document_path, target, graph)
+                                values.append(
+                                    f'<a href="{html.escape(href)}"><code>{html.escape(target.name)}</code></a>'
+                                )
+                        lines.append(
+                            '<div class="besa-api-meta-row besa-api-related"><strong>Related:</strong><span>'
+                            + " · ".join(values)
+                            + "</span></div>"
+                        )
+                    lines.append("</article>")
+            lines.extend(["</div>", ""])
+            continue
+
+        lines.append('<div class="besa-api-member-list">')
         for child in children:
-            href = _relative_link(document_path, entity_document(child))
+            href = _entity_href(document_path, child, graph)
             signatures = child.signatures if child.kind in {"function", "method", "constructor"} else []
             spellings = (
                 [_member_signature_spelling(child, signature) for signature in signatures]
                 if signatures
                 else [_member_summary_spelling(child)]
             )
-            for spelling in spellings:
+            for index, spelling in enumerate(spellings):
+                anchor = f' id="{html.escape(_member_anchor(child))}"' if index == 0 else ""
                 lines.append(
-                    f'<a class="besa-api-member-detail" href="{html.escape(href)}">'
+                    f'<a class="besa-api-member-detail"{anchor} href="{html.escape(href)}">'
                     f'<span class="api-kind" data-kind="{html.escape(child.kind)}"></span>'
                     f'<code class="language-{html.escape(child.language)}">'
-                    + _highlight_code(spelling, child.language)
+                    + _highlight_declaration(
+                        spelling,
+                        child.language,
+                        entity=child,
+                        graph=graph,
+                        document_path=document_path,
+                    )
                     + "</code></a>"
                 )
         lines.extend(["</div>", ""])
@@ -504,7 +771,13 @@ def _entity_page(entity: ApiEntity, graph: ApiGraph) -> str:
             '<pre class="besa-api-declaration"><code class="language-'
             + html.escape(entity.language)
             + '">'
-            + _highlight_code(declaration, entity.language)
+            + _highlight_declaration(
+                declaration,
+                entity.language,
+                entity=entity,
+                graph=graph,
+                document_path=document_path,
+            )
             + "</code></pre>"
         )
         properties = list(dict.fromkeys([*entity.properties, *signature_properties]))
@@ -544,7 +817,7 @@ def _entity_page(entity: ApiEntity, graph: ApiGraph) -> str:
                 if target is None:
                     values.append(f"<code>{html.escape(text)}</code>")
                 else:
-                    href = _relative_link(document_path, entity_document(target))
+                    href = _entity_href(document_path, target, graph)
                     values.append(
                         f'<a href="{html.escape(href)}"><code>{html.escape(target.name)}</code></a>'
                     )
@@ -839,13 +1112,19 @@ def _hierarchy_label(entity: ApiEntity) -> str:
 
 
 def _hierarchy_entity(entity: ApiEntity, graph: ApiGraph, document_path: Path) -> list[str]:
-    href = _relative_link(document_path, entity_document(entity))
+    href = _entity_href(document_path, entity, graph)
     lines = [
         '<ul class="besa-api-hierarchy-list"><li>'
         f'<span class="api-kind" data-kind="{html.escape(entity.kind)}"></span>'
         f'<a href="{html.escape(href)}">{html.escape(_hierarchy_label(entity))}</a>'
     ]
-    children = [graph.entities[child_id] for child_id in entity.children if graph.entities[child_id].kind != "macro"]
+    # Class/struct members belong on the class page itself.  The global API hierarchy is for
+    # namespace/module/type discovery, not for duplicating every method and data member.
+    children = [] if entity.kind in _CLASS_LIKE_KINDS else [
+        graph.entities[child_id]
+        for child_id in entity.children
+        if graph.entities[child_id].kind != "macro"
+    ]
     if children:
         lines.append('<div class="besa-api-hierarchy-children">')
         for child in children:
@@ -934,17 +1213,19 @@ def _nav_entity(entity: ApiEntity, graph: ApiGraph, indent: int) -> list[str]:
     pad = "  " * indent
     label = entity.navigation_label
     document = entity_document(entity).as_posix()
-    if not entity.children:
+    visible_children = [] if entity.kind in _CLASS_LIKE_KINDS else [
+        graph.entities[child_id]
+        for child_id in entity.children
+        if graph.entities[child_id].kind != "macro"
+    ]
+    if not visible_children:
         return [f"{pad}- {json.dumps(label)}: {json.dumps(document)}"]
     lines = [f"{pad}- {json.dumps(label)}:"]
     # The first child is an index page.  ProperDocs/Material turns that into a clickable section
     # title when navigation.indexes is enabled, so class/namespace names remain both expandable and
     # directly navigable without an extra visible "Overview" row.
     lines.append(f"{pad}  - {json.dumps(label)}: {json.dumps(document)}")
-    for child_id in entity.children:
-        child = graph.entities[child_id]
-        if child.kind == "macro":
-            continue
+    for child in visible_children:
         lines.extend(_nav_entity(child, graph, indent + 1))
     return lines
 
@@ -1010,20 +1291,24 @@ def _properdocs_config(
     return "\n".join(lines)
 
 
-def _symbol_alias_document(entity: ApiEntity, alias_document: Path) -> str:
-    target = _relative_link(alias_document, entity_document(entity))
-    # The semantic aliases are intentionally tiny stable pages. ProperDocs' main-site hook checks
-    # for their existence before resolving @apidocs:: references.
+def _redirect_document(title: str, target: str) -> str:
     return "\n".join(
         [
-            f"# {entity.qualified_name}",
+            f"# {title}",
             "",
             f'<meta http-equiv="refresh" content="0; url={html.escape(target)}">',
             "",
-            f"[{entity.qualified_name}]({target})",
+            f"[{title}]({target})",
             "",
         ]
     )
+
+
+def _symbol_alias_document(entity: ApiEntity, alias_document: Path, graph: ApiGraph) -> str:
+    target = _entity_href(alias_document, entity, graph)
+    # The semantic aliases are intentionally tiny stable pages. ProperDocs' main-site hook checks
+    # for their existence before resolving @apidocs:: references.
+    return _redirect_document(entity.qualified_name, target)
 
 
 def render_properdocs_source(
@@ -1045,14 +1330,20 @@ def render_properdocs_source(
     for entity in graph.entities.values():
         document = source_directory / entity_document(entity)
         document.parent.mkdir(parents=True, exist_ok=True)
-        document.write_text(_entity_page(entity, graph), encoding="utf-8")
+        embedded_parent = _embedded_member_parent(entity, graph)
+        if embedded_parent is None:
+            document.write_text(_entity_page(entity, graph), encoding="utf-8")
+        else:
+            target = _relative_link(entity_document(entity), entity_document(embedded_parent))
+            target += f"#{_member_anchor(entity)}"
+            document.write_text(_redirect_document(entity.qualified_name, target), encoding="utf-8")
 
         separator = "." if entity.language == "python" else "::"
         symbol = Path(*entity.qualified_name.split(separator))
         alias_document = Path("_symbols", *symbol.parts, "index.md")
         alias = source_directory / alias_document
         alias.parent.mkdir(parents=True, exist_ok=True)
-        alias.write_text(_symbol_alias_document(entity, alias_document), encoding="utf-8")
+        alias.write_text(_symbol_alias_document(entity, alias_document, graph), encoding="utf-8")
 
     for source_path, content in graph.sources.items():
         source_document = source_directory / _source_document(source_path)
@@ -1074,6 +1365,14 @@ def render_properdocs_source(
                 "projectDocsUrl": project_docs_url,
                 "apiRootUrl": "../" * (2 + max(1, len(Path(graph.version).parts))),
                 "entityKinds": {entity_url(entity): entity.kind for entity in graph.entities.values()},
+                "embeddedMembers": {
+                    entity_url(entity): {
+                        "url": entity_url(parent),
+                        "anchor": _member_anchor(entity),
+                    }
+                    for entity in graph.entities.values()
+                    if (parent := _embedded_member_parent(entity, graph)) is not None
+                },
             },
             sort_keys=True,
         )

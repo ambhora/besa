@@ -9,14 +9,13 @@ import dataclasses
 import json
 import re
 import shutil
-import subprocess
 import tempfile
 from pathlib import Path, PurePosixPath
 
 from .cpp_backend import build_cpp_graph
+from .html_renderer import render_html_site
 from .model import ApiGraph
 from .python_backend import build_python_graph
-from .render import render_properdocs_source
 from .rust_backend import build_rust_graph
 from .versioning import selected_ref_names, selector
 
@@ -47,32 +46,24 @@ def _render_graph(
     properdocs: str,
     project_docs_url: str,
 ) -> None:
+    del properdocs
     render_root = work_directory / "render"
-    source = render_root / "source"
-    version_depth = max(1, len(PurePosixPath(graph.version).parts))
-    effective_project_docs_url = project_docs_url + ("../" * (version_depth - 1))
-    config = render_properdocs_source(
+    render_root.mkdir(parents=True, exist_ok=True)
+    effective_project_docs_url = project_docs_url
+    if project_docs_url == "auto":
+        # Published API versions live below reference/api/<ref>/. A ref containing slashes adds
+        # one directory level per path component, so derive the project-site link from the version
+        # name rather than baking page-specific ../../ chains into generated templates.
+        version_depth = max(1, len(PurePosixPath(graph.version).parts))
+        effective_project_docs_url = "../" * (2 + version_depth)
+    render_html_site(
         graph,
-        source_directory=source,
         output_directory=output_directory,
-        template_directory=template_directory,
         project_docs_url=effective_project_docs_url,
         copyright_text=_copyright(project_root, graph.project),
+        template_directory=template_directory,
     )
     (render_root / "api-graph.json").write_text(_graph_json(graph), encoding="utf-8")
-    shutil.rmtree(output_directory, ignore_errors=True)
-    output_directory.parent.mkdir(parents=True, exist_ok=True)
-    command = [properdocs, "build", "--config-file", str(config), "--site-dir", str(output_directory)]
-    result = subprocess.run(
-        command,
-        cwd=project_root,
-        check=False,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-    )
-    if result.returncode != 0:
-        raise RuntimeError("ProperDocs API build failed:\n" + result.stdout.rstrip())
 
 
 def _build_cpp(arguments: argparse.Namespace) -> ApiGraph:
@@ -199,8 +190,11 @@ def _common(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--work-directory", type=Path, required=True)
     parser.add_argument("--output-directory", type=Path, required=True)
     parser.add_argument("--template-directory", type=Path, required=True)
-    parser.add_argument("--properdocs", required=True)
-    parser.add_argument("--project-docs-url", default="../../../../../")
+    # Retained as an accepted compatibility option because older generated CMake files still pass
+    # it.  The semantic API reference is rendered directly to HTML and no longer invokes
+    # ProperDocs/Sphinx/Doxygen.
+    parser.add_argument("--properdocs", default="")
+    parser.add_argument("--project-docs-url", default="auto")
     parser.add_argument("--version", default="main")
 
 
