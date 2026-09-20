@@ -80,6 +80,54 @@
     });
   }
 
+  function initializeOutlineTree() {
+    const root = document.querySelector(".md-sidebar--primary .md-nav--primary");
+    if (!root) return;
+
+    const lists = Array.from(root.querySelectorAll("ul.md-nav__list"));
+    lists.forEach((list, index) => {
+      list.classList.add("besa-api-outline-list");
+      if (index > 0) list.classList.add("besa-api-outline-children");
+    });
+
+    root.querySelectorAll("li.md-nav__item").forEach((item) => {
+      item.classList.add("besa-api-outline-item");
+    });
+
+    root.querySelectorAll("a.md-nav__link, label.md-nav__link").forEach((row) => {
+      row.classList.add("besa-api-outline-row");
+      if (row.querySelector(".besa-api-nav-kind")) {
+        row.classList.add("besa-api-outline-entity-row");
+      }
+      const name = row.querySelector(".md-ellipsis");
+      if (name) name.classList.add("besa-api-outline-name");
+    });
+
+    root.querySelectorAll(".md-nav__item--nested").forEach((item) => {
+      const toggle = item.querySelector(":scope > .md-nav__toggle");
+      const row = item.querySelector(":scope > .md-nav__link, :scope > label.md-nav__link");
+      const icon = row ? row.querySelector(".md-nav__icon") : null;
+      if (!toggle || !icon) return;
+
+      icon.classList.add("besa-api-outline-toggle");
+      let symbol = icon.querySelector(".besa-api-outline-toggle-symbol");
+      if (!symbol) {
+        symbol = document.createElement("span");
+        symbol.className = "besa-api-outline-toggle-symbol";
+        icon.replaceChildren(symbol);
+      }
+      const update = () => {
+        symbol.textContent = toggle.checked ? "−" : "+";
+        icon.setAttribute("aria-label", toggle.checked ? "Collapse" : "Expand");
+      };
+      update();
+      if (!toggle.dataset.besaOutlineBound) {
+        toggle.addEventListener("change", update);
+        toggle.dataset.besaOutlineBound = "true";
+      }
+    });
+  }
+
   function renameToc() {
     const title = document.querySelector(".md-sidebar--secondary .md-nav__title");
     if (title) title.textContent = "On this page";
@@ -148,6 +196,7 @@
   function initialize() {
     addOutlineTitle();
     addKindMarkers();
+    initializeOutlineTree();
     renameToc();
     addHeaderActions();
     simplifyFooter();
