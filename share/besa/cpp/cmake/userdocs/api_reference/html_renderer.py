@@ -650,6 +650,17 @@ def _markdown_template(text: str, graph: ApiGraph) -> str:
     return _MARKDOWN.render(substituted)
 
 
+def _render_markdown(text: str, graph: ApiGraph) -> str:
+    """Render human-authored Markdown used by the standalone API site."""
+
+    substituted = (
+        text.replace("{{ project }}", graph.project)
+        .replace("{{ version }}", graph.version)
+        .replace("{{ language }}", graph.language)
+    )
+    return _MARKDOWN.render(substituted)
+
+
 def _home_page(
     graph: ApiGraph,
     document: Path,
@@ -666,13 +677,13 @@ def _home_page(
             "This site is the generated API reference for this version of `{{ project }}`. "
             "For tutorials, how-to guides, explanations, and general project information, see the "
             "[main project documentation](projectdocs:).\n\n"
-            "The language backend extracts semantic declarations into BESA's language-neutral API graph. "
-            "This versioned reference is rendered directly from that graph with a code-oriented layout.\n\n"
-            "[API variants and features](api-variants/) explains how configured features select entity "
-            "variants, which inputs participate, and which parser predefinitions are used.\n"
+            "BESA extracts semantic declarations into a language-neutral API graph and renders this "
+            "versioned reference directly as a code-oriented site.\n\n"
+            "The [API variants and features](api-variants/) page explains how configured features select "
+            "entity variants, which inputs participate, and which parser predefinitions are used.\n"
         )
     body = [
-        _markdown_template(introduction, graph),
+        _render_markdown(introduction, graph),
         '<section id="api-hierarchy" class="api-section"><h2>API hierarchy</h2>',
         _legend(graph),
         '<ul class="api-hierarchy">',
