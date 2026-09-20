@@ -25,15 +25,7 @@ project(
 # Always emit compile_commands.json for editor, analysis, and developer tooling.
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Configure the Doxygen parser from this exact build tree. This is intentionally done even when
-# user-docs is disabled: sphinx-multiversion configures historical refs with ~user-docs and still
-# needs a checkout-specific Doxyfile pointing at that ref's compile_commands.json.
-file(MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/api-docs")
-configure_file(
-  "${PROJECT_SOURCE_DIR}/api-docs/Doxyfile.in"
-  "${PROJECT_BINARY_DIR}/api-docs/Doxyfile"
-  @ONLY
-)
+# API-reference configuration is created per semantic build profile by BESA's Clang backend.
 
 # The BESA CMake implementation is vendored into the repository by `besa cpp generate` and may later
 # be replaced in-place with `besa cpp update`.  The project therefore has no dependency on a global

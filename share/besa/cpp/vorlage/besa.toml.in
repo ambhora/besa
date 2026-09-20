@@ -65,12 +65,6 @@ kind = "dev"
 provider = "cmake"
 when = { all = ["build-testing"] }
 
-[[dependencies]]
-name = "Doxygen"
-kind = "dev"
-provider = "cmake"
-when = { all = ["user-docs"] }
-
 [[sources]]
 name = "cpp"
 path = "src/cpp"

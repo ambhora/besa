@@ -36,7 +36,7 @@ cmake -S . -B build -DPROJECT_FEATURES=user-docs
 The documentation site has two deliberately separate source trees:
 
 - `docs/` is the canonical ProperDocs documentation and owns the site's information architecture.
-- `api-docs/` contains the Doxygen/Breathe/Sphinx API renderer used by sphinx-multiversion.
+- `api-docs/properdocs/` contains the shared code-oriented API layout used by BESA's semantic backends.
 
 Build the complete publication site with:
 
@@ -58,13 +58,13 @@ build/doc/site/
 └── .nojekyll
 ```
 
-ProperDocs owns the site root and the Reference page. Its **Versioned API** section is the canonical
-entry point into the Sphinx/Breathe trees mounted below `reference/api/`. Every generated API page
-contains a persistent link back to the ProperDocs site and an API-version selector.
+The project ProperDocs site owns the site root and the Reference page. Its **Versioned API** section
+is the canonical entry point into a second ProperDocs site mounted below `reference/api/`. Every API
+page contains a persistent link back to the non-versioned project site and an API-version selector.
 
-The API-version landing page contains the namespace and file hierarchy directly; BESA does not add an
-intermediate `<project> API` landing page. Historical refs created by older BESA versions retain their
-original layout when rendered.
+The API-version landing page exposes the semantic API hierarchy directly; BESA does not add an
+intermediate `<project> API` landing page. Historical refs are extracted with the same current BESA
+backend and renderer, so the reference layout stays consistent across versions.
 
 Set the standard `repo_url` in `properdocs.yml` to enable **Edit this page** and source-file actions at
 the top-right of every ProperDocs page. BESA derives the repository path from the actual Markdown
@@ -76,7 +76,7 @@ override the issue-board destination.
 
 Cross-references between the two documentation surfaces use semantic targets rather than deployed hostnames:
 
-- C/C++ Doxygen comments use `@projectdocs`, `@projectdocs{path}`, or
+- C/C++ documentation comments may use `@projectdocs`, `@projectdocs{path}`, or
   `@projectdocs{path,link text}`.
 - ProperDocs Markdown uses `@apidocs::qualified::cpp::symbol`; `extra.besa_api_version` in
   `properdocs.yml` selects the default API version for those links. A single reference can override
@@ -88,6 +88,16 @@ For API-only debugging, build the current checkout or the selected historical ve
 cmake --build build --target user.docs.api
 cmake --build build --target user.docs.multiversion
 ```
+
+By default BESA realizes every declared API profile as its own CMake build. A developer machine that
+does not provide every optional toolchain can constrain local extraction without changing the model:
+
+```bash
+cmake -S . -B build -DPROJECT_FEATURES=user-docs -DBESA_API_PROFILES=cpu
+```
+
+Publication builds should normally leave `BESA_API_PROFILES` empty so every declared API
+configuration is represented.
 
 Historical API generation defaults to every tag plus `main`. Configure a persistent subset with
 `extra.besa_api_versions` in `properdocs.yml`, or override one invocation with `BESA_API_VERSIONS`:
@@ -111,7 +121,7 @@ lexicographic order. `refs:...` is the escape hatch for an exact set of tags or 
 `main` is included independently in every selection as the development API.
 
 The raw multiversion API output is written to `build/doc/api/multiversion/`. It contains
-`versions.json` and one Sphinx site per selected ref, but it is not itself the publication root.
+`versions.json` and one code-oriented ProperDocs API site per selected ref, but it is not itself the publication root.
 
 With `vorlage+user_docs` selected and the development bundle installed with `+docs`, local documentation
 development is just:
@@ -123,18 +133,20 @@ properdocs serve
 The default development server previews all selected historical versions while retaining live
 working-tree API documentation under `main/`. ProperDocs watches `src/`, `test/base/`, `api-docs/`,
 and Git refs. Historical versions are regenerated when the refs or version selector change; ordinary
-source edits regenerate only the working-tree `main/` API. Prose-only edits do not rerun Doxygen.
+source edits regenerate only the working-tree `main/` API. Prose-only edits do not rerun semantic
+API extraction.
 
 All live documentation working state is kept outside the checkout below `../build/properdocs/`:
 
 ```text
 ../build/properdocs/
-├── cmake/       # CMake, Doxygen, Sphinx, Exhale, and multiversion working state
+├── cmake/       # CMake, Clang semantic extraction, and versioned API working state
 └── site/        # ProperDocs live site
 ```
 
-In particular, Exhale works from a staged copy of `api-docs/` below the CMake build tree rather than
-writing `api-docs/generated/` into the repository. A normal `properdocs build` does not run the live
+Each selected C++ API configuration gets its own CMake build directory. BESA reads that concrete
+configuration, runs the Clang frontend over the public headers, merges the resulting API graphs, and
+renders the API site outside the source checkout. A normal `properdocs build` does not run the live
 API hook. `properdocs.multiversion.yml` remains only as a compatibility alias for older commands that
 selected the multiversion configuration explicitly.
 

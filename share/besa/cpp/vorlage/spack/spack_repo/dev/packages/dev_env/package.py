@@ -26,11 +26,5 @@ class DevEnv(BundlePackage):
     depends_on("lcov", when="+coverage")
     depends_on("py-gcovr", when="+coverage")
 
-    depends_on("doxygen+libclang", when="+docs")
-    depends_on("graphviz", when="+docs")
-    depends_on("py-sphinx@:8", when="+docs")
-    depends_on("py-breathe", when="+docs")
-    depends_on("py-exhale", when="+docs")
-    depends_on("py-pydata-sphinx-theme", when="+docs")
-    depends_on("py-sphinx-multiversion", when="+docs")
     depends_on("properdocs", when="+docs")
+    depends_on("py-packaging", when="+docs")

@@ -26,8 +26,8 @@ extra:
   # Optional override when issues live somewhere other than the repository's standard issue board.
   # besa_issue_url: https://example.invalid/project/issues/new
 
-# ProperDocs owns the public documentation site's information architecture. The versioned C/C++ API
-# reference is mounted below reference/api/ after ProperDocs has built the main documentation site.
+# ProperDocs owns the non-versioned project site. BESA builds the semantic API reference as a
+# second, versioned ProperDocs site and mounts it below reference/api/ for combined deployments.
 theme:
   name: materialx
   custom_dir: overrides
@@ -52,10 +52,9 @@ theme:
 extra_css:
   - assets/stylesheets/ambhora.css
 
-# `properdocs serve` previews the complete versioned API by default. Historical branch/tag API
-# sites come from sphinx-multiversion, while main/ is overlaid with the current working tree so
-# uncommitted edits remain visible. Source changes rebuild only main; Git-ref changes rebuild the
-# historical version set.
+# `properdocs serve` previews the separately generated API site as well. Historical branch/tag API
+# sites are built directly by BESA from Git worktrees, while main/ is overlaid with the current
+# working tree so uncommitted API edits remain visible.
 watch:
   - src
   - api-docs

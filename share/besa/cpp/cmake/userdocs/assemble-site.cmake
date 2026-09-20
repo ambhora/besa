@@ -2,8 +2,8 @@
 # SPDX-FileCopyrightText: 2026 BESA developers
 # SPDX-License-Identifier: Apache-2.0
 # --------------------------------------------------------------------------------------------------
-# Assemble the canonical publication tree. ProperDocs owns the root; the Sphinx/Breathe API output
-# is mounted below API_PATH as a separate versioned documentation surface.
+# Assemble the canonical publication tree. One ProperDocs build owns the non-versioned project
+# website; the separately generated, versioned BESA API site is mounted below API_PATH.
 
 foreach(_required PROPERDOCS_DIRECTORY API_DIRECTORY OUTPUT_DIRECTORY API_PATH)
   if(NOT DEFINED ${_required} OR "${${_required}}" STREQUAL "")
@@ -26,6 +26,6 @@ set(_besa_api_destination "${OUTPUT_DIRECTORY}/${API_PATH}")
 file(MAKE_DIRECTORY "${_besa_api_destination}")
 file(COPY "${API_DIRECTORY}/" DESTINATION "${_besa_api_destination}")
 
-# Disable Jekyll for the entire assembled site so Sphinx's underscore-prefixed static directories are
-# served correctly when the tree is uploaded to GitHub Pages.
+# Disable Jekyll for the assembled site so underscore-prefixed generated API paths are served
+# unchanged when the tree is uploaded to GitHub Pages.
 file(WRITE "${OUTPUT_DIRECTORY}/.nojekyll" "")

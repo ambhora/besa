@@ -1,8 +1,8 @@
 # SPDX-FileCopyrightText: 2026 BESA developers
 # SPDX-License-Identifier: Apache-2.0
-# ProperDocs owns the documentation-site root. Doxygen/Breathe/Exhale/Sphinx provide only the versioned API
-# reference mounted below reference/api/. The final user.docs target assembles both trees into one
-# static artifact under <build>/doc/site.
+# ProperDocs builds two deliberately separate sites: the non-versioned project documentation and
+# the versioned semantic API reference. The final user.docs target may assemble both trees for a
+# single static deployment, but their versioning semantics remain independent.
 besa_add_user_docs(
   NAME user.docs
   PROPERDOCS_CONFIG "${PROJECT_SOURCE_DIR}/properdocs.yml"
@@ -10,5 +10,4 @@ besa_add_user_docs(
   API_PATH reference/api
   OUTPUT_DIRECTORY "${BESA_DOCS_DIRECTORY}/site"
   MULTIVERSION_DEFAULT_VERSION main
-  DOXYGEN_OUTPUT_DIRECTORY "${BESA_DOCS_DIRECTORY}/doxygen"
 )

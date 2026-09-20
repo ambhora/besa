@@ -248,10 +248,153 @@ function(besa_add_sphinx_breathe_docs)
   endif()
 endfunction()
 
+# Register a semantic, language-neutral API reference rendered as a dedicated ProperDocs site.
+#
+# C++ extraction is performed by Clang for each concrete CMake API configuration. The resulting
+# ApiGraph is independent of Clang and is rendered by the same code-oriented layout used by the
+# Python and Rust backends. The current checkout and historical refs are separate ProperDocs builds;
+# no Sphinx, Breathe, Exhale, Doxygen, or sphinx-multiversion step participates in this path.
+function(besa_add_semantic_api_docs)
+  _besa_require_config_complete("besa_add_semantic_api_docs")
+
+  cmake_parse_arguments(
+    ARG
+    "NO_INSTALL"
+    "NAME;SOURCE_DIRECTORY;OUTPUT_DIRECTORY;MULTIVERSION_NAME;MULTIVERSION_OUTPUT_DIRECTORY;MULTIVERSION_DEFAULT_VERSION;SITE_ROOT_DEPTH;INSTALL_DIRECTORY;MULTIVERSION_INSTALL_DIRECTORY"
+    ""
+    ${ARGN}
+  )
+  _besa_require_no_unparsed("besa_add_semantic_api_docs" "${ARG_UNPARSED_ARGUMENTS}")
+  _besa_require_value("besa_add_semantic_api_docs" "NAME" "${ARG_NAME}")
+  _besa_require_value(
+    "besa_add_semantic_api_docs" "SOURCE_DIRECTORY" "${ARG_SOURCE_DIRECTORY}"
+  )
+
+  if(NOT ARG_OUTPUT_DIRECTORY)
+    set(ARG_OUTPUT_DIRECTORY "${BESA_DOCS_DIRECTORY}/api/current")
+  endif()
+  if(NOT ARG_MULTIVERSION_NAME)
+    set(ARG_MULTIVERSION_NAME "${ARG_NAME}.multiversion")
+  endif()
+  if(NOT ARG_MULTIVERSION_OUTPUT_DIRECTORY)
+    set(ARG_MULTIVERSION_OUTPUT_DIRECTORY "${BESA_DOCS_DIRECTORY}/api/multiversion")
+  endif()
+  if(NOT ARG_MULTIVERSION_DEFAULT_VERSION)
+    set(ARG_MULTIVERSION_DEFAULT_VERSION "main")
+  endif()
+  if(NOT ARG_SITE_ROOT_DEPTH)
+    set(ARG_SITE_ROOT_DEPTH 3)
+  endif()
+
+  get_filename_component(
+    _besa_api_source_absolute
+    "${ARG_SOURCE_DIRECTORY}"
+    ABSOLUTE
+    BASE_DIR "${PROJECT_SOURCE_DIR}"
+  )
+  set(_besa_api_template "${_besa_api_source_absolute}/properdocs")
+  if(NOT IS_DIRECTORY "${_besa_api_template}")
+    message(
+      FATAL_ERROR
+      "besa_add_semantic_api_docs: expected ProperDocs API assets below ${_besa_api_template}"
+    )
+  endif()
+
+  find_program(_besa_python NAMES python3 python REQUIRED)
+  find_program(_besa_properdocs NAMES properdocs REQUIRED)
+  find_program(_besa_clang NAMES clang++ clang REQUIRED)
+
+  # The API site will ultimately be mounted at <API_PATH>/<version>/. The generated configuration
+  # script lives two levels deeper under assets/javascripts, so derive a deployment-prefix-neutral
+  # relative link back to the non-versioned project site.
+  math(EXPR _besa_project_docs_levels "${ARG_SITE_ROOT_DEPTH} + 2")
+  set(_besa_project_docs_url "")
+  foreach(_index RANGE 1 ${_besa_project_docs_levels})
+    string(APPEND _besa_project_docs_url "../")
+  endforeach()
+
+  set(_besa_api_work "${BESA_DOCS_DIRECTORY}/work/api-reference")
+  set(_besa_api_pythonpath "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/userdocs")
+
+  # Empty means every API configuration declared by the project. Developers may constrain a local
+  # documentation build (for example on a machine without CUDA/HIP toolchains) without changing the
+  # project's API model: -DBESA_API_PROFILES=cpu;mpi. Publication CI should normally leave this empty.
+  set(BESA_API_PROFILES "" CACHE STRING "API profiles to extract; empty means all declared profiles")
+  set(_besa_api_profile_arguments "")
+  foreach(_profile IN LISTS BESA_API_PROFILES)
+    if(NOT _profile STREQUAL "")
+      list(APPEND _besa_api_profile_arguments --profile "${_profile}")
+    endif()
+  endforeach()
+
+  add_custom_target(
+    "${ARG_NAME}"
+    COMMAND "${CMAKE_COMMAND}" -E rm -rf "${ARG_OUTPUT_DIRECTORY}"
+    COMMAND
+      "${CMAKE_COMMAND}" -E env
+      "PYTHONPATH=${_besa_api_pythonpath}"
+      "${_besa_python}" -m api_reference build-cpp
+      --project-root "${PROJECT_SOURCE_DIR}"
+      --work-directory "${_besa_api_work}/current"
+      --output-directory "${ARG_OUTPUT_DIRECTORY}"
+      --template-directory "${_besa_api_template}"
+      --properdocs "${_besa_properdocs}"
+      --project-docs-url "${_besa_project_docs_url}"
+      --version main
+      --cmake "${CMAKE_COMMAND}"
+      --clang "${_besa_clang}"
+      ${_besa_api_profile_arguments}
+    WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+    COMMENT "Generating semantic C++ API documentation with Clang and ProperDocs"
+    VERBATIM
+  )
+  if(TARGET besa.generated)
+    add_dependencies("${ARG_NAME}" besa.generated)
+  endif()
+
+  add_custom_target(
+    "${ARG_MULTIVERSION_NAME}"
+    COMMAND "${CMAKE_COMMAND}" -E rm -rf "${ARG_MULTIVERSION_OUTPUT_DIRECTORY}"
+    COMMAND
+      "${CMAKE_COMMAND}" -E env
+      "PYTHONPATH=${_besa_api_pythonpath}"
+      "${_besa_python}" -m api_reference build-versions
+      --project-root "${PROJECT_SOURCE_DIR}"
+      --work-directory "${_besa_api_work}/multiversion"
+      --output-directory "${ARG_MULTIVERSION_OUTPUT_DIRECTORY}"
+      --template-directory "${_besa_api_template}"
+      --properdocs "${_besa_properdocs}"
+      --project-docs-url "${_besa_project_docs_url}"
+      --default-version "${ARG_MULTIVERSION_DEFAULT_VERSION}"
+      --cmake "${CMAKE_COMMAND}"
+      --clang "${_besa_clang}"
+      ${_besa_api_profile_arguments}
+    WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+    COMMENT "Generating versioned semantic API documentation from Git refs"
+    VERBATIM
+  )
+
+  if(NOT ARG_NO_INSTALL)
+    include(GNUInstallDirs)
+    if(NOT ARG_INSTALL_DIRECTORY)
+      set(ARG_INSTALL_DIRECTORY "${CMAKE_INSTALL_DOCDIR}/api/current")
+    endif()
+    if(NOT ARG_MULTIVERSION_INSTALL_DIRECTORY)
+      set(ARG_MULTIVERSION_INSTALL_DIRECTORY "${CMAKE_INSTALL_DOCDIR}/api")
+    endif()
+    install(DIRECTORY "${ARG_OUTPUT_DIRECTORY}/" DESTINATION "${ARG_INSTALL_DIRECTORY}" OPTIONAL)
+    install(
+      DIRECTORY "${ARG_MULTIVERSION_OUTPUT_DIRECTORY}/"
+      DESTINATION "${ARG_MULTIVERSION_INSTALL_DIRECTORY}"
+      OPTIONAL
+    )
+  endif()
+endfunction()
+
 # Register the complete user-documentation site.
 #
-# ProperDocs owns the site root and all prose/information architecture.  Sphinx/Breathe/Exhale owns only the
-# versioned API subtree.  Building NAME assembles both into one static site that can be uploaded to
+# ProperDocs owns the non-versioned project site and a separate ProperDocs build owns the
+# versioned semantic API subtree.  Building NAME assembles both into one static site that can be uploaded to
 # GitHub Pages without additional path rewriting.
 #
 # NAME
@@ -263,7 +406,7 @@ endfunction()
 #   remains directly usable with `properdocs serve` while CMake keeps generated HTML in the build tree.
 #
 # API_SOURCE_DIRECTORY
-#   Sphinx/Breathe source directory for the API reference.
+#   API-reference assets used by BESA's semantic renderer.
 #
 # API_PATH
 #   Relative path below the ProperDocs site root where API versions are mounted. Defaults to
@@ -349,14 +492,13 @@ function(besa_add_user_docs)
   list(LENGTH _besa_api_path_parts _besa_api_path_depth)
   math(EXPR _besa_site_root_depth "${_besa_api_path_depth} + 1")
 
-  besa_add_sphinx_breathe_docs(
+  besa_add_semantic_api_docs(
     NAME "${_besa_api_target}"
     SOURCE_DIRECTORY "${ARG_API_SOURCE_DIRECTORY}"
     OUTPUT_DIRECTORY "${_besa_api_output}"
     MULTIVERSION_NAME "${_besa_api_multiversion_target}"
     MULTIVERSION_OUTPUT_DIRECTORY "${_besa_api_multiversion_output}"
     MULTIVERSION_DEFAULT_VERSION "${ARG_MULTIVERSION_DEFAULT_VERSION}"
-    DOXYGEN_OUTPUT_DIRECTORY "${ARG_DOXYGEN_OUTPUT_DIRECTORY}"
     SITE_ROOT_DEPTH "${_besa_site_root_depth}"
     NO_INSTALL
   )

@@ -8,12 +8,13 @@ For example, build provenance is exposed by @apidocs::vorlage::meta::build.
 
 ## Versioned API
 
-The C/C++ API is extracted with Doxygen, rendered through Breathe and Sphinx, and built for `main`
-plus the historical Git refs selected by BESA.
+The API reference is a separate ProperDocs site with a code-oriented layout. For C++, BESA configures
+each declared API profile and extracts the compiler-semantic API with Clang; the same normalized API
+graph and renderer are also used by the Python and Rust backends.
 
-The complete `user.docs` build publishes each available API version below this section. Every Sphinx
-API page also exposes a version selector. Selecting another version keeps the current page when that
-page exists in the target version and otherwise opens that version's API root.
+The complete `user.docs` build publishes `main` plus the selected historical Git refs below this
+section. Every API page exposes a version selector and a persistent link back to the non-versioned
+project documentation.
 
 <div id="besa-api-versions">
   <p><a href="api/main/">Open development API (`main`) →</a></p>

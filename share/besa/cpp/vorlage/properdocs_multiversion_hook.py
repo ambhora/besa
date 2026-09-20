@@ -2,11 +2,11 @@
 # SPDX-FileCopyrightText: 2026 BESA developers
 # SPDX-License-Identifier: Apache-2.0
 # --------------------------------------------------------------------------------------------------
-"""Live ProperDocs integration for the complete versioned C/C++ API reference.
+"""Live ProperDocs integration for the separately versioned BESA API reference.
 
-This is the default ``properdocs serve`` hook. It keeps historical branch/tag API outputs from
-sphinx-multiversion and overlays ``main/`` with the current working-tree API. Therefore uncommitted
-source edits remain visible without losing the ability to browse older versions.
+This is the default ``properdocs serve`` hook. It keeps BESA-generated historical branch/tag API
+outputs and overlays ``main/`` with the current working-tree API, so uncommitted source edits remain
+visible without losing the ability to browse older versions.
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ API_PUBLIC_PATH = Path("reference") / "api"
 
 _APIDOCS_REFERENCE = re.compile(
     r"@apidocs(?:\[(?P<version>[A-Za-z0-9][A-Za-z0-9._-]*)\])?::"
-    r"(?P<symbol>[A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_][A-Za-z0-9_]*)*)"
+    r"(?P<symbol>[A-Za-z_][A-Za-z0-9_]*(?:(?:::|\.)[A-Za-z_][A-Za-z0-9_]*)*)"
 )
 
 _serve_active = False
@@ -360,8 +360,8 @@ def _publish_multiversion_api(site_directory: Path) -> None:
     for source in MULTIVERSION_API_BUILD_DIRECTORY.iterdir():
         _copy_entry(source, api_root / source.name)
 
-    # sphinx-multiversion builds Git refs, so uncommitted edits are not represented there. Overlay
-    # main/ with the ordinary Sphinx build of the current checkout to make this a true live preview.
+    # Historical refs come from detached worktrees, so uncommitted edits are not represented there.
+    # Overlay main/ with the current-checkout API build to make this a true live preview.
     if CURRENT_API_BUILD_DIRECTORY.is_dir():
         _copy_entry(CURRENT_API_BUILD_DIRECTORY, api_root / "main")
 
@@ -387,7 +387,7 @@ def _api_symbol_public_path(symbol: str, version: str) -> PurePosixPath:
         PurePosixPath(API_PUBLIC_PATH.as_posix())
         / version
         / "_symbols"
-        / PurePosixPath(*symbol.split("::"))
+        / PurePosixPath(*re.split(r"::|\.", symbol))
     )
 
 
@@ -397,11 +397,11 @@ def _api_symbol_build_path(symbol: str, version: str) -> Path:
         if version == "main"
         else MULTIVERSION_API_BUILD_DIRECTORY / version
     )
-    return root / "_symbols" / Path(*symbol.split("::")) / "index.html"
+    return root / "_symbols" / Path(*re.split(r"::|\.", symbol)) / "index.html"
 
 
 def on_page_markdown(markdown, page, config, **_kwargs):
-    """Resolve ``@apidocs[version]::qualified::name`` to the generated API.
+    """Resolve a semantic ``@apidocs`` C++, Python, or Rust name to the generated API.
 
     Omitting ``[version]`` uses ``extra.besa_api_version`` from ``properdocs.yml`` and ultimately
     falls back to ``main``. An explicit version always overrides that site-wide default.

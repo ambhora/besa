@@ -772,155 +772,115 @@ endif()
 
 @pytest.mark.cpp
 def test_generated_cpp_project_contains_properdocs_and_versioned_api_docs(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
 ) -> None:
-    import importlib.util
-
     project = cpp_generate(tmp_path, "example_docs")
     docs = project / "docs"
     api_docs = project / "api-docs"
 
-    # ProperDocs owns the prose site; the versioned API is a separate Sphinx tree mounted below it.
+    # The project site and API reference are deliberately separate ProperDocs sites. The former is
+    # non-versioned; the latter is generated per Git ref and mounted below reference/api/.
     assert (project / "properdocs.yml").is_file()
     assert (project / "properdocs.multiversion.yml").is_file()
     assert (project / "properdocs_multiversion_hook.py").is_file()
     assert (docs / "index.md").is_file()
     reference_landing = docs / "reference" / "index.md"
     assert reference_landing.is_file()
-    assert "## Versioned API" in reference_landing.read_text(encoding="utf-8")
+    reference_text = reference_landing.read_text(encoding="utf-8")
+    assert "## Versioned API" in reference_text
+    assert "separate ProperDocs site" in reference_text
+    assert "compiler-semantic API with Clang" in reference_text
+
     contributing = docs / "contributing.md"
     assert contributing.is_file()
     contributing_text = contributing.read_text(encoding="utf-8")
-    assert "## How to contribute to the docs" in contributing_text
-    assert "## How to contribute to the software" in contributing_text
+    assert "# Contributing" in contributing_text
+    assert "## Documentation" in contributing_text
+    assert "## Software" in contributing_text
+    assert "### License Compliance" in contributing_text
+    assert "REUSE Specification" in contributing_text
     assert "Developer Certificate of Origin (DCO) 1.1" in contributing_text
     assert "Signed-off-by: Name <email@example.com>" in contributing_text
 
     properdocs_config = (project / "properdocs.yml").read_text(encoding="utf-8")
     assert "- content.action.edit" in properdocs_config
-    assert "- How to contribute: contributing.md" in properdocs_config
+    assert "- Contributing: contributing.md" in properdocs_config
+    assert "second, versioned ProperDocs site" in properdocs_config
+    for page in (
+        "tutorials/index.md",
+        "how-to/index.md",
+        "explanations/index.md",
+        "showcases/index.md",
+        "blog/index.md",
+        "users.md",
+        "cite-us.md",
+        "about/index.md",
+    ):
+        assert (docs / page).is_file()
 
-    # besa.toml is the generated project's authoritative declaration, including the named API
-    # variants used to discover feature-dependent forms of individual entities.
+    # besa.toml remains the authoritative declaration of API profiles. The semantic C++ backend
+    # realizes each selected profile through CMake and asks Clang what API exists in that concrete
+    # compilation environment.
     model = (project / "besa.toml").read_text(encoding="utf-8")
     assert "schema = 1" in model
     assert '[project]\nname = "example_docs"\nversion = "0.1.0"' in model
-    for variant in ("cpu", "cuda", "hip"):
-        assert f"[api.variants.{variant}]" in model
+    for profile in ("cpu", "cuda", "hip"):
+        assert f"[api.profiles.{profile}]" in model
     assert 'path = "src/cpp"' in model
     assert 'api = "public"' in model
-    assert 'name = "Doxygen"' in model
     assert 'when = { all = ["user-docs"] }' in model
+    assert 'name = "Doxygen"' not in model
 
-    # The API source carries the complete documentation presentation and discovery
-    # machinery: multi-variant Doxygen union, source-backed listings, overload consolidation,
-    # inheritance/related-entity sections, availability metadata, and the hierarchical Outline.
-    conf_path = api_docs / "conf.py"
-    assert conf_path.is_file()
-    conf_text = conf_path.read_text(encoding="utf-8")
+    backend = project / "cmake" / "besa" / "userdocs" / "api_reference"
+    for module in (
+        "__main__.py",
+        "model.py",
+        "clang_backend.py",
+        "cpp_backend.py",
+        "python_backend.py",
+        "rust_backend.py",
+        "render.py",
+        "versioning.py",
+    ):
+        assert (backend / module).is_file()
+
+    api_cmake = (project / "cmake" / "besa" / "userdocs.cmake").read_text(encoding="utf-8")
     for needle in (
-        '"sphinx.ext.graphviz"',
-        'graphviz_output_format = "svg"',
-        'html_title = f"{project} API documentation"',
-        '"css/besa-api-desktop.css"',
-        '"js/besa-api-source-locations.js"',
-        '"EXAMPLE_DOCS_HOST_DEVICE"',
-        "def _configure_api_discovery(",
-        "def _merge_variant_xml(",
-        "def _write_variant_availability_sections(",
-        "def _write_define_variant_sections(",
-        "def _write_api_configuration_page(",
-        "def _write_overload_pages(",
-        "def _write_inheritance_graph_sections(",
-        "def _write_related_operator_sections(",
-        "def _write_related_function_sections(",
-        "def _restore_program_listings_from_sources(",
-        "def _api_global_macros(",
-        "besa_api_sidebar_tree",
+        "function(besa_add_semantic_api_docs)",
+        "BESA_API_PROFILES",
+        "-m api_reference build-cpp",
+        "-m api_reference build-versions",
+        "Generating semantic C++ API documentation with Clang and ProperDocs",
+        "besa_add_semantic_api_docs(",
     ):
-        assert needle in conf_text
+        assert needle in api_cmake
 
-    # Sphinx's C++ parser must accept the generated project's portability qualifier macros.
-    for qualifier in ("HOST", "DEVICE", "GLOBAL", "HOST_DEVICE"):
-        assert f'"EXAMPLE_DOCS_{qualifier}"' in conf_text
-
-    doxyfile = (api_docs / "Doxyfile.in").read_text(encoding="utf-8")
-    for setting in (
-        "XML_PROGRAMLISTING     = YES",
-        "ENABLE_PREPROCESSING   = YES",
-        "MACRO_EXPANSION        = YES",
-        "EXPAND_ONLY_PREDEF     = YES",
-    ):
-        assert setting in doxyfile
-    assert "CLANG_ASSISTED_PARSING" in doxyfile
-
-    api_css = (api_docs / "_static" / "css" / "besa-api.css").read_text(encoding="utf-8")
-    desktop_css = (api_docs / "_static" / "css" / "besa-api-desktop.css").read_text(
+    # The shared API layout is language-neutral. C++, Python, and Rust all render through these
+    # ProperDocs assets rather than through Sphinx/Breathe/Exhale presentation machinery.
+    api_template = api_docs / "properdocs"
+    api_css = (api_template / "assets" / "stylesheets" / "besa-api.css").read_text(
         encoding="utf-8"
     )
-    assert ".besa-api-outline-toggle" in api_css
-    assert ".api-kind" in api_css
-    assert "@media" in desktop_css
-    assert "bd-main" in desktop_css
-
-    presentation_script = (api_docs / "_static" / "js" / "besa-api-presentation.js").read_text(
+    api_js = (api_template / "assets" / "javascripts" / "besa-api.js").read_text(
         encoding="utf-8"
     )
-    assert 'className = "besa-api-qualifiers"' in presentation_script
-    assert "description.prepend(metadata)" in presentation_script
-    assert "besa-api-outline-toggle" in presentation_script
+    assert ".md-sidebar--primary" in api_css
+    assert ".md-sidebar--secondary" in api_css
+    assert ".besa-api-entity-card" in api_css
+    assert "Outline" in api_js
+    assert "Project documentation" in api_js
+    assert "versionRoot" in api_js
 
-    sidebar = (api_docs / "_templates" / "api-sidebar.html").read_text(encoding="utf-8")
-    assert "Outline" in sidebar
-    assert "besa_api_sidebar_tree" in sidebar
-    assert "besa-api-outline-toggle" in sidebar
-    assert "pathto(namespace.document)" in sidebar
-
-    not_found = (project / "overrides" / "404.html").read_text(encoding="utf-8")
-    assert 'href="{{ base_url }}"' in not_found
-
-    # Importing conf.py without a Sphinx build must resolve project identity/version from besa.toml;
-    # this also covers historical fallback plumbing without executing Doxygen.
-    monkeypatch.setenv("BESA_API_PROJECT_SOURCE_DIRECTORY", str(project))
-    module_name = "besa_generated_api_conf"
-    spec = importlib.util.spec_from_file_location(module_name, conf_path)
-    assert spec is not None and spec.loader is not None
-    conf = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(conf)
-    assert conf.project == "example_docs"
-    assert conf.release == "0.1.0"
-    assert conf._variant_reference_label("cuda") == "besa-api-variant-cuda"
-    assert "EXAMPLE_DOCS_HOST_DEVICE" in conf.cpp_id_attributes
+    docs_cmake = (docs / "CMakeLists.txt").read_text(encoding="utf-8")
+    assert "besa_add_user_docs(" in docs_cmake
+    assert "API_PATH reference/api" in docs_cmake
 
 
 @pytest.mark.cpp
 def test_generated_cpp_combined_docs_build_when_toolchain_is_available(tmp_path: Path) -> None:
-    required = (
-        "cmake",
-        "g++",
-        "git",
-        "doxygen",
-        "dot",
-        "properdocs",
-        "sphinx-build",
-        "sphinx-multiversion",
-    )
+    required = ("cmake", "g++", "git", "clang++", "properdocs")
     if any(shutil.which(tool) is None for tool in required):
-        pytest.skip("ProperDocs, Doxygen, Sphinx, Breathe, sphinx-multiversion, Git, and CMake are required")
-
-    extensions = subprocess.run(
-        [
-            sys.executable,
-            "-c",
-            "import breathe, exhale, pydata_sphinx_theme, sphinx_multiversion",
-        ],
-        check=False,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-    )
-    if extensions.returncode != 0:
-        pytest.skip("Breathe, Exhale, PyData Sphinx Theme, and sphinx-multiversion are required")
+        pytest.skip("ProperDocs, Clang, Git, and CMake are required")
 
     project = cpp_generate(tmp_path, "example_multidocs")
     _run(["git", "init", "-b", "main"], project)
@@ -932,8 +892,8 @@ def test_generated_cpp_combined_docs_build_when_toolchain_is_available(tmp_path:
     _run(["git", "commit", "-m", "initial"], project)
     _run(["git", "tag", "v0.1.0"], project)
 
-    # Add an API symbol only after v0.1.0. The old tag must never see this declaration even though
-    # sphinx-multiversion uses the current checkout's conf.py as its configuration directory.
+    # Add an API symbol only after v0.1.0. Historical sites are rebuilt from detached Git worktrees,
+    # so the old tag must retain its own compiler-semantic API rather than seeing the current tree.
     header = project / "src" / "cpp" / "include" / "example_multidocs" / "example_multidocs.hpp"
     header.write_text(
         header.read_text(encoding="utf-8")
@@ -951,9 +911,10 @@ def test_generated_cpp_combined_docs_build_when_toolchain_is_available(tmp_path:
     _run(["git", "add", "CMakeLists.txt", str(header.relative_to(project))], project)
     _run(["git", "commit", "-m", "add future API"], project)
     _run(["git", "tag", "v0.2.0"], project)
-    _run(["git", "branch", "docs-branch"], project)
 
-    configured = _run(
+    # Restrict this smoke test to the CPU profile so it does not require optional CUDA/HIP
+    # toolchains. Publication builds normally leave BESA_API_PROFILES empty and realize all profiles.
+    _run(
         [
             "cmake",
             "-S",
@@ -962,19 +923,16 @@ def test_generated_cpp_combined_docs_build_when_toolchain_is_available(tmp_path:
             "build/docs",
             "-DPROJECT_FEATURES=user-docs",
             "-DPROJECT_WARNINGS=none",
+            "-DBESA_API_PROFILES=cpu",
         ],
         project,
-        check=False,
     )
-    if configured.returncode != 0 and "breathe" in configured.stdout.lower():
-        pytest.skip("Breathe is not available to the Sphinx installation")
-    assert configured.returncode == 0, configured.stdout
 
-    # The raw multiversion target remains useful for API debugging.
+    # The raw multiversion target is a collection of independent ProperDocs API sites plus metadata;
+    # it deliberately has no publication-root index.html.
     _run(["cmake", "--build", "build/docs", "--target", "user.docs.multiversion"], project)
     raw_api = project / "build" / "docs" / "doc" / "api" / "multiversion"
     assert (raw_api / "main" / "index.html").is_file()
-    assert (raw_api / "docs-branch" / "index.html").is_file()
     assert (raw_api / "v0.1.0" / "index.html").is_file()
     assert (raw_api / "v0.2.0" / "index.html").is_file()
     assert (raw_api / "versions.json").is_file()
@@ -990,34 +948,29 @@ def test_generated_cpp_combined_docs_build_when_toolchain_is_available(tmp_path:
     assert "future_api" in html_text(raw_api / "v0.2.0")
     assert "future_api" in html_text(raw_api / "main")
 
-    # The file-oriented API mirrors the installed include namespace. Generated version.hpp is part
-    # of that public tree, while repository-only src/cpp/include path components stay hidden.
+    # Source locations use the public include namespace rather than leaking repository/build paths.
     main_api_text = html_text(raw_api / "main")
     assert "version.hpp" in main_api_text
     assert "example_multidocs/example_multidocs.hpp" in main_api_text
     assert "src/cpp/include" not in main_api_text
 
-    # Exhale should produce a structured API tree rather than one monolithic doxygenindex page.
-    assert (raw_api / "main" / "generated" / "library_root.html").is_file()
-    assert any((raw_api / "main" / "generated").glob("namespace_*.html")) or any(
-        (raw_api / "main" / "generated").glob("file_*.html")
-    )
+    # Semantic symbol aliases are emitted directly by the common renderer, without a Sphinx domain.
+    assert (raw_api / "main" / "_symbols" / "future_api" / "index.html").is_file()
 
-    # user.docs is the publication target: ProperDocs at the root, API versions below reference/api.
+    # user.docs is the publication target: non-versioned project ProperDocs at the root and versioned
+    # API ProperDocs sites below reference/api/.
     _run(["cmake", "--build", "build/docs", "--target", "user.docs"], project)
     site = project / "build" / "docs" / "doc" / "site"
     assert (site / "index.html").is_file()
     assert (site / "reference" / "api" / "index.html").is_file()
     assert (site / "reference" / "api" / "versions.json").is_file()
     assert (site / "reference" / "api" / "main" / "index.html").is_file()
-    assert (site / "reference" / "api" / "docs-branch" / "index.html").is_file()
     assert (site / "reference" / "api" / "v0.1.0" / "index.html").is_file()
     assert (site / "reference" / "api" / "v0.2.0" / "index.html").is_file()
     assert (site / ".nojekyll").is_file()
 
-    # A full CMake install also installs the normal project targets. The documentation targets above
-    # do not build those targets as a side effect, so build the ordinary project before exercising
-    # the complete install path.
+    # Documentation targets do not build the ordinary project as a side effect. Build it before
+    # exercising the complete install path.
     _run(["cmake", "--build", "build/docs"], project)
 
     prefix = tmp_path / "docs-prefix"
@@ -1069,7 +1022,6 @@ def test_generated_api_version_selectors_choose_semantic_tags_and_exact_refs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     import importlib.util
-    import re
 
     if shutil.which("git") is None:
         pytest.skip("Git is required")
@@ -1084,42 +1036,40 @@ def test_generated_api_version_selectors_choose_semantic_tags_and_exact_refs(
         _run(["git", "tag", tag], project)
     _run(["git", "branch", "maintenance"], project)
 
-    driver = project / "cmake" / "besa" / "userdocs" / "multiversion.py"
-    spec = importlib.util.spec_from_file_location("example_versions_driver", driver)
+    versioning = project / "cmake" / "besa" / "userdocs" / "api_reference" / "versioning.py"
+    spec = importlib.util.spec_from_file_location("example_versions_driver", versioning)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
 
-    all_branches, all_tags = module.selected_refs(project, "all")
-    assert all_branches == r"^(?:main)$"
-    assert all_tags == r"^.*$"
-
-    latest_branches, latest_tags = module.selected_refs(project, "latest:3")
-    assert re.fullmatch(latest_branches, "main")
-    assert not re.fullmatch(latest_branches, "maintenance")
-    assert re.fullmatch(latest_tags, "v0.11.0")
-    assert re.fullmatch(latest_tags, "v0.11.0-rc.1")
-    assert re.fullmatch(latest_tags, "v0.10.0")
-    assert not re.fullmatch(latest_tags, "v0.9.0")
-    assert not re.fullmatch(latest_tags, "nightly")
-
-    _range_branches, ranged_tags = module.selected_refs(project, "range:>=0.9,<0.11")
-    assert re.fullmatch(ranged_tags, "v0.9.0")
-    assert re.fullmatch(ranged_tags, "v0.10.0")
-    assert re.fullmatch(ranged_tags, "v0.11.0-rc.1")
-    assert not re.fullmatch(ranged_tags, "v0.8.0")
-    assert not re.fullmatch(ranged_tags, "v0.11.0")
-
-    explicit_branches, explicit_tags = module.selected_refs(
-        project, "refs:v0.8.0,maintenance"
-    )
-    assert re.fullmatch(explicit_branches, "main")
-    assert re.fullmatch(explicit_branches, "maintenance")
-    assert re.fullmatch(explicit_tags, "v0.8.0")
-    assert not re.fullmatch(explicit_tags, "v0.9.0")
+    assert module.selected_ref_names(project, "all") == [
+        "main",
+        "v0.11.0",
+        "v0.11.0-rc.1",
+        "v0.10.0",
+        "v0.9.0",
+        "v0.8.0",
+    ]
+    assert module.selected_ref_names(project, "latest:3") == [
+        "main",
+        "v0.11.0",
+        "v0.11.0-rc.1",
+        "v0.10.0",
+    ]
+    assert module.selected_ref_names(project, "range:>=0.9,<0.11") == [
+        "main",
+        "v0.11.0-rc.1",
+        "v0.10.0",
+        "v0.9.0",
+    ]
+    assert module.selected_ref_names(project, "refs:v0.8.0,maintenance") == [
+        "main",
+        "v0.8.0",
+        "maintenance",
+    ]
 
     with pytest.raises(RuntimeError, match="unknown BESA API Git refs"):
-        module.selected_refs(project, "refs:v9.9.9")
+        module.selected_ref_names(project, "refs:v9.9.9")
 
     monkeypatch.delenv("BESA_API_VERSIONS", raising=False)
     properdocs = project / "properdocs.yml"
@@ -1129,96 +1079,105 @@ def test_generated_api_version_selectors_choose_semantic_tags_and_exact_refs(
         ),
         encoding="utf-8",
     )
-    assert module._selector(project) == "latest:2"
+    assert module.selector(project) == "latest:2"
 
 
 @pytest.mark.cpp
-def test_multiversion_driver_neutralizes_selector_inside_historical_configs(
+def test_semantic_multiversion_builder_uses_git_worktrees(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import importlib.util
+    import importlib
+    import sys
+    from argparse import Namespace
 
-    project = cpp_generate(tmp_path, "example_versions_driver")
-    driver = project / "cmake" / "besa" / "userdocs" / "multiversion.py"
-    spec = importlib.util.spec_from_file_location("example_versions_runtime_driver", driver)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-
-    monkeypatch.setenv("BESA_API_VERSIONS", "latest:2")
-    monkeypatch.setattr(
-        module,
-        "selected_refs",
-        lambda _root, selector: (r"^(?:main)$", r"^(?:v0\.3\.0|v1\.0\.0)$")
-        if selector == "latest:2"
-        else (_ for _ in ()).throw(AssertionError(selector)),
+    project = tmp_path / "project"
+    project.mkdir()
+    output = tmp_path / "api"
+    work = tmp_path / "work"
+    backend_root = (
+        Path(__file__).resolve().parents[1] / "share" / "besa" / "cpp" / "cmake" / "userdocs"
     )
+    if str(backend_root) not in sys.path:
+        sys.path.insert(0, str(backend_root))
+    driver = importlib.import_module("api_reference.__main__")
 
-    calls = []
+    monkeypatch.setattr(driver, "selector", lambda _root: "all")
+    monkeypatch.setattr(driver, "selected_ref_names", lambda _root, _selector: ["main", "v1.0.0"])
 
-    def fake_run(command, *, cwd, check, env):
-        calls.append((command, cwd, check, env))
+    git_calls: list[list[str]] = []
 
-    monkeypatch.setattr(module.subprocess, "run", fake_run)
-    assert module.main(
-        [
-            "--sphinx-multiversion",
-            "/bin/sphinx-multiversion",
-            "--project-root",
-            str(project),
-            "--source-directory",
-            "api-docs",
-            "--output-directory",
-            str(tmp_path / "out"),
-            "--",
-            "-W",
-            "--keep-going",
-        ]
-    ) == 0
+    def fake_git(command: list[str], *, cwd: Path) -> None:
+        git_calls.append(command)
+        if command[:2] == ["worktree", "add"]:
+            checkout = Path(command[-2])
+            checkout.mkdir(parents=True, exist_ok=True)
 
-    assert len(calls) == 1
-    command, cwd, check, environment = calls[0]
-    assert cwd == project.resolve()
-    assert check is True
-    assert environment["BESA_API_VERSIONS"] == "all"
-    assert environment["BESA_SMV_BRANCH_WHITELIST"] == r"^(?:main)$"
-    assert environment["BESA_SMV_TAG_WHITELIST"] == r"^(?:v0\.3\.0|v1\.0\.0)$"
-    assert not any(argument.startswith("smv_branch_whitelist=") for argument in command)
-    assert not any(argument.startswith("smv_tag_whitelist=") for argument in command)
+    monkeypatch.setattr(driver, "_git", fake_git)
+
+    built: list[tuple[str, Path]] = []
+
+    def fake_build_cpp(arguments):
+        from api_reference.model import ApiGraph
+
+        built.append((arguments.version, arguments.project_root))
+        return ApiGraph(project="example", version=arguments.version, language="cpp")
+
+    monkeypatch.setattr(driver, "_build_cpp", fake_build_cpp)
+
+    def fake_render(graph, **kwargs):
+        destination = kwargs["output_directory"]
+        destination.mkdir(parents=True, exist_ok=True)
+        (destination / "index.html").write_text(graph.version, encoding="utf-8")
+
+    monkeypatch.setattr(driver, "_render_graph", fake_render)
+
+    args = Namespace(
+        project_root=project,
+        work_directory=work,
+        output_directory=output,
+        template_directory=tmp_path / "template",
+        properdocs="properdocs",
+        project_docs_url="../../../../../",
+        default_version="main",
+        cmake="cmake",
+        clang="clang++",
+        profile=[],
+    )
+    assert driver._build_versions(args) == 0
+    assert built[0] == ("main", project.resolve())
+    assert built[1][0] == "v1.0.0"
+    assert built[1][1] != project.resolve()
+    assert git_calls[0][:3] == ["worktree", "add", "--detach"]
+    assert git_calls[-1][:3] == ["worktree", "remove", "--force"]
+    assert (output / "main" / "index.html").read_text(encoding="utf-8") == "main"
+    assert (output / "v1.0.0" / "index.html").read_text(encoding="utf-8") == "v1.0.0"
 
 
 @pytest.mark.cpp
 def test_multiversion_api_metadata_is_generated(tmp_path: Path) -> None:
+    import importlib
+    import json
+    import sys
+
+    backend_root = (
+        Path(__file__).resolve().parents[1] / "share" / "besa" / "cpp" / "cmake" / "userdocs"
+    )
+    if str(backend_root) not in sys.path:
+        sys.path.insert(0, str(backend_root))
+    driver = importlib.import_module("api_reference.__main__")
+
     output = tmp_path / "api"
     for version in ("main", "1.0.0", "2.0.0", "release/3.0"):
-        (output / version / "_static").mkdir(parents=True)
+        (output / version).mkdir(parents=True)
         (output / version / "index.html").write_text(version, encoding="utf-8")
 
-    # Nested pages belong to a version's page manifest; they must not be mistaken for refs.
+    # Nested pages belong to a version's page manifest; branch names containing slashes remain one
+    # semantic version entry because the ref list, not directory discovery, defines the versions.
     (output / "main" / "detail").mkdir()
     (output / "main" / "detail" / "index.html").write_text("detail", encoding="utf-8")
 
-    script = (
-        Path(__file__).resolve().parents[1]
-        / "share"
-        / "besa"
-        / "cpp"
-        / "cmake"
-        / "userdocs"
-        / "multiversion-metadata.cmake"
-    )
-    _run(
-        [
-            "cmake",
-            f"-DOUTPUT_DIRECTORY={output}",
-            "-DDEFAULT_VERSION=main",
-            "-P",
-            str(script),
-        ],
-        tmp_path,
-    )
-
-    import json
+    refs = ["main", "1.0.0", "2.0.0", "release/3.0"]
+    driver._write_versions(output, refs, "main")
 
     metadata = json.loads((output / "versions.json").read_text(encoding="utf-8"))
     assert metadata["default"] == "main"
@@ -1227,12 +1186,7 @@ def test_multiversion_api_metadata_is_generated(tmp_path: Path) -> None:
         "url": "main/",
         "pages": ["detail/index.html", "index.html"],
     }
-    assert {item["name"] for item in metadata["versions"]} == {
-        "main",
-        "1.0.0",
-        "2.0.0",
-        "release/3.0",
-    }
+    assert {item["name"] for item in metadata["versions"]} == set(refs)
     assert "main/detail" not in {item["name"] for item in metadata["versions"]}
     assert not (output / "index.html").exists()
 
@@ -1322,29 +1276,25 @@ def test_generated_cpp_spack_environment_uses_amstack_and_local_dev_bundle(
     assert 'version("1.2")' in environment_package
     for variant in ("docs", "tests", "coverage"):
         assert f'variant("{variant}"' in environment_package
-    assert 'depends_on("doxygen+libclang", when="+docs")' in environment_package
-    assert 'depends_on("py-sphinx@:8", when="+docs")' in environment_package
-    assert 'depends_on("py-breathe", when="+docs")' in environment_package
-    assert 'depends_on("py-exhale", when="+docs")' in environment_package
-    assert 'depends_on("py-pydata-sphinx-theme", when="+docs")' in environment_package
-    assert 'depends_on("py-sphinx-multiversion", when="+docs")' in environment_package
     assert 'depends_on("properdocs", when="+docs")' in environment_package
+    assert 'depends_on("py-packaging", when="+docs")' in environment_package
+    for obsolete in (
+        "doxygen",
+        "py-sphinx",
+        "py-breathe",
+        "py-exhale",
+        "py-pydata-sphinx-theme",
+        "py-sphinx-multiversion",
+    ):
+        assert obsolete not in environment_package
     for toolchain in ("cuda", "hip"):
         assert f'variant("{toolchain}"' not in environment_package
         assert f'depends_on("{toolchain}"' not in environment_package
     assert not (repo / "packages" / "properdocs").exists()
 
-    doxygen_package_path = repo / "packages" / "doxygen" / "package.py"
-    assert doxygen_package_path.is_file()
-    doxygen_package = doxygen_package_path.read_text(encoding="utf-8")
-    assert "from spack_repo.builtin.packages.doxygen.package import Doxygen as BuiltinDoxygen" in doxygen_package
-    assert "class Doxygen(BuiltinDoxygen):" in doxygen_package
-    assert 'variant(\n        "libclang"' in doxygen_package
-    assert 'depends_on("llvm+clang", when="+libclang")' in doxygen_package
-    assert 'define_from_variant("use_libclang", "libclang")' in doxygen_package
+    assert not (repo / "packages" / "doxygen").exists()
 
     compile(environment_package, "dev_env/package.py", "exec")
-    compile(doxygen_package, "doxygen/package.py", "exec")
 
 
 @pytest.mark.cpp
@@ -1708,68 +1658,17 @@ def test_generated_documentation_cross_references_are_semantic(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     import importlib.util
-    import json
     from types import SimpleNamespace
 
     project = cpp_generate(tmp_path, "example_xrefs")
-    api_docs = project / "api-docs"
-
-    spec = importlib.util.spec_from_file_location("example_xrefs_conf", api_docs / "conf.py")
-    assert spec is not None and spec.loader is not None
-    api_module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(api_module)
-
-    class FakeCppDomain:
-        @staticmethod
-        def get_objects():
-            return [
-                (
-                    "example_xrefs::meta::build()",
-                    "example_xrefs::meta::build()",
-                    "function",
-                    "generated/function_build",
-                    "_CPPv4N13example_xrefs4meta5buildEv",
-                    1,
-                )
-            ]
-
-    class FakeEnv:
-        @staticmethod
-        def get_domain(name: str):
-            assert name == "cpp"
-            return FakeCppDomain()
-
-    class FakeBuilder:
-        @staticmethod
-        def get_target_uri(docname: str) -> str:
-            return f"{docname}.html"
-
-    output = tmp_path / "api-output"
-    output.mkdir()
-    app = SimpleNamespace(
-        env=FakeEnv(),
-        builder=FakeBuilder(),
-        outdir=str(output),
-        config=SimpleNamespace(release="0.1.0"),
-    )
-    api_module._write_api_symbol_aliases(app, None)
-
-    alias = output / "_symbols" / "example_xrefs" / "meta" / "build" / "index.html"
-    assert alias.is_file()
-    alias_text = alias.read_text(encoding="utf-8")
-    assert "../../../../generated/function_build.html#_CPPv4" in alias_text
-
-    symbols = json.loads((output / "symbols.json").read_text(encoding="utf-8"))
-    assert symbols["symbols"]["example_xrefs::meta::build"].startswith(
-        "generated/function_build.html#"
-    )
-
     hook_path = project / "properdocs_multiversion_hook.py"
     hook_spec = importlib.util.spec_from_file_location("example_xrefs_hook", hook_path)
     assert hook_spec is not None and hook_spec.loader is not None
     hook = importlib.util.module_from_spec(hook_spec)
     hook_spec.loader.exec_module(hook)
 
+    # The project documentation resolves language-neutral semantic names. C++ uses :: while Python
+    # may use dots; both map to the same _symbols hierarchy produced by the shared API renderer.
     page = SimpleNamespace(file=SimpleNamespace(dest_uri="reference/index.html"))
     rendered = hook.on_page_markdown(
         "Build metadata: @apidocs::example_xrefs::meta::build.",
@@ -1781,6 +1680,16 @@ def test_generated_documentation_cross_references_are_semantic(
         "(api/main/_symbols/example_xrefs/meta/build/)"
     ) in rendered
 
+    rendered_python = hook.on_page_markdown(
+        "Python solver: @apidocs::example_xrefs.linalg.solve.",
+        page,
+        {"extra": {"besa_api_version": "main"}},
+    )
+    assert (
+        "[`example_xrefs.linalg.solve`]"
+        "(api/main/_symbols/example_xrefs/linalg/solve/)"
+    ) in rendered_python
+
     rendered_versioned = hook.on_page_markdown(
         "Released metadata: @apidocs[v0.2.0]::example_xrefs::meta::build.",
         page,
@@ -1791,7 +1700,13 @@ def test_generated_documentation_cross_references_are_semantic(
         "(api/v0.2.0/_symbols/example_xrefs/meta/build/)"
     ) in rendered_versioned
 
-    hook.CURRENT_API_BUILD_DIRECTORY = output
+    # During `properdocs serve`, unresolved references are checked against the generated semantic
+    # aliases. No Sphinx domain/inventory is involved.
+    current = tmp_path / "current-api"
+    current_alias = current / "_symbols" / "example_xrefs" / "meta" / "build" / "index.html"
+    current_alias.parent.mkdir(parents=True)
+    current_alias.write_text("alias", encoding="utf-8")
+    hook.CURRENT_API_BUILD_DIRECTORY = current
     monkeypatch.setattr(hook, "_serve_active", True)
     hook.on_page_markdown(
         "@apidocs::example_xrefs::meta::build",
