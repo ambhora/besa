@@ -1,30 +1,26 @@
 <!-- SPDX-FileCopyrightText: 2026 BESA developers -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
-# BESA
+# BESA monorepo
 
-BESA is project-development tooling for declarative, self-contained build descriptions. Its current
-focus is C++/CMake plus a minimal Python project generator.
+This repository contains three independently testable Python projects:
 
-```console
-uv run besa cpp generate --path /tmp/example --name example
-cd /tmp/example/main
-cmake --workflow --preset gcc --fresh
-```
+- `besa/` — declarative project-development tooling and the CMake/Python project templates.
+- `cpdoc/` — standalone semantic, versioned API documentation generation.
+- `properdocs-cpdoc/` — the ProperDocs plugin that mounts cpdoc output and resolves API links.
 
-A generated C++ project vendors the BESA CMake implementation under `cmake/besa`; it does not require
-BESA to remain installed in order to build. Pass `--nvim-ycm` to additionally provision gitignored
-project-local Neovim and YouCompleteMe configuration.
+The repository root is a uv workspace so the projects can use one lock file while retaining their own
+`pyproject.toml`, source tree, and test suite.
 
-Run the BESA regression suite with:
+Run the test suites independently with:
 
 ```console
-uv run --group test pytest --basetemp=build/test
+uv run --project besa --group test pytest
+uv run --project cpdoc --group test pytest
+uv run --project properdocs-cpdoc --group test pytest
 ```
 
-Build the ProperDocs site with:
+Build the BESA project website with:
 
 ```console
-uv run --group docs properdocs build
+uv run --project besa --group docs properdocs build --config-file besa/properdocs.yml
 ```
-
-See the full documentation under `docs/` or the GitHub Pages site.

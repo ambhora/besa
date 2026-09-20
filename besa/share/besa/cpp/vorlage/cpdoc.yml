@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 BESA developers
+# SPDX-License-Identifier: Apache-2.0
+schema: 1
+
+project:
+  root: .
+  provider: besa
+  language: cpp
+  copyright: Copyright © vorlage developers · BESA_PROJECT_LICENSE
+
+content:
+  index: api-docs/index.md
+
+output:
+  current: ../build/cpdoc/current
+  versions: ../build/cpdoc/versions
+  work: ../build/cpdoc/work
+
+links:
+  project-docs: auto
+
+versions:
+  select: all
+  default: main
+
+cpp:
+  cmake: cmake
+  clang: clang++
+  variants: []

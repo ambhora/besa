@@ -1,0 +1,74 @@
+# SPDX-FileCopyrightText: 2026 BESA developers
+# SPDX-License-Identifier: Apache-2.0
+site_name: vorlage
+site_description: Documentation for vorlage
+site_dir: ../build/properdocs/site
+
+# Set this to the canonical Git repository to enable per-page edit/source links and the 404 issue
+# action. BESA derives the correct source path and current human Git ref; no edit_uri is required.
+# GitHub and GitLab repository URLs are supported directly; other/self-hosted layouts can set
+# extra.besa_repo_provider explicitly.
+# repo_url: https://github.com/example/vorlage
+copyright: Copyright &copy; vorlage developers &middot; BESA_PROJECT_LICENSE
+
+extra:
+  # The project-specific copyright above replaces MaterialX's generator credit.
+  generator: false
+  # Optional when repo_url is hosted on a provider BESA cannot infer. Supported values are github,
+  # gitlab, and bitbucket. Unknown hosts default to GitLab because self-hosted GitLab is common.
+  # besa_repo_provider: gitlab
+  # Optional override when issues live somewhere other than the repository's standard issue board.
+  # besa_issue_url: https://example.invalid/project/issues/new
+
+# ProperDocs owns the non-versioned project site. The installed properdocs-cpdoc plugin builds
+# cpdoc and mounts its standalone versioned API reference below reference/api/.
+theme:
+  name: materialx
+  custom_dir: overrides
+  palette:
+    - scheme: default
+      primary: custom
+      accent: custom
+    - scheme: slate
+      primary: custom
+      accent: custom
+  features:
+    - content.action.edit
+    - content.code.copy
+    - navigation.indexes
+    - navigation.sections
+    - navigation.tabs
+    - navigation.top
+    - search.highlight
+    - search.suggest
+    - toc.follow
+
+extra_css:
+  - assets/stylesheets/ambhora.css
+
+# ProperDocs and cpdoc remain separate generators; the plugin joins their output at build time.
+watch:
+  - cpdoc.yml
+  - src
+  - api-docs
+  - test/base
+  - .git/refs
+
+plugins:
+  - search
+  - cpdoc:
+      config: cpdoc.yml
+      mount: reference/api
+
+nav:
+  - Home: index.md
+  - Tutorials: tutorials/index.md
+  - How-To: how-to/index.md
+  - Explanations: explanations/index.md
+  - Showcases: showcases/index.md
+  - Reference: reference/index.md
+  - Blog: blog/index.md
+  - Users: users.md
+  - Cite Us: cite-us.md
+  - Contributing: contributing.md
+  - About: about/index.md
