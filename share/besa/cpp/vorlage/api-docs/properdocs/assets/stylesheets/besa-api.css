@@ -182,6 +182,31 @@
   padding: 0.25rem 0.2rem;
 }
 
+.besa-api-member-list {
+  border-top: 1px solid var(--besa-api-border);
+  margin-bottom: 0.85rem;
+}
+
+.besa-api-member-detail {
+  align-items: baseline;
+  border-bottom: 1px solid var(--besa-api-border);
+  display: flex;
+  gap: 0.45rem;
+  padding: 0.34rem 0.28rem;
+}
+
+.besa-api-member-detail code {
+  background: transparent;
+  color: var(--md-code-fg-color);
+  font-size: 0.75rem;
+  padding: 0;
+}
+
+.besa-api-related {
+  border-top: 1px solid var(--besa-api-border);
+  padding-top: 0.42rem;
+}
+
 .besa-api-header-actions {
   align-items: center;
   display: flex;

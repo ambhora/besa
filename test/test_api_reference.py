@@ -15,6 +15,7 @@ if str(API_REFERENCE_ROOT) not in sys.path:
     sys.path.insert(0, str(API_REFERENCE_ROOT))
 
 from api_reference.clang_backend import extract_cpp_graph
+from api_reference.cpp_backend import _configuration_name, _variant_predefines
 from api_reference.model import ApiEntity, ApiGraph, ApiParameter, ApiSignature, merge_graphs, stable_entity_id
 from api_reference.python_backend import build_python_graph
 from api_reference.render import entity_document, render_properdocs_source
@@ -142,6 +143,18 @@ def test_rustdoc_backend_normalizes_function_signature(tmp_path: Path) -> None:
     assert entity.signatures[0].returns == "Result<u64>"
 
 
+def test_cpp_backend_uses_declared_variant_labels_and_predefinitions() -> None:
+    catalog = {
+        "variants": [
+            {"name": "cpu", "features": ["toolchain-cpp"], "predefined": []},
+            {"name": "cuda", "features": ["toolchain-cpp", "toolchain-cuda"], "predefined": ["__CUDACC__=1"]},
+        ]
+    }
+    assert _configuration_name({"variant": "cpu", "variable_features": {}}, 0) == "cpu"
+    assert _configuration_name({"variant": "cuda", "variable_features": {}}, 1) == "cuda"
+    assert _variant_predefines(catalog, "cuda") == ["__CUDACC__=1"]
+
+
 def test_renderer_generates_code_oriented_properdocs_site(tmp_path: Path) -> None:
     graph = ApiGraph(project="dice", version="main", language="cpp")
     namespace = ApiEntity(
@@ -159,11 +172,47 @@ def test_renderer_generates_code_oriented_properdocs_site(tmp_path: Path) -> Non
         qualified_name="dice::foo",
         parent=namespace.id,
         signatures=[ApiSignature(parameters=(ApiParameter("value", "int"),), returns="void")],
+        documentation="Do work.\n\nBESA-API-RELATES-TO: bar",
         variants=["cpu"],
+    )
+    related = ApiEntity(
+        id=stable_entity_id("cpp", "class", "dice::bar"),
+        language="cpp",
+        kind="class",
+        name="bar",
+        qualified_name="dice::bar",
+        parent=namespace.id,
+    )
+    method = ApiEntity(
+        id=stable_entity_id("cpp", "method", "dice::bar::run"),
+        language="cpp",
+        kind="method",
+        name="run",
+        qualified_name="dice::bar::run",
+        parent=related.id,
+        signatures=[ApiSignature(parameters=(ApiParameter("value", "int"),), returns="void")],
     )
     graph.add(namespace)
     graph.add(function)
+    graph.add(related)
+    graph.add(method)
     graph.variants["cpu"] = {"profile": "cpu", "features": ["toolchain-cpp"], "predefined": []}
+    graph.metadata = {
+        "catalog": {
+            "active_features": ["toolchain-cpp"],
+            "project_model": {"features": {"toolchain-cpp": {}}},
+            "registrations": [
+                {"name": "core", "kind": "source-directory", "path": "src/core", "api": "public"}
+            ],
+        },
+        "variant_manifests": {
+            "cpu": {
+                "registrations": [
+                    {"name": "core", "kind": "source-directory", "path": "src/core", "api": "public", "selected": True}
+                ]
+            }
+        },
+    }
     graph.rebuild_children()
 
     template = tmp_path / "template"
@@ -186,8 +235,22 @@ def test_renderer_generates_code_oriented_properdocs_site(tmp_path: Path) -> Non
     assert '<article class="besa-api-entity-card">' in page
     assert "foo(int)" in page
     assert "API variants" in page
-    assert "api-variants/" in page
+    assert "About API variants and features" in page
+    assert "<strong>Related:</strong>" in page
+    assert 'class="language-cpp"' in page
     assert (source / "_symbols" / "dice" / "foo" / "index.md").is_file()
+    class_page = (source / entity_document(related)).read_text(encoding="utf-8")
+    assert '<code class="language-cpp">' in class_page
+    assert "## Public Functions" in class_page
+    assert "method-run/" in class_page
+    assert "## Public Functions" in class_page
+    assert entity_document(related).as_posix().endswith("class-bar/index.md")
+    variants_page = (source / "api-variants.md").read_text(encoding="utf-8")
+    assert "## Registered project inputs" in variants_page
+    assert "## Variant selection by feature" in variants_page
+    assert "### CPU" in variants_page
     config_text = config.read_text(encoding="utf-8")
     assert 'site_name: "dice API documentation"' in config_text
     assert "assets/stylesheets/besa-api.css" in config_text
+    assert '"foo": "api/dice/function-foo.md"' in config_text
+    assert "foo(int)" not in config_text

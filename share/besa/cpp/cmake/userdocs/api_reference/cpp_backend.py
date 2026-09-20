@@ -100,8 +100,9 @@ def _feature_overrides(catalog: dict[str, object], desired: set[str]) -> list[st
 
 
 def _configuration_name(configuration: dict[str, object], index: int) -> str:
+    variant = configuration.get("variant")
     profile = configuration.get("profile")
-    base = str(profile) if profile else "default"
+    base = str(variant or profile or "default")
     variables = configuration.get("variable_features")
     if not isinstance(variables, dict) or not variables:
         return base
@@ -111,16 +112,33 @@ def _configuration_name(configuration: dict[str, object], index: int) -> str:
     return base + "+" + "+".join(labels)
 
 
-def _profile_predefines(catalog: dict[str, object], profile_name: str | None) -> list[str]:
-    profiles = catalog.get("profiles")
-    if not isinstance(profiles, list):
+def _variant_predefines(catalog: dict[str, object], name: str | None) -> list[str]:
+    if not name:
         return []
-    for raw in profiles:
-        if not isinstance(raw, dict) or str(raw.get("name", "")) != str(profile_name or ""):
+
+    # Current manifests expose variants directly; older BESA refs called the same concept profiles.
+    for key in ("variants", "profiles"):
+        values = catalog.get(key)
+        if not isinstance(values, list):
             continue
-        values = raw.get("predefined")
-        if isinstance(values, list):
-            return [str(value) for value in values if str(value)]
+        for raw in values:
+            if not isinstance(raw, dict) or str(raw.get("name", "")) != name:
+                continue
+            predefined = raw.get("predefined")
+            if isinstance(predefined, list):
+                return [str(value) for value in predefined if str(value)]
+
+    model = catalog.get("project_model")
+    if isinstance(model, dict):
+        api = model.get("api")
+        if isinstance(api, dict):
+            variants = api.get("variants")
+            if isinstance(variants, dict):
+                raw = variants.get(name)
+                if isinstance(raw, dict):
+                    predefined = raw.get("predefined")
+                    if isinstance(predefined, list):
+                        return [str(value) for value in predefined if str(value)]
     return []
 
 
@@ -132,6 +150,18 @@ def _configuration_space(catalog: dict[str, object]) -> list[dict[str, object]]:
             values = [item for item in configurations if isinstance(item, dict)]
             if values:
                 return values
+
+    variants = catalog.get("variants")
+    if isinstance(variants, list) and variants:
+        return [
+            {
+                "variant": raw_variant.get("name"),
+                "enabled_features": raw_variant.get("features", []),
+                "variable_features": {},
+            }
+            for raw_variant in variants
+            if isinstance(raw_variant, dict)
+        ]
 
     profiles = catalog.get("profiles")
     if isinstance(profiles, list) and profiles:
@@ -223,8 +253,17 @@ def _configure_profile(
     ]
     if overrides:
         command.append("-DPROJECT_FEATURES=" + ";".join(overrides))
+    variant = configuration.get("variant")
     profile = configuration.get("profile")
-    if profile:
+    if variant:
+        # BESA renamed profiles to API variants once it became clear that they describe alternate
+        # forms of individual entities, not whole-project personalities.  Support both manifest
+        # generations so historical refs remain buildable.
+        if "variants" in catalog or "active_variant" in catalog:
+            command.append(f"-DBESA_API_VARIANT={variant}")
+        else:
+            command.append(f"-DBESA_API_PROFILE={variant}")
+    elif profile:
         command.append(f"-DBESA_API_PROFILE={profile}")
     _run(command, cwd=project_root)
 
@@ -263,11 +302,15 @@ def build_cpp_graph(
     clang_executable = clang or os.environ.get("BESA_CLANG_EXECUTABLE") or "clang++"
 
     graphs: list[tuple[str, ApiGraph]] = []
+    profile_manifests: dict[str, dict[str, object]] = {}
     seen_names: dict[str, int] = {}
     for index, configuration in enumerate(configurations):
+        variant_value = configuration.get("variant")
+        variant = str(variant_value) if variant_value else None
         profile_value = configuration.get("profile")
         profile = str(profile_value) if profile_value else None
-        if only_profiles is not None and (profile or "default") not in only_profiles:
+        selection_name = variant or profile or "default"
+        if only_profiles is not None and selection_name not in only_profiles:
             continue
         name = _configuration_name(configuration, index)
         count = seen_names.get(name, 0)
@@ -295,25 +338,41 @@ def build_cpp_graph(
             build_directory=profile_build,
             public_roots=roots,
             profile_name=name,
-            predefines=_profile_predefines(catalog, profile),
+            predefines=_variant_predefines(catalog, variant or profile),
             clang_executable=clang_executable,
             work_directory=work_directory / "profiles" / name / "clang",
         )
         enabled = configuration.get("enabled_features")
         graph.variants[name] = {
-            "profile": profile or "default",
+            "profile": variant or profile or "default",
             "features": list(enabled) if isinstance(enabled, list) else [],
-            "predefined": _profile_predefines(catalog, profile),
+            "predefined": _variant_predefines(catalog, variant or profile),
         }
+        profile_manifests[name] = manifest
         graphs.append((name, graph))
 
     if not graphs:
         requested = ", ".join(sorted(only_profiles or set())) or "configured API profiles"
         raise RuntimeError(f"No C++ API configurations matched {requested}")
 
-    return merge_graphs(
+    merged = merge_graphs(
         graphs,
         project=project,
         version=effective_version,
         language="cpp",
     )
+    merged.metadata = {
+        "catalog": catalog,
+        "variant_manifests": profile_manifests,
+        "documentation_inputs": [
+            {
+                "path": str(path.relative_to(project_root)).replace(chr(92), "/"),
+                "kind": "test-support",
+                "api": "public",
+                "feature": f"toolchain-{path.parent.name}",
+            }
+            for path in sorted(project_root.glob("test/base/*/include"))
+            if path.is_dir()
+        ],
+    }
+    return merged

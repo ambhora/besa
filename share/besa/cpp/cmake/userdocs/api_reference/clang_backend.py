@@ -176,6 +176,52 @@ def _location(
     return SourceLocation(_logical_public_path(path, public_roots, project_root), line, column)
 
 
+def _related_markers(node: dict[str, object], path: Path | None) -> list[str]:
+    """Read BESA-API-RELATES-TO markers immediately preceding a declaration.
+
+    These markers are intentionally ordinary source comments rather than part of the Doxygen-style
+    documentation block.  Clang therefore does not consistently include them in FullComment nodes,
+    even with ``-fparse-all-comments``.  Source locations are semantic, so using them to recover the
+    adjacent marker is deterministic and keeps this small BESA extension independent of Doxygen.
+    """
+
+    if path is None:
+        return []
+    loc = node.get("loc")
+    line: int | None = None
+    if isinstance(loc, dict):
+        if isinstance(loc.get("line"), int):
+            line = int(loc["line"])
+        elif isinstance(loc.get("offset"), int):
+            line, _ = _line_column_from_offset(path, int(loc["offset"]))
+    if line is None or line <= 1:
+        return []
+
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeDecodeError):
+        return []
+
+    marker = re.compile(r"BESA-API-RELATES-TO:\s*(.+?)\s*(?:\*/)?$")
+    # The marker is conventionally the comment directly above the declaration.  Permit a small
+    # comment/blank window so attributes do not make the convention brittle, but stop at source.
+    values: list[str] = []
+    for index in range(line - 2, max(-1, line - 12), -1):
+        text = lines[index].strip()
+        match = marker.search(text)
+        if match:
+            for value in re.split(r"\s*,\s*", match.group(1)):
+                if value and value not in values:
+                    values.append(value)
+            continue
+        if not text:
+            continue
+        if text.startswith(("//", "/*", "*", "*/", "[[")):
+            continue
+        break
+    return values
+
+
 def _qual_type(node: dict[str, object]) -> str:
     value = node.get("type")
     if isinstance(value, dict):
@@ -331,6 +377,7 @@ def _walk_ast(
             parent=parent_entity.id if parent_entity else None,
             documentation=_attached_comment(node),
             source=_location(node, path, project_root, public_roots),
+            related=_related_markers(node, path),
         )
         graph.add(entity)
         entity = graph.entities[entity.id]
@@ -356,6 +403,7 @@ def _walk_ast(
                 source=_location(node, path, project_root, public_roots),
                 properties=_entity_properties(node) + (["template"] if template_context else []),
                 bases=_base_names(node),
+                related=_related_markers(node, path),
             )
             graph.add(entity)
             entity = graph.entities[entity.id]
@@ -377,6 +425,7 @@ def _walk_ast(
             documentation=_attached_comment(node),
             source=_location(node, path, project_root, public_roots),
             properties=_entity_properties(node) + (["template"] if template_context else []),
+            related=_related_markers(node, path),
         )
         graph.add(entity)
         next_parent = graph.entities[entity_id]
@@ -393,6 +442,7 @@ def _walk_ast(
             documentation=_attached_comment(node),
             source=_location(node, path, project_root, public_roots),
             properties=["scoped"] if node.get("scopedEnumTag") else [],
+            related=_related_markers(node, path),
         )
         graph.add(entity)
         entity = graph.entities[entity.id]
@@ -410,6 +460,7 @@ def _walk_ast(
             parent=parent_entity.id if parent_entity else None,
             documentation=_attached_comment(node),
             source=_location(node, path, project_root, public_roots),
+            related=_related_markers(node, path),
         )
         graph.add(entity)
 
@@ -426,6 +477,7 @@ def _walk_ast(
             documentation=_attached_comment(node),
             source=_location(node, path, project_root, public_roots),
             properties=[f"= {target}"] if target else [],
+            related=_related_markers(node, path),
         )
         graph.add(entity)
 
@@ -442,6 +494,7 @@ def _walk_ast(
             documentation=_attached_comment(node),
             source=_location(node, path, project_root, public_roots),
             properties=[_qual_type(node)] if _qual_type(node) else [],
+            related=_related_markers(node, path),
         )
         graph.add(entity)
 
@@ -456,6 +509,7 @@ def _walk_ast(
             parent=parent_entity.id if parent_entity else None,
             documentation=_attached_comment(node),
             source=_location(node, path, project_root, public_roots),
+            related=_related_markers(node, path),
         )
         graph.add(entity)
 

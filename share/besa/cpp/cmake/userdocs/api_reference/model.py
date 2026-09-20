@@ -53,14 +53,18 @@ class ApiEntity:
     children: list[str] = field(default_factory=list)
     bases: list[str] = field(default_factory=list)
     aliases: list[str] = field(default_factory=list)
+    related: list[str] = field(default_factory=list)
 
     @property
     def navigation_label(self) -> str:
-        if self.kind in {"function", "method", "constructor", "macro"}:
-            if self.signatures:
-                return f"{self.name}{self.signatures[0].compact}"
-            if self.kind != "macro":
-                return f"{self.name}()"
+        # The outline is deliberately name-only.  Detailed/overload signatures belong to the
+        # entity page and its local "On this page" navigation, not to the global API tree.
+        return self.name
+
+    @property
+    def member_label(self) -> str:
+        if self.kind in {"function", "method", "constructor"}:
+            return f"{self.name}()"
         return self.name
 
 
@@ -72,6 +76,7 @@ class ApiGraph:
     entities: dict[str, ApiEntity] = field(default_factory=dict)
     variants: dict[str, dict[str, object]] = field(default_factory=dict)
     sources: dict[str, str] = field(default_factory=dict)
+    metadata: dict[str, object] = field(default_factory=dict)
 
     def add(self, entity: ApiEntity) -> None:
         existing = self.entities.get(entity.id)
@@ -97,6 +102,9 @@ class ApiGraph:
         for value in entity.aliases:
             if value not in existing.aliases:
                 existing.aliases.append(value)
+        for value in entity.related:
+            if value not in existing.related:
+                existing.related.append(value)
         if not existing.documentation and entity.documentation:
             existing.documentation = entity.documentation
         if existing.source is None and entity.source is not None:
@@ -162,6 +170,8 @@ def relative_source_path(path: str | Path, project_root: Path) -> str:
 def merge_graphs(graphs: Iterable[tuple[str, ApiGraph]], *, project: str, version: str, language: str) -> ApiGraph:
     merged = ApiGraph(project=project, version=version, language=language)
     for variant_name, graph in graphs:
+        for key, value in graph.metadata.items():
+            merged.metadata.setdefault(key, value)
         merged.variants[variant_name] = graph.variants.get(variant_name, {})
         for source_path, content in graph.sources.items():
             merged.sources.setdefault(source_path, content)
@@ -181,6 +191,7 @@ def merge_graphs(graphs: Iterable[tuple[str, ApiGraph]], *, project: str, versio
                 children=list(entity.children),
                 bases=list(entity.bases),
                 aliases=list(entity.aliases),
+                related=list(entity.related),
             )
             if variant_name not in entity_copy.variants:
                 entity_copy.variants.append(variant_name)
