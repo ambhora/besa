@@ -12,11 +12,12 @@ import shutil
 from pathlib import Path
 
 try:
-    from pygments import highlight
+    from pygments import highlight, lex
     from pygments.formatters import HtmlFormatter
     from pygments.lexers import CppLexer, PythonLexer, RustLexer, TextLexer
 except ImportError:  # pragma: no cover - optional dependency in some bootstrap environments
     highlight = None
+    lex = None
     HtmlFormatter = None
     CppLexer = PythonLexer = RustLexer = TextLexer = None
 
@@ -63,13 +64,87 @@ def _source_document(source_path: str) -> Path:
     return Path("_sources", *logical.parent.parts, logical.name + ".md")
 
 
+def _source_language(source_path: str) -> str:
+    suffix = Path(source_path).suffix.casefold()
+    if suffix in {".h", ".hh", ".hpp", ".hxx", ".c", ".cc", ".cpp", ".cxx", ".cu", ".cuh"}:
+        return "cpp"
+    if suffix in {".py", ".pyi"}:
+        return "python"
+    if suffix == ".rs":
+        return "rust"
+    return "text"
+
+
+def _pygments_lexer(language: str):
+    lexer_map = {
+        "cpp": CppLexer,
+        "python": PythonLexer,
+        "rust": RustLexer,
+    }
+    lexer_type = lexer_map.get(language, TextLexer)
+    return lexer_type() if lexer_type is not None else None
+
+
+def _token_style(formatter: HtmlFormatter, token_type) -> str:
+    style = formatter.style.style_for_token(token_type)
+    values: list[str] = []
+    if style.get("color"):
+        values.append(f"color: #{style['color']}")
+    if style.get("bgcolor"):
+        values.append(f"background-color: #{style['bgcolor']}")
+    if style.get("bold"):
+        values.append("font-weight: bold")
+    if style.get("italic"):
+        values.append("font-style: italic")
+    if style.get("underline"):
+        values.append("text-decoration: underline")
+    return "; ".join(values)
+
+
+def _highlight_source_lines(content: str, language: str) -> list[str]:
+    if lex is None or HtmlFormatter is None:
+        return [html.escape(value) or " " for value in content.splitlines()]
+
+    lexer = _pygments_lexer(language)
+    if lexer is None:
+        return [html.escape(value) or " " for value in content.splitlines()]
+
+    formatter = HtmlFormatter(noclasses=True)
+    rendered: list[list[str]] = [[]]
+    for token_type, value in lex(content, lexer):
+        style = _token_style(formatter, token_type)
+        parts = value.split("\n")
+        for index, part in enumerate(parts):
+            if part:
+                escaped = html.escape(part)
+                if style:
+                    rendered[-1].append(f'<span style="{html.escape(style, quote=True)}">{escaped}</span>')
+                else:
+                    rendered[-1].append(escaped)
+            if index + 1 < len(parts):
+                rendered.append([])
+
+    # lex() normally preserves the final newline as an empty logical line. Do not add an extra
+    # displayed line for that terminator; line numbers should match the source file exactly.
+    if content.endswith("\n") and rendered and not rendered[-1]:
+        rendered.pop()
+    return ["".join(parts) or " " for parts in rendered]
+
+
 def _source_page(source_path: str, content: str) -> str:
     title = Path(source_path).name
-    lines = [f"# File {title}", "", f"`{source_path}`", "", '<pre class="besa-api-source-code"><code>']
-    source_lines = content.splitlines()
+    language = _source_language(source_path)
+    lines = [
+        f"# File {title}",
+        "",
+        f"`{source_path}`",
+        "",
+        f'<pre class="besa-api-source-code"><code class="language-{html.escape(language)}">',
+    ]
+    source_lines = _highlight_source_lines(content, language)
     for number, value in enumerate(source_lines, 1):
         lines.append(
-            f'<span id="L{number}" data-line="{number}">{html.escape(value) or " "}</span>'
+            f'<span id="L{number}" data-line="{number}">{value}</span>'
         )
     lines.extend(["</code></pre>", ""])
     return "\n".join(lines)
@@ -686,19 +761,147 @@ def _variant_page(graph: ApiGraph) -> str:
 
 
 def _home_page(graph: ApiGraph) -> str:
-    roots = graph.roots()
+    roots = [entity for entity in graph.roots() if entity.kind != "macro"]
+    macros = sorted(
+        (entity for entity in graph.entities.values() if entity.kind == "macro"),
+        key=entity_sort_key,
+    )
     lines = [
         "# API Documentation Home",
         "",
-        f"Semantic API reference for **{graph.project}** {graph.version}.",
+        f"This site is the complete generated API reference for this version of **{graph.project}**.",
         "",
-        "The reference is extracted into a language-neutral BESA API graph and rendered with the same code-oriented layout across supported languages.",
+        "The language backend extracts semantic declarations into BESA's language-neutral API graph;",
+        "the reference renderer then presents the same code-oriented navigation and entity layout",
+        "across C++, Python, and Rust.",
         "",
-        "## Outline",
+        "[API variants and features](api-variants/) explains how configured features select entity",
+        "variants, which registered inputs participate, and which parser predefinitions are used.",
         "",
+        "## API hierarchy",
+        "",
+        _legend_html(graph),
+        "",
+        '<div class="besa-api-hierarchy">',
     ]
     for entity in roots:
-        lines.append(f"- [{entity.navigation_label}]({entity_url(entity)})")
+        lines.extend(_hierarchy_entity(entity, graph, Path("index.md")))
+    if macros:
+        lines.append('<ul class="besa-api-hierarchy-list"><li class="besa-api-hierarchy-group"><strong>Macros</strong><ul>')
+        for macro in macros:
+            href = _relative_link(Path("index.md"), entity_document(macro))
+            lines.append(
+                '<li><span class="api-kind" data-kind="macro"></span>'
+                f'<a href="{html.escape(href)}">{html.escape(macro.name)}</a></li>'
+            )
+        lines.append("</ul></li></ul>")
+    lines.extend(["</div>", "", "## File Hierarchy", "", _file_hierarchy(graph, Path("index.md")), ""])
+    return "\n".join(lines)
+
+
+def _legend_html(graph: ApiGraph) -> str:
+    kinds = {entity.kind for entity in graph.entities.values()}
+    order = [
+        ("namespace", "namespace"),
+        ("module", "module"),
+        ("package", "package"),
+        ("class", "class"),
+        ("struct", "struct"),
+        ("union", "union"),
+        ("enum", "enum"),
+        ("trait", "trait"),
+        ("protocol", "protocol"),
+        ("concept", "concept"),
+        ("type_alias", "type alias"),
+        ("function", "function"),
+        ("method", "method"),
+        ("variable", "variable"),
+        ("attribute", "attribute"),
+        ("constant", "constant"),
+        ("macro", "macro"),
+    ]
+    values = []
+    seen_labels: set[str] = set()
+    for kind, label in order:
+        if kind not in kinds or label in seen_labels:
+            continue
+        seen_labels.add(label)
+        values.append(
+            f'<span class="besa-api-legend-entry"><span class="api-kind" data-kind="{kind}"></span>{label}</span>'
+        )
+    return '<div class="besa-api-legend">' + '<span class="besa-api-legend-separator"> · </span>'.join(values) + "</div>"
+
+
+def _hierarchy_label(entity: ApiEntity) -> str:
+    if entity.kind in {"function", "method", "constructor"}:
+        return f"{entity.name}()"
+    return entity.name
+
+
+def _hierarchy_entity(entity: ApiEntity, graph: ApiGraph, document_path: Path) -> list[str]:
+    href = _relative_link(document_path, entity_document(entity))
+    lines = [
+        '<ul class="besa-api-hierarchy-list"><li>'
+        f'<span class="api-kind" data-kind="{html.escape(entity.kind)}"></span>'
+        f'<a href="{html.escape(href)}">{html.escape(_hierarchy_label(entity))}</a>'
+    ]
+    children = [graph.entities[child_id] for child_id in entity.children if graph.entities[child_id].kind != "macro"]
+    if children:
+        lines.append('<div class="besa-api-hierarchy-children">')
+        for child in children:
+            lines.extend(_hierarchy_entity(child, graph, document_path))
+        lines.append("</div>")
+    lines.append("</li></ul>")
+    return lines
+
+
+def _file_tree(graph: ApiGraph) -> dict[str, object]:
+    root: dict[str, object] = {}
+    for source_path in sorted(graph.sources):
+        current = root
+        parts = Path(source_path).parts
+        for part in parts[:-1]:
+            child = current.setdefault(part, {})
+            if not isinstance(child, dict):
+                break
+            current = child
+        current[parts[-1]] = source_path
+    return root
+
+
+def _file_tree_html(node: dict[str, object], document_path: Path) -> str:
+    lines = ['<ul class="besa-api-file-tree">']
+    for name, value in sorted(node.items(), key=lambda item: (not isinstance(item[1], dict), item[0].casefold())):
+        if isinstance(value, dict):
+            lines.append(f'<li><strong>Directory {html.escape(name)}</strong>{_file_tree_html(value, document_path)}</li>')
+        else:
+            target = _source_document(str(value))
+            href = _relative_link(document_path, target)
+            lines.append(f'<li><a href="{html.escape(href)}">File {html.escape(name)}</a></li>')
+    lines.append("</ul>")
+    return "".join(lines)
+
+
+def _file_hierarchy(graph: ApiGraph, document_path: Path) -> str:
+    if not graph.sources:
+        return '<p class="besa-api-undocumented">No source files were recorded for this API graph.</p>'
+    return _file_tree_html(_file_tree(graph), document_path)
+
+
+def _macros_page(graph: ApiGraph) -> str:
+    macros = sorted(
+        (entity for entity in graph.entities.values() if entity.kind == "macro"),
+        key=entity_sort_key,
+    )
+    lines = ["# Macros", "", '<div class="besa-api-member-list">']
+    for macro in macros:
+        href = _relative_link(Path("macros.md"), entity_document(macro))
+        lines.append(
+            f'<a class="besa-api-member-detail" href="{html.escape(href)}">'
+            '<span class="api-kind" data-kind="macro"></span>'
+            f'<code>{html.escape(macro.name)}</code></a>'
+        )
+    lines.extend(["</div>", ""])
     lines.append("")
     return "\n".join(lines)
 
@@ -722,8 +925,8 @@ def _kind_marker(kind: str) -> str:
         "attribute": "A",
         "property": "P",
         "constant": "C",
-        "macro": "M",
-        "concept": "C",
+        "macro": "D",
+        "concept": "K",
     }.get(kind, "·")
 
 
@@ -739,7 +942,10 @@ def _nav_entity(entity: ApiEntity, graph: ApiGraph, indent: int) -> list[str]:
     # directly navigable without an extra visible "Overview" row.
     lines.append(f"{pad}  - {json.dumps(label)}: {json.dumps(document)}")
     for child_id in entity.children:
-        lines.extend(_nav_entity(graph.entities[child_id], graph, indent + 1))
+        child = graph.entities[child_id]
+        if child.kind == "macro":
+            continue
+        lines.extend(_nav_entity(child, graph, indent + 1))
     return lines
 
 
@@ -789,7 +995,17 @@ def _properdocs_config(
         '  - "API Variants and Features": "api-variants.md"',
     ]
     for entity in graph.roots():
+        if entity.kind == "macro":
+            continue
         lines.extend(_nav_entity(entity, graph, 1))
+    macros = sorted(
+        (entity for entity in graph.entities.values() if entity.kind == "macro"),
+        key=entity_sort_key,
+    )
+    if macros:
+        lines.extend(['  - "Macros":', '    - "Macros": "macros.md"'])
+        for macro in macros:
+            lines.extend(_nav_entity(macro, graph, 2))
     lines.append("")
     return "\n".join(lines)
 
@@ -823,6 +1039,8 @@ def render_properdocs_source(
     source_directory.mkdir(parents=True)
     (source_directory / "index.md").write_text(_home_page(graph), encoding="utf-8")
     (source_directory / "api-variants.md").write_text(_variant_page(graph), encoding="utf-8")
+    if any(entity.kind == "macro" for entity in graph.entities.values()):
+        (source_directory / "macros.md").write_text(_macros_page(graph), encoding="utf-8")
 
     for entity in graph.entities.values():
         document = source_directory / entity_document(entity)

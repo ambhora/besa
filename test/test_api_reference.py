@@ -175,6 +175,14 @@ def test_renderer_generates_code_oriented_properdocs_site(tmp_path: Path) -> Non
         documentation="Do work.\n\nBESA-API-RELATES-TO: bar",
         variants=["cpu"],
     )
+    nested_namespace = ApiEntity(
+        id=stable_entity_id("cpp", "namespace", "dice::meta"),
+        language="cpp",
+        kind="namespace",
+        name="meta",
+        qualified_name="dice::meta",
+        parent=namespace.id,
+    )
     related = ApiEntity(
         id=stable_entity_id("cpp", "class", "dice::bar"),
         language="cpp",
@@ -192,10 +200,20 @@ def test_renderer_generates_code_oriented_properdocs_site(tmp_path: Path) -> Non
         parent=related.id,
         signatures=[ApiSignature(parameters=(ApiParameter("value", "int"),), returns="void")],
     )
+    macro = ApiEntity(
+        id=stable_entity_id("cpp", "macro", "DICE_TEST"),
+        language="cpp",
+        kind="macro",
+        name="DICE_TEST",
+        qualified_name="DICE_TEST",
+    )
     graph.add(namespace)
+    graph.add(nested_namespace)
     graph.add(function)
     graph.add(related)
     graph.add(method)
+    graph.add(macro)
+    graph.sources["dice/version.hpp"] = "#pragma once\nnamespace dice { namespace meta {} }\n"
     graph.variants["cpu"] = {"profile": "cpu", "features": ["toolchain-cpp"], "predefined": []}
     graph.metadata = {
         "catalog": {
@@ -245,6 +263,20 @@ def test_renderer_generates_code_oriented_properdocs_site(tmp_path: Path) -> Non
     assert "method-run/" in class_page
     assert "## Public Functions" in class_page
     assert entity_document(related).as_posix().endswith("class-bar/index.md")
+    namespace_page = (source / entity_document(namespace)).read_text(encoding="utf-8")
+    assert "namespace" in namespace_page
+    assert "style=" in namespace_page
+    source_page = (source / "_sources" / "dice" / "version.hpp.md").read_text(encoding="utf-8")
+    assert 'class="language-cpp"' in source_page
+    assert "style=" in source_page
+    home_page = (source / "index.md").read_text(encoding="utf-8")
+    assert "## API hierarchy" in home_page
+    assert "## File Hierarchy" in home_page
+    assert "besa-api-legend" in home_page
+    assert "DICE_TEST" in home_page
+    assert "Directory dice" in home_page
+    assert "File version.hpp" in home_page
+    assert (source / "macros.md").is_file()
     variants_page = (source / "api-variants.md").read_text(encoding="utf-8")
     assert "## Registered project inputs" in variants_page
     assert "## Variant selection by feature" in variants_page
@@ -254,3 +286,5 @@ def test_renderer_generates_code_oriented_properdocs_site(tmp_path: Path) -> Non
     assert "assets/stylesheets/besa-api.css" in config_text
     assert '"foo": "api/dice/function-foo.md"' in config_text
     assert "foo(int)" not in config_text
+    assert '  - "meta":' in config_text
+    assert '  - "Macros":' in config_text

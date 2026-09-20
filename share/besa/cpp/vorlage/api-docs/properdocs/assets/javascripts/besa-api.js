@@ -22,8 +22,8 @@
     attribute: "A",
     property: "P",
     constant: "C",
-    macro: "M",
-    concept: "C",
+    macro: "D",
+    concept: "K",
   };
 
   function scriptBase() {
