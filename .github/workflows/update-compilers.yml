@@ -1,0 +1,52 @@
+# ------------------------------------------------------------------------------
+# SPDX-FileCopyrightText: 2026 BESA developers
+# SPDX-License-Identifier: Apache-2.0
+# ------------------------------------------------------------------------------
+# Weekly check for newly released compilers. When `besa-dev discover --write`
+# changes dev/etc/compilers.json, a pull request is opened; merging it adds the
+# compilers to the test matrix.
+#
+# Pull requests opened with the default GITHUB_TOKEN do not start other
+# workflows. Store a fine-grained token with contents and pull-request write
+# access as the BESA_BOT_TOKEN secret to have the test workflow run on them.
+name: update-compilers
+
+on:
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+      - name: Discover released compilers
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          uv run --frozen --project dev besa-dev discover --write \
+            | tee "${RUNNER_TEMP}/discover.txt"
+          {
+            echo "body<<BESA_EOF"
+            echo 'Changes reported by `besa-dev discover --write`:'
+            echo
+            echo '```'
+            cat "${RUNNER_TEMP}/discover.txt"
+            echo '```'
+            echo "BESA_EOF"
+          } >> "${GITHUB_ENV}"
+      - uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.BESA_BOT_TOKEN || secrets.GITHUB_TOKEN }}
+          branch: besa-dev/update-compilers
+          delete-branch: true
+          add-paths: dev/etc/compilers.json
+          commit-message: "ci: update the compiler matrix"
+          title: "ci: update the compiler matrix"
+          body: ${{ env.body }}

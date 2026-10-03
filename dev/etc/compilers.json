@@ -1,0 +1,82 @@
+{
+  "schema": 1,
+  "families": {
+    "gcc": {
+      "minimum": 13,
+      "discovery": {
+        "kind": "docker-hub-tags",
+        "repository": "library/gcc",
+        "pattern": "^(\\d+)$"
+      },
+      "image": "gcc:{version}",
+      "setup": [
+        "apt-get update",
+        "apt-get install --yes --no-install-recommends python3-venv"
+      ],
+      "cc": "gcc",
+      "cxx": "g++",
+      "path": ""
+    },
+    "clang": {
+      "minimum": 20,
+      "discovery": {
+        "kind": "github-releases",
+        "repository": "llvm/llvm-project",
+        "pattern": "^llvmorg-(\\d+)\\.\\d+\\.\\d+$"
+      },
+      "image": "ubuntu:24.04",
+      "setup": [
+        "apt-get update",
+        "apt-get install --yes --no-install-recommends ca-certificates gnupg lsb-release software-properties-common wget python3-venv g++ libstdc++-14-dev",
+        "wget --quiet --output-document=/tmp/llvm.sh https://apt.llvm.org/llvm.sh",
+        "bash /tmp/llvm.sh {version} all",
+        "apt-get install --yes --no-install-recommends libclang-rt-{version}-dev"
+      ],
+      "cc": "clang",
+      "cxx": "clang++",
+      "path": "/usr/lib/llvm-{version}/bin"
+    }
+  },
+  "compilers": [
+    {
+      "family": "gcc",
+      "version": 16,
+      "experimental": false
+    },
+    {
+      "family": "gcc",
+      "version": 15,
+      "experimental": false
+    },
+    {
+      "family": "gcc",
+      "version": 14,
+      "experimental": false
+    },
+    {
+      "family": "gcc",
+      "version": 13,
+      "experimental": false
+    },
+    {
+      "family": "clang",
+      "version": 23,
+      "experimental": false
+    },
+    {
+      "family": "clang",
+      "version": 22,
+      "experimental": false
+    },
+    {
+      "family": "clang",
+      "version": 21,
+      "experimental": false
+    },
+    {
+      "family": "clang",
+      "version": 20,
+      "experimental": false
+    }
+  ]
+}

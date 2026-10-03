@@ -1,0 +1,75 @@
+# ------------------------------------------------------------------------------
+# SPDX-FileCopyrightText: 2026 BESA developers
+# SPDX-License-Identifier: Apache-2.0
+# ------------------------------------------------------------------------------
+# The compiler jobs are not listed here: the matrix job reads them from
+# dev/etc/compilers.json through besa-dev, and each job runs the same container
+# command as `besa-dev run <id>` does locally.
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  dev:
+    name: dev tooling
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+      - name: Lint
+        run: |
+          uv run --frozen --project dev ruff check dev
+          uv run --frozen --project dev ruff format --check dev
+      - name: Unit tests
+        run: uv run --frozen --project dev pytest dev/tests
+
+  matrix:
+    name: compiler matrix
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+      - id: matrix
+        name: Read dev/etc/compilers.json
+        run: |
+          matrix="$(uv run --frozen --quiet --project dev besa-dev matrix)"
+          echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
+          uv run --frozen --quiet --project dev besa-dev list
+
+  test:
+    name: ${{ matrix.name }}
+    needs: matrix
+    runs-on: ubuntu-24.04
+    continue-on-error: ${{ matrix.experimental }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.matrix.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+      # The runner kernel uses more ASLR entropy than older sanitizer runtimes
+      # tolerate; containers share the host kernel, so lower it here.
+      - name: Prepare the kernel for sanitizers
+        run: sudo sysctl -w vm.mmap_rnd_bits=28
+      - name: Test with ${{ matrix.name }}
+        run: uv run --frozen --project dev besa-dev run "${{ matrix.id }}"
+      - name: Upload test logs
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: test-logs-${{ matrix.id }}
+          path: build/ci-${{ matrix.id }}/Testing/Temporary/
+          if-no-files-found: ignore

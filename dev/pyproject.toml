@@ -1,0 +1,40 @@
+# ------------------------------------------------------------------------------
+# SPDX-FileCopyrightText: 2026 BESA developers
+# SPDX-License-Identifier: Apache-2.0
+# ------------------------------------------------------------------------------
+[project]
+name = "besa-dev"
+dynamic = ["version"]
+description = "Developer tooling for BESA: the CI compiler matrix and its updates"
+readme = "readme.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [{ name = "Jayesh Badwaik", email = "j.badwaik@fz-juelich.de" }]
+dependencies = []
+
+[project.scripts]
+besa-dev = "besa_dev.cli:main"
+
+[dependency-groups]
+dev = ["pytest", "ruff"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/besa_dev/metadata.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/besa_dev"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 80
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]

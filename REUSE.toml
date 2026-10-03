@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: 2026 BESA developers
+# SPDX-License-Identifier: Apache-2.0
+version = 1
+
+[[annotations]]
+path = [
+  "share/besa/cmake/.besa-cmake-module",
+  "tests/projects/**/.clang-format",
+  "tests/projects/**/.clang-tidy",
+  "dev/etc/compilers.json",
+  "dev/uv.lock",
+]
+SPDX-FileCopyrightText = "2026 BESA developers"
+SPDX-License-Identifier = "Apache-2.0"
