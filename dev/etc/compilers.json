@@ -18,7 +18,7 @@
       "path": ""
     },
     "clang": {
-      "minimum": 20,
+      "minimum": 21,
       "discovery": {
         "kind": "github-releases",
         "repository": "llvm/llvm-project",
@@ -71,11 +71,6 @@
     {
       "family": "clang",
       "version": 21,
-      "experimental": false
-    },
-    {
-      "family": "clang",
-      "version": 20,
       "experimental": false
     }
   ]
