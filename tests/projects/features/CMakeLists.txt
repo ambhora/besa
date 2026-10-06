@@ -29,3 +29,8 @@ besa_configure_complete()
 
 besa_add_subdirectory(DIRECTORY alpha TYPE cpp CONDITION alpha)
 besa_add_subdirectory(DIRECTORY beta TYPE cpp CONDITION beta)
+
+# cpdocs is additive: requesting metadata must not suppress the project's normal targets.
+if(WRITE_CPDOCS_FEATURE_SETS AND NOT TARGET libfeatures)
+  message(FATAL_ERROR "cpdocs feature-set export suppressed normal target 'libfeatures'")
+endif()

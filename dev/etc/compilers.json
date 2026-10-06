@@ -24,7 +24,7 @@
         "repository": "llvm/llvm-project",
         "pattern": "^llvmorg-(\\d+)\\.\\d+\\.\\d+$"
       },
-      "image": "ubuntu:24.04",
+      "image": "ubuntu:26.04",
       "setup": [
         "apt-get update",
         "apt-get install --yes --no-install-recommends ca-certificates gnupg lsb-release software-properties-common wget python3-venv g++ libstdc++-14-dev",
