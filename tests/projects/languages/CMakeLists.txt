@@ -14,4 +14,4 @@ besa_set_feature_space(backend DEFAULT host)
 besa_configure_complete()
 
 besa_add_subdirectory(DIRECTORY host TYPE cpp CONDITION host)
-besa_add_subdirectory(DIRECTORY device TYPE cuda CONDITION gpu)
+besa_add_subdirectory(DIRECTORY device TYPE cpp CONDITION gpu)

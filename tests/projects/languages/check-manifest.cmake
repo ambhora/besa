@@ -14,8 +14,8 @@ endif()
 string(JSON _type GET "${_json}" units 0 type)
 string(JSON _language GET "${_json}" units 0 language)
 string(JSON _parser_language GET "${_json}" units 0 parse language)
-if(NOT _type STREQUAL "cuda" OR NOT _language STREQUAL "cuda" OR NOT _parser_language STREQUAL "cpp")
-  message(FATAL_ERROR "feature 'gpu' did not resolve to CUDA semantic language with C++ parsing:\n${_json}")
+if(NOT _type STREQUAL "cpp" OR NOT _language STREQUAL "cpp" OR NOT _parser_language STREQUAL "cpp")
+  message(FATAL_ERROR "feature 'gpu' did not independently resolve to the declared C++ language:\n${_json}")
 endif()
 
 # The manifest describes this build only; feature-set availability is tracked by cpdocs from the

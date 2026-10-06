@@ -4,4 +4,4 @@
 # ------------------------------------------------------------------------------
 """Python interface for installing and vendoring BESA's CMake support."""
 
-__version__ = "0.4.0"
+__version__ = "0.4.1"
