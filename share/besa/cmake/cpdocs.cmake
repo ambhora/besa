@@ -54,11 +54,19 @@ function(_besa_cpdocs_write_feature_sets OUTPUT_FILE)
   endforeach()
   string(JOIN ",\n    " _objects_json ${_objects})
 
+  _besa_json_string("${PROJECT_NAME}" _project_name_json)
+  _besa_json_string("${PROJECT_VERSION}" _project_version_json)
+
   get_filename_component(_directory "${OUTPUT_FILE}" DIRECTORY)
   file(MAKE_DIRECTORY "${_directory}")
   file(WRITE "${OUTPUT_FILE}"
     "{\n"
     "  \"cpdocs-feature-sets\": 1,\n"
+    "  \"generator\": \"besa\",\n"
+    "  \"project\": {\n"
+    "    \"name\": ${_project_name_json},\n"
+    "    \"version\": ${_project_version_json}\n"
+    "  },\n"
     "  \"feature-sets\": [\n    ${_objects_json}\n  ]\n"
     "}\n"
   )
