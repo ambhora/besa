@@ -2,6 +2,22 @@
 # SPDX-FileCopyrightText: 2026 BESA developers
 # SPDX-License-Identifier: Apache-2.0
 # --------------------------------------------------------------------------------------------------
+execute_process(
+  COMMAND "${CMAKE_COMMAND}" --build "${BINARY_DIR}" --target besa.cpdocs
+  RESULT_VARIABLE _cpdocs_result
+  OUTPUT_VARIABLE _cpdocs_output
+  ERROR_VARIABLE _cpdocs_output
+)
+if(NOT _cpdocs_result EQUAL 0)
+  message(FATAL_ERROR "besa.cpdocs target failed:\n${_cpdocs_output}")
+endif()
+if(NOT EXISTS "${BINARY_DIR}/besa/subdirectories/schema/codegen.stamp")
+  message(FATAL_ERROR "besa.cpdocs did not run the registered code generator")
+endif()
+if(NOT EXISTS "${BINARY_DIR}/cpdocs-manifest.json")
+  message(FATAL_ERROR "besa.cpdocs manifest was not written")
+endif()
+
 set(_manifest "${BINARY_DIR}/besa/manifest.json")
 file(READ "${_manifest}" _json)
 string(JSON _count LENGTH "${_json}" units)

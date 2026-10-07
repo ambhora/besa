@@ -92,5 +92,16 @@ function(_besa_cpdocs_finalize)
   endif()
   if(DEFINED BESA_CPDOCS_MANIFEST_OUTPUT AND NOT "${BESA_CPDOCS_MANIFEST_OUTPUT}" STREQUAL "")
     _besa_cpdocs_write_manifest("${BESA_CPDOCS_MANIFEST_OUTPUT}")
+
+    # The manifest is complete after configuration, but generated API inputs may still need their
+    # build-time generators. cpdocs invokes this target before extraction for exactly that step.
+    if(NOT TARGET besa.cpdocs)
+      add_custom_target(besa.cpdocs)
+      get_property(_codegen_targets GLOBAL PROPERTY BESA_INTERNAL_CODEGEN_TARGETS)
+      if(_codegen_targets)
+        list(REMOVE_DUPLICATES _codegen_targets)
+        add_dependencies(besa.cpdocs ${_codegen_targets})
+      endif()
+    endif()
   endif()
 endfunction()
