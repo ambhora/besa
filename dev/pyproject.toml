@@ -38,3 +38,7 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+
+# Keep Python formatting at 80 columns, but allow 100-column SPDX borders.
+[tool.ruff.lint.pycodestyle]
+max-line-length = 100
