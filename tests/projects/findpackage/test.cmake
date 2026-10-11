@@ -1,6 +1,6 @@
 # --------------------------------------------------------------------------------------------------
-# SPDX-FileCopyrightText: 2026 BESA developers
 # SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 besa developers
 # --------------------------------------------------------------------------------------------------
 # Test-only assertions for package discovery.
 function(_besa_test_findpackage)

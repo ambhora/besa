@@ -1,9 +1,9 @@
 # --------------------------------------------------------------------------------------------------
-# SPDX-FileCopyrightText: 2026 BESA developers
 # SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 besa developers
 # --------------------------------------------------------------------------------------------------
 # Release policy and the generated <project>/version.hpp header.
-cmake_minimum_required(VERSION 3.25)
+cmake_minimum_required(VERSION 4.3)
 project(relinfo VERSION 1.2.3 LANGUAGES NONE)
 include(CTest)
 find_package(besa CONFIG REQUIRED)

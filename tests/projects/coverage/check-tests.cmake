@@ -1,6 +1,6 @@
 # --------------------------------------------------------------------------------------------------
-# SPDX-FileCopyrightText: 2026 BESA developers
 # SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 besa developers
 # --------------------------------------------------------------------------------------------------
 # The coverage devtool must register the per-group and aggregate report tests.
 execute_process(

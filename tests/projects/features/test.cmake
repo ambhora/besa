@@ -1,6 +1,6 @@
 # --------------------------------------------------------------------------------------------------
-# SPDX-FileCopyrightText: 2026 BESA developers
 # SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 besa developers
 # --------------------------------------------------------------------------------------------------
 # Test-only assertions for the feature-space example. Keeping them here makes CMakeLists.txt a useful
 # copyable example of the public BESA API.

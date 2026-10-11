@@ -1,9 +1,8 @@
 # --------------------------------------------------------------------------------------------------
-# SPDX-FileCopyrightText: 2026 BESA developers
 # SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 besa developers
 # --------------------------------------------------------------------------------------------------
-# Code-generation integration. CMake 3.31+ owns the reserved `codegen` target; on older CMake BESA
-# provides an equivalent compatibility target.
+# CMake 4.3 owns the reserved `codegen` target.
 include_guard(GLOBAL)
 include("${CMAKE_CURRENT_LIST_DIR}/workspace.cmake")
 if(POLICY CMP0171)
@@ -11,9 +10,7 @@ if(POLICY CMP0171)
 endif()
 
 function(_besa_codegen_initialize)
-  if(CMAKE_VERSION VERSION_LESS 3.31 AND NOT TARGET codegen)
-    add_custom_target(codegen)
-  endif()
+  # The generator-owned `codegen` target is provided by CMake 4.3.
 endfunction()
 
 function(_besa_codegen_register_target NAME TARGET_NAME)
@@ -25,20 +22,16 @@ function(_besa_codegen_register_target NAME TARGET_NAME)
   endif()
   set_property(GLOBAL APPEND PROPERTY BESA_INTERNAL_CODEGEN_TARGETS "${TARGET_NAME}")
   _besa_codegen_initialize()
-  if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.31)
-    set(_stamp "${PROJECT_BINARY_DIR}/besa/codegen/${NAME}.stamp")
-    get_filename_component(_directory "${_stamp}" DIRECTORY)
-    file(MAKE_DIRECTORY "${_directory}")
-    add_custom_command(
-      OUTPUT "${_stamp}"
-      COMMAND "${CMAKE_COMMAND}" -E touch "${_stamp}"
-      DEPENDS "${TARGET_NAME}"
-      CODEGEN
-      VERBATIM
-    )
-  else()
-    add_dependencies(codegen "${TARGET_NAME}")
-  endif()
+  set(_stamp "${PROJECT_BINARY_DIR}/besa/codegen/${NAME}.stamp")
+  get_filename_component(_directory "${_stamp}" DIRECTORY)
+  file(MAKE_DIRECTORY "${_directory}")
+  add_custom_command(
+    OUTPUT "${_stamp}"
+    COMMAND "${CMAKE_COMMAND}" -E touch "${_stamp}"
+    DEPENDS "${TARGET_NAME}"
+    CODEGEN
+    VERBATIM
+  )
 endfunction()
 
 function(_besa_codegen_include NAME OUTPUT_VARIABLE)

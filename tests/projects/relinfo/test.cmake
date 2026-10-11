@@ -1,6 +1,6 @@
 # --------------------------------------------------------------------------------------------------
-# SPDX-FileCopyrightText: 2026 BESA developers
 # SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 besa developers
 # --------------------------------------------------------------------------------------------------
 # Test-only assertions and compile definitions for the release-info example.
 function(_besa_test_relinfo)

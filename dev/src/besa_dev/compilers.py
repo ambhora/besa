@@ -1,7 +1,7 @@
-# ------------------------------------------------------------------------------
-# SPDX-FileCopyrightText: 2026 BESA developers
+# --------------------------------------------------------------------------------------------------
 # SPDX-License-Identifier: Apache-2.0
-# ------------------------------------------------------------------------------
+# SPDX-FileCopyrightText: 2026 besa developers
+# --------------------------------------------------------------------------------------------------
 """The compiler configuration in dev/etc/compilers.json.
 
 The file has three parts. ``families`` describes, per compiler family, how a

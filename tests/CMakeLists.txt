@@ -1,6 +1,6 @@
 # --------------------------------------------------------------------------------------------------
-# SPDX-FileCopyrightText: 2026 BESA developers
 # SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 besa developers
 # --------------------------------------------------------------------------------------------------
 # Every test configures, builds, and tests a small project under projects/ against a staged
 # installation of BESA, so the tests exercise exactly what find_package(besa) delivers.
@@ -252,3 +252,15 @@ if(BESA_TEST_GCOVR OR (BESA_TEST_LLVM_COV AND BESA_TEST_LLVM_PROFDATA))
     LABELS devtool
   )
 endif()
+
+# --------------------------------------------------------------------------------------------------
+# Native cache-backed feature configuration
+# --------------------------------------------------------------------------------------------------
+besa_project_test(NAME options.implicit PROJECT new-options LABELS options)
+besa_project_test(NAME options.one-feature PROJECT new-options
+  ARGS -DPROJECT_FEATURE=mpi LABELS options)
+besa_project_test(NAME options.conflict PROJECT new-options
+  ARGS "-DPROJECT_FEATURE=mpi$<SEMICOLON>gpu"
+  EXPECT CONFIGURE_FAIL MATCH "contain a declared conflict" LABELS options)
+besa_project_test(NAME options.invalid PROJECT new-options
+  ARGS -DPROJECT_FEATURE=unknown EXPECT CONFIGURE_FAIL MATCH "unknown feature" LABELS options)

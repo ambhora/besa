@@ -1,6 +1,6 @@
 # --------------------------------------------------------------------------------------------------
-# SPDX-FileCopyrightText: 2026 BESA developers
 # SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 besa developers
 # --------------------------------------------------------------------------------------------------
 # Install BESA from BINARY_DIR into a clean PREFIX for the project tests.
 foreach(_required BINARY_DIR PREFIX CMAKEDIR)

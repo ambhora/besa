@@ -1,5 +1,9 @@
-<!-- SPDX-FileCopyrightText: 2026 BESA developers -->
-<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!--
+--------------------------------------------------------------------------------------------------
+SPDX-License-Identifier: Apache-2.0
+SPDX-FileCopyrightText: 2026 besa developers
+--------------------------------------------------------------------------------------------------
+-->
 # besa-dev
 
 Developer tooling for BESA, independent of the BESA CMake package. It owns the

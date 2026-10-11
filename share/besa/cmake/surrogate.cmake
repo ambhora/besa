@@ -1,6 +1,6 @@
 # --------------------------------------------------------------------------------------------------
-# SPDX-FileCopyrightText: 2026 BESA developers
 # SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 besa developers
 # --------------------------------------------------------------------------------------------------
 include_guard(GLOBAL)
 include("${CMAKE_CURRENT_LIST_DIR}/internal.cmake")
@@ -22,7 +22,12 @@ function(_besa_surrogate_generate_source HEADER INCLUDE_ROOT DESTINATION OUTPUT_
   set(_source "${DESTINATION}/${_source_relative}")
   get_filename_component(_dir "${_source}" DIRECTORY)
   file(MAKE_DIRECTORY "${_dir}")
-  file(WRITE "${_source}" "#include <${_relative}>\n")
+  file(WRITE "${_source}"
+    "// --------------------------------------------------------------------------------------------------\n"
+    "// SPDX-License-Identifier: Apache-2.0\n"
+    "// SPDX-FileCopyrightText: 2026 ${PROJECT_NAME} developers\n"
+    "// --------------------------------------------------------------------------------------------------\n"
+    "#include <${_relative}>\n")
   set("${OUTPUT_VARIABLE}" "${_source}" PARENT_SCOPE)
 endfunction()
 

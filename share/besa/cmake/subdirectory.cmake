@@ -1,6 +1,6 @@
 # --------------------------------------------------------------------------------------------------
-# SPDX-FileCopyrightText: 2026 BESA developers
 # SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 besa developers
 # --------------------------------------------------------------------------------------------------
 # Semantic project units and extensible directory types.
 include_guard(GLOBAL)
@@ -132,6 +132,9 @@ function(_besa_subdir_lower_library ROOT TYPE GENERATED)
   set(_library "lib${PROJECT_NAME}")
   file(GLOB_RECURSE _headers LIST_DIRECTORIES FALSE CONFIGURE_DEPENDS "${ROOT}/include/*")
   file(GLOB_RECURSE _sources LIST_DIRECTORIES FALSE CONFIGURE_DEPENDS "${ROOT}/lib/*")
+  if(TYPE STREQUAL "cpp")
+    file(GLOB_RECURSE _cpp_modules LIST_DIRECTORIES FALSE CONFIGURE_DEPENDS "${ROOT}/module/*.cppm")
+  endif()
   if(TYPE STREQUAL "fortran")
     file(GLOB_RECURSE _modules LIST_DIRECTORIES FALSE CONFIGURE_DEPENDS "${ROOT}/mod/*")
   else()
@@ -140,13 +143,18 @@ function(_besa_subdir_lower_library ROOT TYPE GENERATED)
   _besa_subdir_filter_metadata(_headers)
   _besa_subdir_filter_metadata(_sources)
   _besa_subdir_filter_metadata(_modules)
+  _besa_subdir_filter_metadata(_cpp_modules)
 
-  if(_headers OR _sources OR _modules)
+  if(_headers OR _sources OR _modules OR _cpp_modules)
     if(NOT TARGET "${_library}")
       besa_add_library(NAME "${_library}")
     endif()
     if(_sources OR _modules)
       target_sources("${_library}" PRIVATE ${_sources} ${_modules})
+    endif()
+    if(_cpp_modules)
+      target_compile_features("${_library}" PUBLIC cxx_std_20)
+      target_sources("${_library}" PUBLIC FILE_SET CXX_MODULES BASE_DIRS "${ROOT}/module" FILES ${_cpp_modules})
     endif()
     if(_headers)
       target_sources("${_library}" PUBLIC FILE_SET HEADERS BASE_DIRS "${ROOT}/include" FILES ${_headers})

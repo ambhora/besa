@@ -1,9 +1,9 @@
 # --------------------------------------------------------------------------------------------------
-# SPDX-FileCopyrightText: 2026 BESA developers
 # SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 besa developers
 # --------------------------------------------------------------------------------------------------
 # A feature selects project topology; TYPE independently states the language of the selected unit.
-cmake_minimum_required(VERSION 3.25)
+cmake_minimum_required(VERSION 4.3)
 project(languages VERSION 1.0.0 LANGUAGES NONE)
 find_package(besa CONFIG REQUIRED)
 

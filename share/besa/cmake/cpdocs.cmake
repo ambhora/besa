@@ -1,6 +1,6 @@
 # --------------------------------------------------------------------------------------------------
-# SPDX-FileCopyrightText: 2026 BESA developers
 # SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 besa developers
 # --------------------------------------------------------------------------------------------------
 # Native provider for the cpdocs feature-set/manifest protocol.
 include_guard(GLOBAL)
@@ -34,8 +34,15 @@ function(_besa_cpdocs_apply_feature_set)
     endforeach()
   endif()
 
-  set(PROJECT_FEATURES "${_selected}" CACHE STRING "cpdocs selected BESA feature set" FORCE)
-  set(PROJECT_FEATURES "${_selected}" PARENT_SCOPE)
+  get_property(_variable GLOBAL PROPERTY BESA_FEATURE_VARIABLE)
+  if(NOT _variable)
+    set(_variable PROJECT_FEATURES)
+  endif()
+  if(NOT _selected)
+    set(_selected none)
+  endif()
+  set(${_variable} "${_selected}" CACHE STRING "cpdocs selected BESA feature set" FORCE)
+  set(${_variable} "${_selected}" PARENT_SCOPE)
 endfunction()
 
 function(_besa_cpdocs_write_feature_sets OUTPUT_FILE)
@@ -43,12 +50,29 @@ function(_besa_cpdocs_write_feature_sets OUTPUT_FILE)
   if(_space)
     _besa_keyso_space_get("${_space}" _sets)
   else()
+    # Enumerate the implicit Cartesian product for documentation only.
+    # Ordinary project configuration never expands this potentially large space.
+    get_property(_features GLOBAL PROPERTY BESA_DECLARED_FEATURES)
     set(_sets "${_BESA_KEYSO_EMPTY}")
+    foreach(_feature IN LISTS _features)
+      set(_new_sets "${_sets}")
+      foreach(_token IN LISTS _sets)
+        _besa_keyso_decode("${_token}" _members)
+        list(APPEND _members "${_feature}")
+        _besa_keyso_canonicalize(_member_token ${_members})
+        list(APPEND _new_sets "${_member_token}")
+      endforeach()
+      set(_sets "${_new_sets}")
+    endforeach()
   endif()
 
   set(_objects)
   foreach(_token IN LISTS _sets)
     _besa_keyso_decode("${_token}" _features)
+    _besa_feature_set_is_valid("${_features}" _valid)
+    if(NOT _valid)
+      continue()
+    endif()
     _besa_json_array(_features_json ${_features})
     list(APPEND _objects "{\"features\": ${_features_json}}")
   endforeach()
@@ -76,11 +100,13 @@ endfunction()
 # cpdocs, so it is intentionally not duplicated here.
 function(_besa_cpdocs_write_manifest OUTPUT_FILE)
   _besa_manifest_units_json(_units_json)
+  _besa_manifest_options_json(_options_json)
   get_filename_component(_directory "${OUTPUT_FILE}" DIRECTORY)
   file(MAKE_DIRECTORY "${_directory}")
   file(WRITE "${OUTPUT_FILE}"
     "{\n"
     "  \"cpdocs-manifest\": 1,\n"
+    "  \"options\": ${_options_json},\n"
     "  \"units\": [\n    ${_units_json}\n  ]\n"
     "}\n"
   )

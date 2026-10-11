@@ -1,6 +1,6 @@
 # --------------------------------------------------------------------------------------------------
-# SPDX-FileCopyrightText: 2026 BESA developers
 # SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 besa developers
 # --------------------------------------------------------------------------------------------------
 if(NOT DEFINED CLANG_FORMAT OR NOT DEFINED SOURCE_DIR)
   message(FATAL_ERROR "clang-format check requires CLANG_FORMAT and SOURCE_DIR")

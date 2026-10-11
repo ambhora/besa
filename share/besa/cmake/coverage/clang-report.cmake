@@ -1,6 +1,6 @@
 # --------------------------------------------------------------------------------------------------
-# SPDX-FileCopyrightText: 2026 BESA developers
 # SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 besa developers
 # --------------------------------------------------------------------------------------------------
 foreach(_required PROFDATA LLVM_COV PROFILE_DIR OUTPUT_DIR TARGET_FILES)
   if(NOT DEFINED ${_required})

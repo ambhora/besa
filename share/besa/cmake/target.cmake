@@ -1,6 +1,6 @@
 # --------------------------------------------------------------------------------------------------
-# SPDX-FileCopyrightText: 2026 BESA developers
 # SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 besa developers
 # --------------------------------------------------------------------------------------------------
 include_guard(GLOBAL)
 include("${CMAKE_CURRENT_LIST_DIR}/internal.cmake")
@@ -90,7 +90,7 @@ function(besa_add_library)
   if(ARG_INSTALL)
     _besa_register_install_target("${ARG_NAME}")
   endif()
-  if(BUILD_TESTING AND PROJECT_DEVTOOLS_SURROGATE)
+  if(BUILD_TESTING AND BUILD_DEVTOOLS_SURROGATE)
     besa_surrogate_check(TARGET "${ARG_NAME}" LABELS instrumentation surrogate)
   endif()
 endfunction()

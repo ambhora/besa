@@ -1,6 +1,9 @@
-<!-- SPDX-FileCopyrightText: 2026 BESA developers -->
-<!-- SPDX-License-Identifier: Apache-2.0 -->
-
+<!--
+--------------------------------------------------------------------------------------------------
+SPDX-License-Identifier: Apache-2.0
+SPDX-FileCopyrightText: 2026 besa developers
+--------------------------------------------------------------------------------------------------
+-->
 # Test projects as examples
 
 The `CMakeLists.txt` files in this directory are intentionally written as small, realistic examples

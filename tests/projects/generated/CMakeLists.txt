@@ -1,10 +1,10 @@
 # --------------------------------------------------------------------------------------------------
-# SPDX-FileCopyrightText: 2026 BESA developers
 # SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 besa developers
 # --------------------------------------------------------------------------------------------------
 # A custom generated type resolves to the built-in cpp layout. BESA owns the output prefix and the
 # shared codegen target; the generator only describes how to populate it.
-cmake_minimum_required(VERSION 3.25)
+cmake_minimum_required(VERSION 4.3)
 project(generated VERSION 0.4.0 LANGUAGES NONE)
 find_package(besa CONFIG REQUIRED)
 

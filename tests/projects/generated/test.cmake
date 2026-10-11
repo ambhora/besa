@@ -1,6 +1,6 @@
 # --------------------------------------------------------------------------------------------------
-# SPDX-FileCopyrightText: 2026 BESA developers
 # SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 besa developers
 # --------------------------------------------------------------------------------------------------
 # Test-only assertions for the generated-type example.
 set(BESA_CPDOCS_MANIFEST_OUTPUT "${PROJECT_BINARY_DIR}/cpdocs-manifest.json" CACHE FILEPATH "" FORCE)

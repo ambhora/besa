@@ -1,6 +1,6 @@
 # --------------------------------------------------------------------------------------------------
-# SPDX-FileCopyrightText: 2026 BESA developers
 # SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 besa developers
 # --------------------------------------------------------------------------------------------------
 include_guard(GLOBAL)
 
@@ -29,7 +29,7 @@ function(_besa_require_config_open FUNCTION_NAME)
   if(_complete)
     _besa_fatal(
       "${FUNCTION_NAME}"
-      "configuration has already been frozen by besa_configure_complete()"
+      "configuration has already been frozen by besa_finalize_options()"
     )
   endif()
 endfunction()
@@ -39,7 +39,7 @@ function(_besa_require_config_complete FUNCTION_NAME)
   if(NOT _complete)
     _besa_fatal(
       "${FUNCTION_NAME}"
-      "besa_configure_complete() must be called before this function"
+      "besa_finalize_options() must be called before this function"
     )
   endif()
 endfunction()

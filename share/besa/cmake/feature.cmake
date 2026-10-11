@@ -1,6 +1,6 @@
 # --------------------------------------------------------------------------------------------------
-# SPDX-FileCopyrightText: 2026 BESA developers
 # SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 besa developers
 # --------------------------------------------------------------------------------------------------
 # Atomic features, project feature spaces, and configuration resolution.
 include_guard(GLOBAL)
@@ -60,47 +60,86 @@ function(besa_set_feature_space NAME)
   set_property(GLOBAL PROPERTY BESA_PROJECT_DEFAULT_FEATURE_SET "${_default}")
 endfunction()
 
+# The project owns this ordinary CACHE STRING; BESA only knows its name.
+function(besa_set_feature_variable VARIABLE)
+  _besa_require_config_open("besa_set_feature_variable")
+  if(NOT VARIABLE MATCHES "^[A-Za-z_][A-Za-z_0-9]*$")
+    _besa_fatal("besa_set_feature_variable" "expected a CMake variable name")
+  endif()
+  set_property(GLOBAL PROPERTY BESA_FEATURE_VARIABLE "${VARIABLE}")
+endfunction()
+
+# A symmetric pairwise exclusion.  Other Keyso feature spaces remain available.
+function(besa_features_conflict FIRST SECOND)
+  _besa_require_config_open("besa_features_conflict")
+  if(NOT ARGC EQUAL 2 OR FIRST STREQUAL SECOND)
+    _besa_fatal("besa_features_conflict" "expected two distinct feature names")
+  endif()
+  get_property(_declared GLOBAL PROPERTY BESA_DECLARED_FEATURES)
+  foreach(_feature IN ITEMS "${FIRST}" "${SECOND}")
+    if(NOT "${_feature}" IN_LIST _declared)
+      _besa_fatal("besa_features_conflict" "unknown feature '${_feature}'")
+    endif()
+  endforeach()
+  set(_pair "${FIRST};${SECOND}")
+  list(SORT _pair)
+  string(JOIN "|" _record ${_pair})
+  get_property(_conflicts GLOBAL PROPERTY BESA_FEATURE_CONFLICTS)
+  if(NOT "${_record}" IN_LIST _conflicts)
+    set_property(GLOBAL APPEND PROPERTY BESA_FEATURE_CONFLICTS "${_record}")
+  endif()
+endfunction()
+
+function(_besa_feature_set_is_valid ENABLED OUTPUT_VARIABLE)
+  get_property(_conflicts GLOBAL PROPERTY BESA_FEATURE_CONFLICTS)
+  foreach(_record IN LISTS _conflicts)
+    string(REPLACE "|" ";" _pair "${_record}")
+    list(GET _pair 0 _first)
+    list(GET _pair 1 _second)
+    if("${_first}" IN_LIST ENABLED AND "${_second}" IN_LIST ENABLED)
+      set("${OUTPUT_VARIABLE}" FALSE PARENT_SCOPE)
+      return()
+    endif()
+  endforeach()
+  set("${OUTPUT_VARIABLE}" TRUE PARENT_SCOPE)
+endfunction()
+
 function(_besa_resolve_features OUTPUT_VARIABLE)
   get_property(_declared GLOBAL PROPERTY BESA_DECLARED_FEATURES)
   get_property(_space GLOBAL PROPERTY BESA_PROJECT_FEATURE_SPACE)
   get_property(_default GLOBAL PROPERTY BESA_PROJECT_DEFAULT_FEATURE_SET)
+  get_property(_variable GLOBAL PROPERTY BESA_FEATURE_VARIABLE)
 
-  if(DEFINED PROJECT_FEATURES)
-    set(_enabled ${PROJECT_FEATURES})
+  if(_variable AND DEFINED ${_variable})
+    set(_enabled "${${_variable}}")
+  elseif(DEFINED PROJECT_FEATURES)
+    # Keep existing Keyso-based projects working unchanged.
+    set(_enabled "${PROJECT_FEATURES}")
   elseif(NOT "${_default}" STREQUAL "")
     _besa_keyso_decode("${_default}" _enabled)
   else()
     set(_enabled)
   endif()
-  list(REMOVE_ITEM _enabled "")
+  list(REMOVE_ITEM _enabled "" "none")
   list(REMOVE_DUPLICATES _enabled)
   list(SORT _enabled)
 
   foreach(_feature IN LISTS _enabled)
     if(NOT "${_feature}" IN_LIST _declared)
-      _besa_fatal(
-        "besa_configure_complete"
-        "unknown feature '${_feature}'. Declared features are: ${_declared}"
-      )
+      _besa_fatal("besa_finalize_options" "unknown feature '${_feature}'. Declared features are: ${_declared}")
     endif()
   endforeach()
-
   if(_space)
     _besa_keyso_exact_contains("${_space}" "${_enabled}" _allowed)
     if(NOT _allowed)
       string(JOIN ", " _display ${_enabled})
-      _besa_fatal(
-        "besa_configure_complete"
-        "feature set '${_display}' is not allowed by project feature space '${_space}'"
-      )
+      _besa_fatal("besa_finalize_options" "feature set '${_display}' is not allowed by project feature space '${_space}'")
     endif()
-  elseif(_declared)
-    _besa_fatal(
-      "besa_configure_complete"
-      "features were declared, but besa_set_feature_space() was not called"
-    )
   endif()
-
+  _besa_feature_set_is_valid("${_enabled}" _conflict_free)
+  if(NOT _conflict_free)
+    _besa_fatal("besa_finalize_options" "selected features '${_enabled}' contain a declared conflict")
+  endif()
   set("${OUTPUT_VARIABLE}" "${_enabled}" PARENT_SCOPE)
 endfunction()
 
@@ -146,10 +185,10 @@ function(_besa_configuration_summary LIST_FEATURES LIST_DEVTOOLS LIST_TEST_MODES
   message(STATUS "  Version       : ${PROJECT_SEMVER}")
 endfunction()
 
-macro(besa_configure_complete)
+macro(besa_finalize_options)
   cmake_parse_arguments(ARG "" "" "" ${ARGN})
-  _besa_require_no_unparsed("besa_configure_complete" "${ARG_UNPARSED_ARGUMENTS}")
-  _besa_require_config_open("besa_configure_complete")
+  _besa_require_no_unparsed("besa_finalize_options" "${ARG_UNPARSED_ARGUMENTS}")
+  _besa_require_config_open("besa_finalize_options")
 
   besa_workspace_initialize()
   if(COMMAND _besa_cpdocs_apply_feature_set)
@@ -182,4 +221,9 @@ macro(besa_configure_complete)
   cmake_language(EVAL CODE
     "cmake_language(DEFER DIRECTORY [[${PROJECT_SOURCE_DIR}]] CALL _besa_project_finalize)"
   )
+endmacro()
+
+# Compatibility alias for existing projects; new projects call besa_finalize_options().
+macro(besa_configure_complete)
+  besa_finalize_options(${ARGN})
 endmacro()

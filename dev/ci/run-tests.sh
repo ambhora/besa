@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# ------------------------------------------------------------------------------
-# SPDX-FileCopyrightText: 2026 BESA developers
+# --------------------------------------------------------------------------------------------------
 # SPDX-License-Identifier: Apache-2.0
-# ------------------------------------------------------------------------------
+# SPDX-FileCopyrightText: 2026 besa developers
+# --------------------------------------------------------------------------------------------------
 # Run the BESA test suite inside a compiler image. Started by `besa-dev run`,
 # which passes the compiler description from dev/etc/compilers.json as:
 #

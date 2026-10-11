@@ -1,7 +1,7 @@
-# ------------------------------------------------------------------------------
-# SPDX-FileCopyrightText: 2026 BESA developers
+# --------------------------------------------------------------------------------------------------
 # SPDX-License-Identifier: Apache-2.0
-# ------------------------------------------------------------------------------
+# SPDX-FileCopyrightText: 2026 besa developers
+# --------------------------------------------------------------------------------------------------
 # The compiler jobs are not listed here: the matrix job reads them from
 # dev/etc/compilers.json through besa-dev, and each job runs the same container
 # command as `besa-dev run <id>` does locally.

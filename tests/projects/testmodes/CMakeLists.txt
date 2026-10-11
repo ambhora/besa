@@ -1,9 +1,9 @@
 # --------------------------------------------------------------------------------------------------
-# SPDX-FileCopyrightText: 2026 BESA developers
 # SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 besa developers
 # --------------------------------------------------------------------------------------------------
 # Project-declared test modes select test directories through MODES.
-cmake_minimum_required(VERSION 3.25)
+cmake_minimum_required(VERSION 4.3)
 project(testmodes VERSION 1.0.0 LANGUAGES CXX)
 include(CTest)
 find_package(besa CONFIG REQUIRED)

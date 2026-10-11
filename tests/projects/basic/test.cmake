@@ -1,6 +1,6 @@
 # --------------------------------------------------------------------------------------------------
-# SPDX-FileCopyrightText: 2026 BESA developers
 # SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 besa developers
 # --------------------------------------------------------------------------------------------------
 # Test-only assertions for the basic example. The project CMakeLists.txt intentionally contains only
 # normal BESA usage; the test harness loads this file through CMAKE_PROJECT_INCLUDE.

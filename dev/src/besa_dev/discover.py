@@ -1,7 +1,7 @@
-# ------------------------------------------------------------------------------
-# SPDX-FileCopyrightText: 2026 BESA developers
+# --------------------------------------------------------------------------------------------------
 # SPDX-License-Identifier: Apache-2.0
-# ------------------------------------------------------------------------------
+# SPDX-FileCopyrightText: 2026 besa developers
+# --------------------------------------------------------------------------------------------------
 """Discover released compiler versions and fold them into the configuration.
 
 Each discovery kind reads one upstream listing and keeps the major versions

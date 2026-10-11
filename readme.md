@@ -1,3 +1,9 @@
+<!--
+--------------------------------------------------------------------------------------------------
+SPDX-License-Identifier: Apache-2.0
+SPDX-FileCopyrightText: 2026 besa developers
+--------------------------------------------------------------------------------------------------
+-->
 # BESA
 
 BESA is a declarative CMake project model. Projects describe **features**, **valid feature spaces**, and
@@ -8,22 +14,17 @@ Features and source languages are independent concepts. A project feature such a
 CUDA source unit, but the feature is still just a project capability while `cuda` is the unit's language.
 
 ```cmake
-cmake_minimum_required(VERSION 3.25)
+cmake_minimum_required(VERSION 4.3)
 project(example VERSION 1.0.0 LANGUAGES NONE)
 find_package(besa CONFIG REQUIRED)
+include(cmake/options.cmake) # Native CMake CACHE options and besa_finalize_options()
 
-besa_add_feature(mpi)
-besa_add_feature(gpu)
-
-besa_keyso_zero_or_one(parallel mpi)
-besa_keyso_zero_or_one(acceleration gpu)
-besa_keyso_create_feature_space(supported PRODUCT parallel acceleration)
-besa_set_feature_space(supported)
-besa_configure_complete()
-
-besa_add_subdirectory(DIRECTORY src/core TYPE cpp)
-besa_add_subdirectory(DIRECTORY src/gpu TYPE cuda CONDITION gpu)
-besa_add_subdirectory(DIRECTORY bin TYPE bin)
+if(BUILD_SOURCE)
+  besa_add_subdirectory(DIRECTORY src/cpp TYPE cpp)
+endif()
+if(BUILD_TESTING)
+  add_subdirectory(test)
+endif()
 ```
 
 Built-in semantic types are `c`, `cpp`, `cuda`, `hip`, `fortran`, and `bin`. Their manifest languages
@@ -49,3 +50,11 @@ BESA owns the generated prefix and the global `codegen` target. The callback rec
 `besa_add_subdirectory()` are forwarded unchanged. This lets cpdocs build `codegen` on the host and
 then read the generated `include/`, `lib/`, and (for Fortran) `mod/` roots without building the target
 application.
+
+Registered features are independent by default. Use `besa_features_conflict(a b)` for a
+pairwise exclusion; retain `besa_keyso_*` and `besa_set_feature_space` when precise
+feature spaces are needed. BESA writes its semantic manifest inside the build tree
+(`build/besa/manifest.json`) and exports both CMake and CPS package descriptions
+when public targets are installed. An installation-time JSON manifest enumerates the
+actual installed paths. `src/cpp/module/*.cppm` files are optional and automatically
+attached to the existing library as public C++ module interfaces.

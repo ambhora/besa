@@ -1,9 +1,9 @@
 # --------------------------------------------------------------------------------------------------
-# SPDX-FileCopyrightText: 2026 BESA developers
 # SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 besa developers
 # --------------------------------------------------------------------------------------------------
 # Coverage groups: running the tests produces a report through the generated report tests.
-cmake_minimum_required(VERSION 3.25)
+cmake_minimum_required(VERSION 4.3)
 project(coverage VERSION 1.0.0 LANGUAGES NONE)
 include(CTest)
 find_package(besa CONFIG REQUIRED)

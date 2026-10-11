@@ -1,7 +1,7 @@
-# ------------------------------------------------------------------------------
-# SPDX-FileCopyrightText: 2026 BESA developers
+# --------------------------------------------------------------------------------------------------
 # SPDX-License-Identifier: Apache-2.0
-# ------------------------------------------------------------------------------
+# SPDX-FileCopyrightText: 2026 besa developers
+# --------------------------------------------------------------------------------------------------
 # Weekly check for newly released compilers. When `besa-dev discover --write`
 # changes dev/etc/compilers.json, a pull request is opened; merging it adds the
 # compilers to the test matrix.

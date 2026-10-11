@@ -1,6 +1,6 @@
 # --------------------------------------------------------------------------------------------------
-# SPDX-FileCopyrightText: 2026 BESA developers
 # SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 besa developers
 # --------------------------------------------------------------------------------------------------
 include_guard(GLOBAL)
 include("${CMAKE_CURRENT_LIST_DIR}/internal.cmake")
@@ -90,7 +90,7 @@ function(besa_test_add_directory)
       set_tests_properties("${_target}" PROPERTIES DISABLED TRUE)
     endif()
 
-    if(PROJECT_DEVTOOLS_COVERAGE AND ARG_COVERAGE_GROUP)
+    if(BUILD_DEVTOOLS_COVERAGE AND ARG_COVERAGE_GROUP)
       _besa_coverage_register_test("${ARG_COVERAGE_GROUP}" "${_target}" "${_target}")
     endif()
   endforeach()

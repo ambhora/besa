@@ -1,13 +1,13 @@
 # --------------------------------------------------------------------------------------------------
-# SPDX-FileCopyrightText: 2026 BESA developers
 # SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 besa developers
 # --------------------------------------------------------------------------------------------------
 include_guard(GLOBAL)
 include("${CMAKE_CURRENT_LIST_DIR}/internal.cmake")
 
 # Test modes are project-defined names describing test workflows such as `ci-commit`, `ci-merge`, or
 # a site-specific validation mode.  BESA deliberately assigns no special semantics to any mode name.
-# Projects declare the available/default modes before besa_configure_complete(); TEST_MODES then acts
+# Projects declare the available/default modes before besa_finalize_options(); TEST_MODES then acts
 # as the same kind of explicit override set as PROJECT_FEATURES, including `~mode` to disable a
 # default.  The same underlying mode may appear at most once in TEST_MODES.
 function(besa_test_modes_add)
@@ -97,6 +97,15 @@ function(_besa_resolve_test_modes OUTPUT_VARIABLE)
   endif()
 
   set(_enabled ${_defaults})
+  if(DEFINED TEST_MODE)
+    if("${TEST_MODE}" STREQUAL "none")
+      set(_enabled)
+    elseif("${TEST_MODE}" IN_LIST _declared)
+      set(_enabled "${TEST_MODE}")
+    else()
+      _besa_fatal("besa_finalize_options" "unknown TEST_MODE '${TEST_MODE}'; declared modes: ${_declared}")
+    endif()
+  endif()
   set(_seen)
   foreach(_entry IN LISTS TEST_MODES)
     if("${_entry}" STREQUAL "")
@@ -106,7 +115,7 @@ function(_besa_resolve_test_modes OUTPUT_VARIABLE)
     _besa_feature_base_name("${_entry}" _mode _negated)
     if("${_mode}" IN_LIST _seen)
       _besa_fatal(
-        "besa_configure_complete"
+        "besa_finalize_options"
         "test mode '${_mode}' is specified more than once in TEST_MODES"
       )
     endif()
@@ -114,7 +123,7 @@ function(_besa_resolve_test_modes OUTPUT_VARIABLE)
 
     if(NOT "${_mode}" IN_LIST _declared)
       _besa_fatal(
-        "besa_configure_complete"
+        "besa_finalize_options"
         "unknown test mode '${_mode}'. Declared test modes are: ${_declared}"
       )
     endif()

@@ -1,7 +1,7 @@
-# ------------------------------------------------------------------------------
-# SPDX-FileCopyrightText: 2026 BESA developers
+# --------------------------------------------------------------------------------------------------
 # SPDX-License-Identifier: Apache-2.0
-# ------------------------------------------------------------------------------
+# SPDX-FileCopyrightText: 2026 besa developers
+# --------------------------------------------------------------------------------------------------
 """Turn the compiler configuration into CI jobs and container commands.
 
 The GitHub workflow asks for the matrix at run time, and every matrix job runs
