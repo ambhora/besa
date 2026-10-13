@@ -5,9 +5,9 @@
 # Warning policies: the source warns, so essential;error must fail the build.
 cmake_minimum_required(VERSION 4.3)
 project(warnings VERSION 1.0.0 LANGUAGES CXX)
-include(CTest)
 find_package(besa CONFIG REQUIRED)
 
-besa_configure_complete()
+include(cmake/options.cmake)
+include(CTest)
 
 besa_add_executable(NAME warns SOURCES warns.cpp)

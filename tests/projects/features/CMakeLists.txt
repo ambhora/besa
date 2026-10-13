@@ -8,30 +8,13 @@ cmake_minimum_required(VERSION 4.3)
 project(features VERSION 1.0.0 LANGUAGES NONE)
 find_package(besa CONFIG REQUIRED)
 
-besa_add_feature(alpha)
-besa_add_feature(beta)
-besa_add_feature(mpi)
-besa_add_feature(gpu)
-
-besa_keyso_one_of(implementation alpha beta)
-besa_keyso_zero_or_one(parallel mpi)
-besa_keyso_zero_or_one(acceleration gpu)
-
-besa_keyso_create_feature_space(
-  supported
-  PRODUCT
-  implementation
-  parallel
-  acceleration
-)
-besa_set_feature_space(supported DEFAULT alpha)
-besa_configure_complete()
+include(cmake/options.cmake)
 
 besa_add_library(NAME libfeatures TYPE STATIC INSTALL YES)
 besa_add_directory(LIBRARY libfeatures ROOT alpha TYPE cpp CONDITION alpha)
 besa_add_directory(LIBRARY libfeatures ROOT beta TYPE cpp CONDITION beta)
 
-# cpdocs is additive: requesting metadata must not suppress the project's normal targets.
-if(WRITE_CPDOCS_FEATURE_SETS AND NOT TARGET libfeatures)
+# cpdocs is additive: requesting metadata must not suppress normal targets.
+if(BESA_CPDOCS_FEATURE_SETS_OUTPUT AND NOT TARGET libfeatures)
   message(FATAL_ERROR "cpdocs feature-set export suppressed normal target 'libfeatures'")
 endif()

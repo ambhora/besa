@@ -7,11 +7,7 @@ cmake_minimum_required(VERSION 4.3)
 project(languages VERSION 1.0.0 LANGUAGES NONE)
 find_package(besa CONFIG REQUIRED)
 
-besa_add_feature(host)
-besa_add_feature(gpu)
-besa_keyso_one_of(backend host gpu)
-besa_set_feature_space(backend DEFAULT host)
-besa_configure_complete()
+include(cmake/options.cmake)
 
 besa_add_library(NAME liblanguages TYPE STATIC INSTALL YES)
 besa_add_directory(LIBRARY liblanguages ROOT host TYPE cpp CONDITION host)

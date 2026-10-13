@@ -5,10 +5,6 @@
 # Test-only assertions for the basic example. The project CMakeLists.txt intentionally contains only
 # normal BESA usage; the test harness loads this file through CMAKE_PROJECT_INCLUDE.
 function(_besa_test_basic)
-  if(FREEZE_VIOLATION)
-    besa_add_feature(late)
-  endif()
-
   foreach(_target IN ITEMS libbasic basic-cli)
     if(NOT TARGET "${_target}")
       message(FATAL_ERROR "expected target '${_target}' to exist")

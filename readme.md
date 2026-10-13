@@ -75,3 +75,44 @@ feature spaces are needed. BESA writes its semantic manifest inside the build tr
 when public targets are installed. An installation-time JSON manifest enumerates the
 actual installed paths. `src/cpp/module/*.cppm` files are optional and automatically
 attached to the existing library as public C++ module interfaces.
+
+## Project options and test selection
+
+As in the Nola project layout, a project declares its user-facing cache variables once in
+`cmake/options.cmake`. BESA registers their metadata and resolves feature, devtool, and test-mode
+selections before any targets or tests are created:
+
+```cmake
+# cmake/options.cmake
+set(PROJECT_FEATURE "none" CACHE STRING "Selected project features")
+besa_set_feature_variable(PROJECT_FEATURE)
+set(BUILD_DEVTOOLS "none" CACHE STRING "Enabled development tools")
+set(BUILD_WARNINGS "minimal" CACHE STRING "Warning policies")
+option(BUILD_TESTING "Build tests" OFF)
+set(TEST_MODE "commit" CACHE STRING "Test mode")
+besa_test_modes_add(MODES commit)
+
+besa_register_options(GROUP project VARIABLES PROJECT_FEATURE)
+besa_register_options(GROUP build VARIABLES BUILD_DEVTOOLS BUILD_WARNINGS BUILD_TESTING TEST_MODE)
+besa_finalize_options()
+```
+
+Source and test declarations use the resolved configuration. There is no second `SANITIZER`
+variable or hidden build option to choose test fixtures. The example below registers tests
+only when their corresponding developer tool has been selected through `BUILD_DEVTOOLS`:
+
+```cmake
+# CMakeLists.txt
+include(cmake/options.cmake)
+include(CTest)
+foreach(_sanitizer IN ITEMS asan ubsan)
+  besa_devtools_check(OUTPUT_VARIABLE _enabled DEVTOOLS "${_sanitizer}")
+  if(_enabled)
+    besa_test_add_directory(NAME "${_sanitizer}" PREFIX sanitizers)
+  endif()
+endforeach()
+```
+
+`besa_test_add_directory()` may still express test requirements through `MODES` and `CONDITION`
+when a test supports a subset of declared test modes or project features. These are predicates
+on the already-resolved configuration, not independent user-facing options.

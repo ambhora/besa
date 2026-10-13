@@ -33,7 +33,7 @@ function(besa_test_add_directory)
     ARG
     ""
     "NAME;PREFIX;COVERAGE_GROUP;CONDITION"
-    "LABELS;CMDLINE;TARGET_LIST;MODES"
+    "LABELS;CMDLINE;TARGET_LIST;MODES;DEVTOOLS"
     ${ARGN}
   )
   _besa_require_no_unparsed("besa_test_add_directory" "${ARG_UNPARSED_ARGUMENTS}")
@@ -47,7 +47,12 @@ function(besa_test_add_directory)
     endif()
   endif()
   besa_test_modes_check(OUTPUT_VARIABLE _mode_selected MODES ${ARG_MODES})
-  if(NOT _mode_selected)
+  if(ARG_DEVTOOLS)
+    besa_devtools_check(OUTPUT_VARIABLE _devtool_selected DEVTOOLS ${ARG_DEVTOOLS})
+  else()
+    set(_devtool_selected TRUE)
+  endif()
+  if(NOT _mode_selected OR NOT _devtool_selected)
     return()
   endif()
 
@@ -100,7 +105,7 @@ endfunction()
 # build tool for that target.  `.fail.t.<ext>` therefore expresses a target which must fail to build.
 function(besa_compile_test_add_directory)
   _besa_require_config_complete("besa_compile_test_add_directory")
-  cmake_parse_arguments(ARG "" "NAME;PREFIX;CONDITION" "LABELS;TARGET_LIST;MODES" ${ARGN})
+  cmake_parse_arguments(ARG "" "NAME;PREFIX;CONDITION" "LABELS;TARGET_LIST;MODES;DEVTOOLS" ${ARGN})
   _besa_require_no_unparsed("besa_compile_test_add_directory" "${ARG_UNPARSED_ARGUMENTS}")
   _besa_require_value("besa_compile_test_add_directory" "NAME" "${ARG_NAME}")
 
@@ -112,7 +117,12 @@ function(besa_compile_test_add_directory)
     endif()
   endif()
   besa_test_modes_check(OUTPUT_VARIABLE _mode_selected MODES ${ARG_MODES})
-  if(NOT _mode_selected)
+  if(ARG_DEVTOOLS)
+    besa_devtools_check(OUTPUT_VARIABLE _devtool_selected DEVTOOLS ${ARG_DEVTOOLS})
+  else()
+    set(_devtool_selected TRUE)
+  endif()
+  if(NOT _mode_selected OR NOT _devtool_selected)
     return()
   endif()
 

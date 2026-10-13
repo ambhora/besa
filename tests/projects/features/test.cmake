@@ -4,18 +4,10 @@
 # --------------------------------------------------------------------------------------------------
 # Test-only assertions for the feature-space example. Keeping them here makes CMakeLists.txt a useful
 # copyable example of the public BESA API.
-if(WRITE_CPDOCS_FEATURE_SETS)
-  set(BESA_CPDOCS_FEATURE_SETS_OUTPUT "${PROJECT_BINARY_DIR}/feature-sets.json")
-endif()
-
 function(_besa_test_features)
   set(_actual ${BESA_ENABLED_FEATURES})
   list(SORT _actual)
-  if(DEFINED EXPECTED_FEATURES)
-    set(_expected ${EXPECTED_FEATURES})
-  else()
-    set(_expected alpha)
-  endif()
+  set(_expected ${PROJECT_FEATURE})
   list(SORT _expected)
   if(NOT _actual STREQUAL _expected)
     message(FATAL_ERROR "enabled features are '${_actual}', expected '${_expected}'")

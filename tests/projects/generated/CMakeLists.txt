@@ -16,6 +16,6 @@ besa_register_subdirectory_type(
   GENERATED
 )
 
-besa_configure_complete()
+include(cmake/options.cmake)
 besa_add_library(NAME libgenerated TYPE STATIC INSTALL YES)
 besa_add_directory(LIBRARY libgenerated ROOT schema TYPE jnum ARGS LINK_TYPE STATIC)

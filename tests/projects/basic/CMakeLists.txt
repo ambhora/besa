@@ -5,10 +5,10 @@
 # Minimal semantic project: one C++ library unit and one bin unit.
 cmake_minimum_required(VERSION 4.3)
 project(basic VERSION 1.2.3 LANGUAGES NONE)
-include(CTest)
 find_package(besa CONFIG REQUIRED)
 
-besa_configure_complete()
+include(cmake/options.cmake)
+include(CTest)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

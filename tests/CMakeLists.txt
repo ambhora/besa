@@ -113,30 +113,25 @@ besa_project_test(NAME layout.multilib.shared-default PROJECT multilib CONSUMER 
   CHECK multilib/check.cmake
   LABELS core
 )
-besa_project_test(NAME layout.multilib.bare-kind-rejected PROJECT multilib
-  ARGS -DTEST_BARE_LIBRARY_KIND=ON
+besa_project_test(NAME layout.multilib.bare-kind-rejected PROJECT library-rejection/bare-kind
   EXPECT CONFIGURE_FAIL MATCH "besa_add_library: unknown arguments: STATIC"
   LABELS core
 )
-besa_project_test(NAME layout.multilib.invalid-type-rejected PROJECT multilib
-  ARGS -DTEST_INVALID_LIBRARY_TYPE=ON
+besa_project_test(NAME layout.multilib.invalid-type-rejected PROJECT library-rejection/invalid-type
   EXPECT CONFIGURE_FAIL MATCH "unsupported TYPE 'UNKNOWN'"
   LABELS core
 )
-besa_project_test(NAME layout.multilib.missing-type-rejected PROJECT multilib
-  ARGS -DTEST_MISSING_LIBRARY_TYPE=ON
+besa_project_test(NAME layout.multilib.missing-type-rejected PROJECT library-rejection/missing-type
   EXPECT CONFIGURE_FAIL MATCH "TYPE requires STATIC, SHARED"
   LABELS core
 )
-besa_project_test(NAME layout.multilib.implicit-library-rejected PROJECT multilib
-  ARGS -DTEST_IMPLICIT_LIBRARY_CREATION=ON
+besa_project_test(NAME layout.multilib.implicit-library-rejected PROJECT library-rejection/implicit-library
   EXPECT CONFIGURE_FAIL MATCH "LIBRARY must name an existing target"
   LABELS core
 )
 besa_project_test(NAME layout.generated PROJECT generated CHECK generated/check-manifest.cmake LABELS core)
 besa_project_test(NAME layout.compile-tests PROJECT compile LABELS core)
-besa_project_test(NAME layout.freeze PROJECT basic
-  ARGS -DFREEZE_VIOLATION=ON
+besa_project_test(NAME layout.freeze PROJECT freeze
   EXPECT CONFIGURE_FAIL MATCH "already been frozen"
   LABELS core
 )
@@ -145,32 +140,32 @@ besa_project_test(NAME layout.freeze PROJECT basic
 # Features and Keyso feature spaces
 # --------------------------------------------------------------------------------------------------
 besa_project_test(NAME feature.default PROJECT features
-  ARGS "-DEXPECTED_FEATURES=alpha"
   LABELS feature
 )
 besa_project_test(NAME feature.selection PROJECT features
   ARGS
-    "-DPROJECT_FEATURES=beta$<SEMICOLON>mpi$<SEMICOLON>gpu"
-    "-DEXPECTED_FEATURES=beta$<SEMICOLON>mpi$<SEMICOLON>gpu"
+    "-DPROJECT_FEATURE=beta$<SEMICOLON>mpi$<SEMICOLON>gpu"
   LABELS feature
 )
 besa_project_test(NAME feature.mutually-exclusive PROJECT features
-  ARGS "-DPROJECT_FEATURES=alpha$<SEMICOLON>beta"
+  ARGS "-DPROJECT_FEATURE=alpha$<SEMICOLON>beta"
   EXPECT CONFIGURE_FAIL MATCH "is not allowed by project feature space 'supported'"
   LABELS feature
 )
 besa_project_test(NAME feature.unknown PROJECT features
-  ARGS -DPROJECT_FEATURES=gamma
+  ARGS -DPROJECT_FEATURE=gamma
   EXPECT CONFIGURE_FAIL MATCH "unknown feature 'gamma'"
   LABELS feature
 )
 besa_project_test(NAME feature.cpdocs-feature-sets PROJECT features
-  ARGS -DWRITE_CPDOCS_FEATURE_SETS=ON
+  ARGS -DBESA_CPDOCS_FEATURE_SETS_OUTPUT=@BINARY_DIR@/feature-sets.json
   CHECK features/check-feature-sets.cmake
   LABELS feature
 )
 besa_project_test(NAME feature.language-is-independent PROJECT languages
-  ARGS -DSELECT_GPU_FROM_CPDOCS=ON
+  ARGS
+    -DBESA_CPDOCS_FEATURE_SET=@SOURCE_DIR@/feature-set-gpu.json
+    -DBESA_CPDOCS_MANIFEST_OUTPUT=@BINARY_DIR@/cpdocs-manifest.json
   CHECK languages/check-manifest.cmake
   LABELS feature
 )
@@ -179,16 +174,15 @@ besa_project_test(NAME feature.language-is-independent PROJECT languages
 # Test modes
 # --------------------------------------------------------------------------------------------------
 besa_project_test(NAME testmode.default PROJECT testmodes
-  ARGS -DEXPECT_MERGE_TESTS=OFF
   LABELS testmode
 )
 besa_project_test(NAME testmode.override PROJECT testmodes
-  ARGS -DTEST_MODES=ci-merge -DEXPECT_MERGE_TESTS=ON
+  ARGS -DTEST_MODE=ci-merge
   LABELS testmode
 )
 besa_project_test(NAME testmode.unknown PROJECT testmodes
-  ARGS -DTEST_MODES=nightly
-  EXPECT CONFIGURE_FAIL MATCH "unknown test mode 'nightly'"
+  ARGS -DTEST_MODE=nightly
+  EXPECT CONFIGURE_FAIL MATCH "unknown TEST_MODE 'nightly'"
   LABELS testmode
 )
 
@@ -213,14 +207,14 @@ besa_project_test(NAME version.invalid PROJECT relinfo
 # --------------------------------------------------------------------------------------------------
 # Warning policies
 # --------------------------------------------------------------------------------------------------
-besa_project_test(NAME warning.essential PROJECT warnings LABELS warning)
-besa_project_test(NAME warning.error PROJECT warnings
-  ARGS "-DPROJECT_WARNINGS=essential$<SEMICOLON>error"
+besa_project_test(NAME warning.minimal PROJECT warnings LABELS warning)
+besa_project_test(NAME warning.werror PROJECT warnings
+  ARGS "-DBUILD_WARNINGS=extra$<SEMICOLON>werror"
   EXPECT BUILD_FAIL MATCH "unused"
   LABELS warning
 )
 besa_project_test(NAME warning.unknown PROJECT warnings
-  ARGS -DPROJECT_WARNINGS=pedantic
+  ARGS -DBUILD_WARNINGS=pedantic
   EXPECT CONFIGURE_FAIL MATCH "unknown warning policy 'pedantic'"
   LABELS warning
 )
@@ -229,34 +223,38 @@ besa_project_test(NAME warning.unknown PROJECT warnings
 # Devtools
 # --------------------------------------------------------------------------------------------------
 besa_project_test(NAME devtool.unknown PROJECT warnings
-  ARGS -DPROJECT_DEVTOOLS=valgrind
+  ARGS -DBUILD_DEVTOOLS=valgrind
   EXPECT CONFIGURE_FAIL MATCH "unknown devtool 'valgrind'"
   LABELS devtool
 )
 besa_project_test(NAME devtool.surrogate PROJECT surrogate
-  ARGS -DPROJECT_DEVTOOLS=surrogate
+  ARGS -DBUILD_DEVTOOLS=surrogate
   LABELS devtool
 )
-besa_project_test(NAME devtool.surrogate.broken PROJECT surrogate
-  ARGS -DPROJECT_DEVTOOLS=surrogate -DSURROGATE_BROKEN=ON
+besa_project_test(NAME devtool.surrogate.broken PROJECT surrogate-broken
+  ARGS -DBUILD_DEVTOOLS=surrogate
   EXPECT TEST_FAIL MATCH "surrogate\\.liboops\\.t"
   LABELS devtool
 )
 foreach(_sanitizer IN ITEMS asan ubsan)
   besa_project_test(NAME devtool.${_sanitizer} PROJECT sanitizers
-    ARGS -DPROJECT_DEVTOOLS=${_sanitizer} -DSANITIZER=${_sanitizer}
+    ARGS -DBUILD_DEVTOOLS=${_sanitizer}
     LABELS devtool
   )
 endforeach()
 
+besa_project_test(NAME devtool.sanitizers.disabled PROJECT sanitizers LABELS devtool)
+besa_project_test(NAME devtool.sanitizers.invalid-selector PROJECT sanitizers-invalid
+  EXPECT CONFIGURE_FAIL MATCH "unknown devtool 'not-a-devtool'" LABELS devtool)
+
 find_program(BESA_TEST_CLANG_FORMAT clang-format)
 if(BESA_TEST_CLANG_FORMAT)
   besa_project_test(NAME devtool.format PROJECT format
-    ARGS -DPROJECT_DEVTOOLS=format
+    ARGS -DBUILD_DEVTOOLS=format
     LABELS devtool
   )
   besa_project_test(NAME devtool.format.broken PROJECT format-broken
-    ARGS -DPROJECT_DEVTOOLS=format
+    ARGS -DBUILD_DEVTOOLS=format
     EXPECT TEST_FAIL MATCH "clang-format failed"
     LABELS devtool
   )
@@ -266,7 +264,7 @@ find_program(BESA_TEST_RUN_CLANG_TIDY run-clang-tidy)
 find_program(BESA_TEST_CLANG_TIDY clang-tidy)
 if(BESA_TEST_RUN_CLANG_TIDY AND BESA_TEST_CLANG_TIDY)
   besa_project_test(NAME devtool.linting PROJECT format
-    ARGS -DPROJECT_DEVTOOLS=linting -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+    ARGS -DBUILD_DEVTOOLS=linting -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
     LABELS devtool
   )
 endif()
@@ -276,7 +274,7 @@ find_program(BESA_TEST_LLVM_COV llvm-cov)
 find_program(BESA_TEST_LLVM_PROFDATA llvm-profdata)
 if(BESA_TEST_GCOVR OR (BESA_TEST_LLVM_COV AND BESA_TEST_LLVM_PROFDATA))
   besa_project_test(NAME devtool.coverage PROJECT coverage
-    ARGS -DPROJECT_DEVTOOLS=coverage
+    ARGS -DBUILD_DEVTOOLS=coverage
     CHECK coverage/check-tests.cmake
     LABELS devtool
   )

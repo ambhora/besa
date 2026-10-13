@@ -5,10 +5,10 @@
 # Release policy and the generated <project>/version.hpp header.
 cmake_minimum_required(VERSION 4.3)
 project(relinfo VERSION 1.2.3 LANGUAGES NONE)
-include(CTest)
 find_package(besa CONFIG REQUIRED)
 
-besa_configure_complete()
+include(cmake/options.cmake)
+include(CTest)
 
 set(CMAKE_CXX_STANDARD 20)
 besa_add_library(NAME librelinfo TYPE STATIC INSTALL YES)

@@ -1,0 +1,4 @@
+{
+  "cpdocs-feature-set": 1,
+  "features": ["gpu"]
+}
