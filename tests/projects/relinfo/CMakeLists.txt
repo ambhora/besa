@@ -11,6 +11,6 @@ find_package(besa CONFIG REQUIRED)
 besa_configure_complete()
 
 set(CMAKE_CXX_STANDARD 20)
-besa_add_library(NAME librelinfo STATIC INSTALL YES)
+besa_add_library(NAME librelinfo TYPE STATIC INSTALL YES)
 besa_add_directory(LIBRARY librelinfo ROOT cpp TYPE cpp)
 besa_test_add_directory(NAME tests PREFIX relinfo TARGET_LIST relinfo::librelinfo)

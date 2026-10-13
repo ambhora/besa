@@ -31,11 +31,11 @@ endif()
 `besa_add_library(NAME libexample INSTALL YES)` is a small wrapper around CMake's
 `add_library`: it sets `OUTPUT_NAME` so `libexample` builds as `libexample.a` rather than
 `liblibexample.a`, creates the `example::libexample` alias, and registers the target for installation
-when `INSTALL YES` (the default). `INSTALL NO` keeps the target build-only. The library kind
-is optional: omitting it follows CMake's `BUILD_SHARED_LIBS` default (STATIC when OFF, SHARED when
-ON). For an explicit kind, use CMake-style `STATIC`, `SHARED`, `MODULE`, `OBJECT`, or `INTERFACE`
-without a `TYPE` keyword, for example `besa_add_library(NAME libexample STATIC INSTALL YES)`.
-`TYPE STATIC` is not supported.
+when `INSTALL YES` (the default). `INSTALL NO` keeps the target build-only. The optional
+`TYPE` argument accepts `STATIC`, `SHARED`, `MODULE`, `OBJECT`, or `INTERFACE`:
+`besa_add_library(NAME libexample TYPE STATIC INSTALL YES)`. Without `TYPE`, CMake selects
+`STATIC` or `SHARED` according to `BUILD_SHARED_LIBS`. Bare kinds such as `STATIC` without
+`TYPE` are not accepted.
 
 `besa_add_directory(LIBRARY libexample ROOT path TYPE cpp)` attaches a source tree to an existing
 library. It recursively adds files under `path/lib/` as private sources and publishes files under
@@ -58,7 +58,7 @@ besa_register_subdirectory_type(
   GENERATED
 )
 
-besa_add_library(NAME libexample STATIC INSTALL YES)
+besa_add_library(NAME libexample TYPE STATIC INSTALL YES)
 besa_add_directory(LIBRARY libexample ROOT schema TYPE jnum)
 ```
 

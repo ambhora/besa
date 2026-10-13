@@ -13,6 +13,6 @@ besa_keyso_one_of(backend host gpu)
 besa_set_feature_space(backend DEFAULT host)
 besa_configure_complete()
 
-besa_add_library(NAME liblanguages STATIC INSTALL YES)
+besa_add_library(NAME liblanguages TYPE STATIC INSTALL YES)
 besa_add_directory(LIBRARY liblanguages ROOT host TYPE cpp CONDITION host)
 besa_add_directory(LIBRARY liblanguages ROOT device TYPE cpp CONDITION gpu)

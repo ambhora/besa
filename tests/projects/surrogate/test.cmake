@@ -5,7 +5,7 @@
 # Test-only mutation for the negative surrogate-header test.
 function(_besa_test_surrogate)
   if(SURROGATE_BROKEN)
-    besa_add_library(NAME liboops STATIC INSTALL NO)
+    besa_add_library(NAME liboops TYPE STATIC INSTALL NO)
     target_include_directories(liboops PUBLIC "${PROJECT_SOURCE_DIR}/oops")
     target_sources(liboops PRIVATE "${PROJECT_SOURCE_DIR}/oops.cpp")
   endif()

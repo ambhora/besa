@@ -13,7 +13,7 @@ besa_configure_complete()
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-besa_add_library(NAME libbasic STATIC INSTALL YES)
+besa_add_library(NAME libbasic TYPE STATIC INSTALL YES)
 besa_add_directory(LIBRARY libbasic ROOT cpp TYPE cpp)
 besa_dependency_add(NAME Threads KIND NORMAL)
 target_link_libraries(libbasic PRIVATE Threads::Threads)

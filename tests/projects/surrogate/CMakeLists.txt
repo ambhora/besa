@@ -11,6 +11,6 @@ find_package(besa CONFIG REQUIRED)
 besa_configure_complete()
 
 set(CMAKE_CXX_STANDARD 20)
-besa_add_library(NAME libfine STATIC INSTALL NO)
+besa_add_library(NAME libfine TYPE STATIC INSTALL NO)
 target_include_directories(libfine PUBLIC "${PROJECT_SOURCE_DIR}/fine")
 target_sources(libfine PRIVATE fine.cpp)

@@ -113,14 +113,19 @@ besa_project_test(NAME layout.multilib.shared-default PROJECT multilib CONSUMER 
   CHECK multilib/check.cmake
   LABELS core
 )
-besa_project_test(NAME layout.multilib.conflicting-kinds PROJECT multilib
-  ARGS -DTEST_CONFLICTING_LIBRARY_KINDS=ON
-  EXPECT CONFIGURE_FAIL MATCH "specify only one library kind"
+besa_project_test(NAME layout.multilib.bare-kind-rejected PROJECT multilib
+  ARGS -DTEST_BARE_LIBRARY_KIND=ON
+  EXPECT CONFIGURE_FAIL MATCH "besa_add_library: unknown arguments: STATIC"
   LABELS core
 )
-besa_project_test(NAME layout.multilib.legacy-kind-rejected PROJECT multilib
-  ARGS -DTEST_LEGACY_LIBRARY_KIND=ON
-  EXPECT CONFIGURE_FAIL MATCH "besa_add_library: unknown arguments: TYPE"
+besa_project_test(NAME layout.multilib.invalid-type-rejected PROJECT multilib
+  ARGS -DTEST_INVALID_LIBRARY_TYPE=ON
+  EXPECT CONFIGURE_FAIL MATCH "unsupported TYPE 'UNKNOWN'"
+  LABELS core
+)
+besa_project_test(NAME layout.multilib.missing-type-rejected PROJECT multilib
+  ARGS -DTEST_MISSING_LIBRARY_TYPE=ON
+  EXPECT CONFIGURE_FAIL MATCH "TYPE requires STATIC, SHARED"
   LABELS core
 )
 besa_project_test(NAME layout.multilib.implicit-library-rejected PROJECT multilib
