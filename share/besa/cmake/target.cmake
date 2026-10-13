@@ -13,6 +13,11 @@ function(_besa_register_install_target TARGET_NAME)
 endfunction()
 
 function(_besa_target_common TARGET_NAME)
+  get_target_property(_target_type "${TARGET_NAME}" TYPE)
+  if(_target_type STREQUAL "INTERFACE_LIBRARY")
+    # An interface target has no compilation step to instrument.
+    return()
+  endif()
   _besa_devtools_activate()
   # ``projectdocs`` is a BESA/Doxygen alias used in C++ documentation comments. Clang otherwise
   # diagnoses it as an unknown documentation command when -Wdocumentation is enabled (for example
@@ -27,30 +32,36 @@ function(_besa_target_common TARGET_NAME)
   _besa_target_apply_devtools("${TARGET_NAME}")
 endfunction()
 
-# Create a project library using BESA's standard target policy.  A leading `lib` belongs to the
-# logical CMake target name but is stripped from OUTPUT_NAME, so `libvorlage` produces the natural
-# file name libvorlage.so/libvorlage.a while retaining an unambiguous target name.
+# Add a CMake library target, using BESA's output name and installation conventions.
+# Source and public-header discovery is handled separately by besa_add_directory().
+# NAME libfoo produces libfoo.a/.so (rather than liblibfoo.a/.so).
 function(besa_add_library)
   _besa_require_config_complete("besa_add_library")
-  cmake_parse_arguments(
-    ARG
-    ""
-    "NAME;TYPE;INSTALL"
-    "SOURCES;HEADERS;PUBLIC_INCLUDE_DIRECTORIES;PRIVATE_INCLUDE_DIRECTORIES;LINK_LIBRARIES"
-    ${ARGN}
-  )
+  # Match add_library(NAME [STATIC|SHARED|MODULE|OBJECT|INTERFACE]): without a
+  # library kind, CMake selects STATIC or SHARED according to BUILD_SHARED_LIBS.
+  cmake_parse_arguments(ARG "STATIC;SHARED;MODULE;OBJECT;INTERFACE" "NAME;INSTALL" "" ${ARGN})
   _besa_require_no_unparsed("besa_add_library" "${ARG_UNPARSED_ARGUMENTS}")
   _besa_require_value("besa_add_library" "NAME" "${ARG_NAME}")
 
-  if(NOT ARG_TYPE)
-    set(ARG_TYPE "")
-  endif()
+  set(_kind "")
+  foreach(_candidate STATIC SHARED MODULE OBJECT INTERFACE)
+    if(ARG_${_candidate})
+      if(_kind)
+        _besa_fatal("besa_add_library" "specify only one library kind")
+      endif()
+      set(_kind "${_candidate}")
+    endif()
+  endforeach()
+
   if(NOT DEFINED ARG_INSTALL OR ARG_INSTALL STREQUAL "")
-    set(ARG_INSTALL TRUE)
+    set(ARG_INSTALL YES)
+  endif()
+  if(NOT ARG_INSTALL STREQUAL "YES" AND NOT ARG_INSTALL STREQUAL "NO")
+    _besa_fatal("besa_add_library" "INSTALL must be YES or NO")
   endif()
 
-  if(ARG_TYPE)
-    add_library("${ARG_NAME}" "${ARG_TYPE}")
+  if(_kind)
+    add_library("${ARG_NAME}" "${_kind}")
   else()
     add_library("${ARG_NAME}")
   endif()
@@ -58,39 +69,19 @@ function(besa_add_library)
   if(ARG_NAME MATCHES "^lib(.+)$")
     set_target_properties("${ARG_NAME}" PROPERTIES OUTPUT_NAME "${CMAKE_MATCH_1}")
   endif()
-
   if(NOT TARGET "${PROJECT_NAME}::${ARG_NAME}")
     add_library("${PROJECT_NAME}::${ARG_NAME}" ALIAS "${ARG_NAME}")
   endif()
 
-  if(ARG_SOURCES)
-    target_sources("${ARG_NAME}" PRIVATE ${ARG_SOURCES})
-  endif()
-  if(ARG_PUBLIC_INCLUDE_DIRECTORIES)
-    target_include_directories(
-      "${ARG_NAME}" PUBLIC
-      $<BUILD_INTERFACE:${ARG_PUBLIC_INCLUDE_DIRECTORIES}>
-      $<INSTALL_INTERFACE:include>
-    )
-  endif()
-  if(ARG_PRIVATE_INCLUDE_DIRECTORIES)
-    target_include_directories("${ARG_NAME}" PRIVATE ${ARG_PRIVATE_INCLUDE_DIRECTORIES})
-  endif()
-  if(ARG_HEADERS)
-    # BASE_DIRS is supplied by besa_add_subdirectory; direct callers can still attach headers as
-    # ordinary sources when they do not use a conventional public include tree.
-    target_sources("${ARG_NAME}" PRIVATE ${ARG_HEADERS})
-  endif()
-  if(ARG_LINK_LIBRARIES)
-    target_link_libraries("${ARG_NAME}" PRIVATE ${ARG_LINK_LIBRARIES})
-  endif()
-
-  _besa_target_common("${ARG_NAME}")
-
-  if(ARG_INSTALL)
+  # The project may start with LANGUAGES NONE; besa_add_directory() enables the
+  # required language later. Apply compiler-sensitive policies after configuration.
+  cmake_language(EVAL CODE
+    "cmake_language(DEFER DIRECTORY [[${PROJECT_SOURCE_DIR}]] CALL _besa_target_common [[${ARG_NAME}]])"
+  )
+  if(ARG_INSTALL STREQUAL "YES")
     _besa_register_install_target("${ARG_NAME}")
   endif()
-  if(BUILD_TESTING AND BUILD_DEVTOOLS_SURROGATE)
+  if(BUILD_TESTING AND BUILD_DEVTOOLS_SURROGATE AND NOT _kind STREQUAL "INTERFACE")
     besa_surrogate_check(TARGET "${ARG_NAME}" LABELS instrumentation surrogate)
   endif()
 endfunction()

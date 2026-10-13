@@ -104,6 +104,30 @@ besa_project_test(NAME layout.cpp PROJECT basic CONSUMER basic-consumer
   CHECK basic/check-manifest.cmake
   LABELS core
 )
+besa_project_test(NAME layout.multilib PROJECT multilib CONSUMER multilib-consumer
+  CHECK multilib/check.cmake
+  LABELS core
+)
+besa_project_test(NAME layout.multilib.shared-default PROJECT multilib CONSUMER multilib-consumer
+  ARGS -DBUILD_SHARED_LIBS=ON
+  CHECK multilib/check.cmake
+  LABELS core
+)
+besa_project_test(NAME layout.multilib.conflicting-kinds PROJECT multilib
+  ARGS -DTEST_CONFLICTING_LIBRARY_KINDS=ON
+  EXPECT CONFIGURE_FAIL MATCH "specify only one library kind"
+  LABELS core
+)
+besa_project_test(NAME layout.multilib.legacy-kind-rejected PROJECT multilib
+  ARGS -DTEST_LEGACY_LIBRARY_KIND=ON
+  EXPECT CONFIGURE_FAIL MATCH "besa_add_library: unknown arguments: TYPE"
+  LABELS core
+)
+besa_project_test(NAME layout.multilib.implicit-library-rejected PROJECT multilib
+  ARGS -DTEST_IMPLICIT_LIBRARY_CREATION=ON
+  EXPECT CONFIGURE_FAIL MATCH "LIBRARY must name an existing target"
+  LABELS core
+)
 besa_project_test(NAME layout.generated PROJECT generated CHECK generated/check-manifest.cmake LABELS core)
 besa_project_test(NAME layout.compile-tests PROJECT compile LABELS core)
 besa_project_test(NAME layout.freeze PROJECT basic

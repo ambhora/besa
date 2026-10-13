@@ -27,8 +27,9 @@ besa_keyso_create_feature_space(
 besa_set_feature_space(supported DEFAULT alpha)
 besa_configure_complete()
 
-besa_add_subdirectory(DIRECTORY alpha TYPE cpp CONDITION alpha)
-besa_add_subdirectory(DIRECTORY beta TYPE cpp CONDITION beta)
+besa_add_library(NAME libfeatures STATIC INSTALL YES)
+besa_add_directory(LIBRARY libfeatures ROOT alpha TYPE cpp CONDITION alpha)
+besa_add_directory(LIBRARY libfeatures ROOT beta TYPE cpp CONDITION beta)
 
 # cpdocs is additive: requesting metadata must not suppress the project's normal targets.
 if(WRITE_CPDOCS_FEATURE_SETS AND NOT TARGET libfeatures)

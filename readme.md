@@ -20,17 +20,33 @@ find_package(besa CONFIG REQUIRED)
 include(cmake/options.cmake) # Native CMake CACHE options and besa_finalize_options()
 
 if(BUILD_SOURCE)
-  besa_add_subdirectory(DIRECTORY src/cpp TYPE cpp)
+  besa_add_library(NAME libexample INSTALL YES)
+  besa_add_directory(LIBRARY libexample ROOT src/cpp TYPE cpp)
 endif()
 if(BUILD_TESTING)
   add_subdirectory(test)
 endif()
 ```
 
-Built-in semantic types are `c`, `cpp`, `cuda`, `hip`, `fortran`, and `bin`. Their manifest languages
-are respectively `c`, `cpp`, `cuda`, `hip`, `fortran`, and no single language for `bin`. C/C++/CUDA/HIP
-units use `include/` and `lib/`; Fortran additionally uses `mod/`; `bin` turns top-level `.c`/`.cpp`
-files into executables.
+`besa_add_library(NAME libexample INSTALL YES)` is a small wrapper around CMake's
+`add_library`: it sets `OUTPUT_NAME` so `libexample` builds as `libexample.a` rather than
+`liblibexample.a`, creates the `example::libexample` alias, and registers the target for installation
+when `INSTALL YES` (the default). `INSTALL NO` keeps the target build-only. The library kind
+is optional: omitting it follows CMake's `BUILD_SHARED_LIBS` default (STATIC when OFF, SHARED when
+ON). For an explicit kind, use CMake-style `STATIC`, `SHARED`, `MODULE`, `OBJECT`, or `INTERFACE`
+without a `TYPE` keyword, for example `besa_add_library(NAME libexample STATIC INSTALL YES)`.
+`TYPE STATIC` is not supported.
+
+`besa_add_directory(LIBRARY libexample ROOT path TYPE cpp)` attaches a source tree to an existing
+library. It recursively adds files under `path/lib/` as private sources and publishes files under
+`path/include/` through a header file set and the public include path. Multiple directory trees may
+be attached to one library, and a project may define any number of independent libraries. `ROOT`
+is relative to the current source directory. A C++ root may also provide `module/*.cppm`;
+Fortran additionally uses `mod/`. Built-in semantic language types are `c`, `cpp`, `cuda`, `hip`,
+and `fortran`.
+
+`besa_add_subdirectory(DIRECTORY path TYPE bin)` creates top-level C/C++ executables.
+For library source units, a previously declared `LIBRARY` target must be specified.
 
 Generators register a custom type that resolves to one built-in type:
 
@@ -42,12 +58,13 @@ besa_register_subdirectory_type(
   GENERATED
 )
 
-besa_add_subdirectory(DIRECTORY schema TYPE jnum)
+besa_add_library(NAME libexample STATIC INSTALL YES)
+besa_add_directory(LIBRARY libexample ROOT schema TYPE jnum)
 ```
 
 BESA owns the generated prefix and the global `codegen` target. The callback receives `SOURCE_DIR`,
 `BUILD_DIR`, `OUTPUT_DIR`, and `OUTPUT_TARGET_VARIABLE`; any extra `ARGS` supplied to
-`besa_add_subdirectory()` are forwarded unchanged. This lets cpdocs build `codegen` on the host and
+`besa_add_directory()` are forwarded unchanged. This lets cpdocs build `codegen` on the host and
 then read the generated `include/`, `lib/`, and (for Fortran) `mod/` roots without building the target
 application.
 

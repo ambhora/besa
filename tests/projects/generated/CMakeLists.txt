@@ -17,4 +17,5 @@ besa_register_subdirectory_type(
 )
 
 besa_configure_complete()
-besa_add_subdirectory(DIRECTORY schema TYPE jnum ARGS LINK_TYPE STATIC)
+besa_add_library(NAME libgenerated STATIC INSTALL YES)
+besa_add_directory(LIBRARY libgenerated ROOT schema TYPE jnum ARGS LINK_TYPE STATIC)

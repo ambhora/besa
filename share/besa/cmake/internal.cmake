@@ -13,7 +13,7 @@ function(_besa_fatal FUNCTION_NAME TEXT)
 endfunction()
 
 function(_besa_require_no_unparsed FUNCTION_NAME UNPARSED)
-  if(UNPARSED)
+  if(NOT "${UNPARSED}" STREQUAL "")
     _besa_fatal("${FUNCTION_NAME}" "unknown arguments: ${UNPARSED}")
   endif()
 endfunction()
