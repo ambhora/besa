@@ -2,9 +2,51 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2026 besa developers
 # --------------------------------------------------------------------------------------------------
+# Check public headers by compiling generated surrogate translation units.
+#
+# Each supported public header is included from its own generated C/C++/CUDA
+# source file, so missing self-contained includes surface as compile failures.
+# Checks register a CTest build invocation, not a runtime executable. Discovery
+# is deferred until the end of project configuration to see later include roots.
+# A passing surrogate check is useful but does not guarantee every possible
+# header combination or generator-expression context is valid.
+
 include_guard(GLOBAL)
 include("${CMAKE_CURRENT_LIST_DIR}/internal.cmake")
 
+# --------------------------------------------------------------------------------------------------
+# Public API
+# --------------------------------------------------------------------------------------------------
+
+# Register deferred checks that compile each public header independently.
+#   besa_surrogate_check(TARGET <library> [EXPECT PASS|FAIL] [LABELS ...])
+# CMake DEFER allows subsequent directory registrations to contribute headers.
+# A generated CTest builds a surrogate target; EXPECT FAIL sets WILL_FAIL.
+function(besa_surrogate_check)
+  _besa_require_config_complete("besa_surrogate_check")
+  cmake_parse_arguments(ARG "" "TARGET;EXPECT" "LABELS" ${ARGN})
+  _besa_require_no_unparsed("besa_surrogate_check" "${ARG_UNPARSED_ARGUMENTS}")
+  _besa_require_value("besa_surrogate_check" "TARGET" "${ARG_TARGET}")
+  if(NOT ARG_EXPECT)
+    set(ARG_EXPECT PASS)
+  endif()
+  if(NOT ARG_EXPECT STREQUAL "PASS" AND NOT ARG_EXPECT STREQUAL "FAIL")
+    _besa_fatal("besa_surrogate_check" "EXPECT must be PASS or FAIL")
+  endif()
+  if(NOT ARG_LABELS)
+    set(ARG_LABELS instrumentation surrogate)
+  endif()
+  cmake_language(EVAL CODE
+    "cmake_language(DEFER DIRECTORY [[${PROJECT_SOURCE_DIR}]] CALL _besa_surrogate_check_impl [[${ARG_TARGET}]] [[${ARG_LABELS}]] [[${ARG_EXPECT}]])"
+  )
+endfunction()
+
+# --------------------------------------------------------------------------------------------------
+# Internal implementation
+# --------------------------------------------------------------------------------------------------
+
+# Generate one translation unit which includes one public header.
+# Header suffix selects C, C++ or CUDA compilation; unsupported suffixes skip.
 function(_besa_surrogate_generate_source HEADER INCLUDE_ROOT DESTINATION OUTPUT_VARIABLE)
   file(RELATIVE_PATH _relative "${INCLUDE_ROOT}" "${HEADER}")
   get_filename_component(_extension "${HEADER}" LAST_EXT)
@@ -31,6 +73,8 @@ function(_besa_surrogate_generate_source HEADER INCLUDE_ROOT DESTINATION OUTPUT_
   set("${OUTPUT_VARIABLE}" "${_source}" PARENT_SCOPE)
 endfunction()
 
+# Read build-tree include directories from the target, ignoring opaque
+# generator expressions and install-only include paths.
 function(_besa_surrogate_collect_includes TARGET_NAME OUTPUT_VARIABLE)
   set(_directories)
   foreach(_property INCLUDE_DIRECTORIES INTERFACE_INCLUDE_DIRECTORIES)
@@ -56,6 +100,8 @@ function(_besa_surrogate_collect_includes TARGET_NAME OUTPUT_VARIABLE)
   set("${OUTPUT_VARIABLE}" "${_directories}" PARENT_SCOPE)
 endfunction()
 
+# At deferred configure time, discover public headers and register one
+# compilation target plus a CTest invocation to build it.
 function(_besa_surrogate_check_impl TARGET_NAME LABELS EXPECT)
   if(NOT TARGET "${TARGET_NAME}")
     _besa_fatal("besa_surrogate_check" "target '${TARGET_NAME}' no longer exists")
@@ -94,25 +140,4 @@ function(_besa_surrogate_check_impl TARGET_NAME LABELS EXPECT)
   if(EXPECT STREQUAL "FAIL")
     set_tests_properties("${_surrogate_target}" PROPERTIES WILL_FAIL TRUE)
   endif()
-endfunction()
-
-# Verify that every public header can be compiled in isolation.  The implementation is deferred so
-# callers may continue adding include directories/file sets after registering the check.
-function(besa_surrogate_check)
-  _besa_require_config_complete("besa_surrogate_check")
-  cmake_parse_arguments(ARG "" "TARGET;EXPECT" "LABELS" ${ARGN})
-  _besa_require_no_unparsed("besa_surrogate_check" "${ARG_UNPARSED_ARGUMENTS}")
-  _besa_require_value("besa_surrogate_check" "TARGET" "${ARG_TARGET}")
-  if(NOT ARG_EXPECT)
-    set(ARG_EXPECT PASS)
-  endif()
-  if(NOT ARG_EXPECT STREQUAL "PASS" AND NOT ARG_EXPECT STREQUAL "FAIL")
-    _besa_fatal("besa_surrogate_check" "EXPECT must be PASS or FAIL")
-  endif()
-  if(NOT ARG_LABELS)
-    set(ARG_LABELS instrumentation surrogate)
-  endif()
-  cmake_language(EVAL CODE
-    "cmake_language(DEFER DIRECTORY [[${PROJECT_SOURCE_DIR}]] CALL _besa_surrogate_check_impl [[${ARG_TARGET}]] [[${ARG_LABELS}]] [[${ARG_EXPECT}]])"
-  )
 endfunction()

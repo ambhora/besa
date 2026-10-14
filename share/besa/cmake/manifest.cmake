@@ -2,9 +2,46 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2026 besa developers
 # --------------------------------------------------------------------------------------------------
-# Semantic project manifest shared by BESA itself and the cpdocs provider.
+# Record BESA semantic units and public option metadata.
+#
+# The generated JSON manifest describes discovered source units, their types,
+# feature constraints and registered CMake cache options. Other BESA facilities
+# and the cpdocs provider consume this shared description. Internal global
+# properties accumulate records until project finalization writes the manifest.
+
 include_guard(GLOBAL)
 include("${CMAKE_CURRENT_LIST_DIR}/internal.cmake")
+
+# --------------------------------------------------------------------------------------------------
+# Public API
+# --------------------------------------------------------------------------------------------------
+
+# Register existing project cache variables for manifest/report metadata.
+#   besa_register_options(GROUP <group> VARIABLES <variable>...)
+function(besa_register_options)
+  _besa_require_config_open("besa_register_options")
+  cmake_parse_arguments(ARG "" "GROUP" "VARIABLES" ${ARGN})
+  _besa_require_no_unparsed("besa_register_options" "${ARG_UNPARSED_ARGUMENTS}")
+  if(NOT ARG_GROUP OR NOT ARG_VARIABLES)
+    _besa_fatal("besa_register_options" "GROUP and VARIABLES are required")
+  endif()
+  foreach(_variable IN LISTS ARG_VARIABLES)
+    get_property(_is_cache CACHE "${_variable}" PROPERTY TYPE SET)
+    if(NOT _is_cache)
+      _besa_fatal("besa_register_options" "'${_variable}' is not a CMake cache variable")
+    endif()
+    get_property(_existing GLOBAL PROPERTY "BESA_OPTION_GROUP_${_variable}")
+    if(_existing)
+      _besa_fatal("besa_register_options" "'${_variable}' already registered")
+    endif()
+    set_property(GLOBAL PROPERTY "BESA_OPTION_GROUP_${_variable}" "${ARG_GROUP}")
+    set_property(GLOBAL APPEND PROPERTY BESA_REGISTERED_OPTIONS "${_variable}")
+  endforeach()
+endfunction()
+
+# --------------------------------------------------------------------------------------------------
+# Internal implementation
+# --------------------------------------------------------------------------------------------------
 
 function(_besa_json_escape INPUT OUTPUT_VARIABLE)
   set(_value "${INPUT}")
@@ -210,28 +247,6 @@ function(_besa_manifest_units_json OUTPUT_VARIABLE)
     set(_json "")
   endif()
   set("${OUTPUT_VARIABLE}" "${_json}" PARENT_SCOPE)
-endfunction()
-
-# Metadata are derived from the native CMake cache, never redeclared in BESA.
-function(besa_register_options)
-  _besa_require_config_open("besa_register_options")
-  cmake_parse_arguments(ARG "" "GROUP" "VARIABLES" ${ARGN})
-  _besa_require_no_unparsed("besa_register_options" "${ARG_UNPARSED_ARGUMENTS}")
-  if(NOT ARG_GROUP OR NOT ARG_VARIABLES)
-    _besa_fatal("besa_register_options" "GROUP and VARIABLES are required")
-  endif()
-  foreach(_variable IN LISTS ARG_VARIABLES)
-    get_property(_is_cache CACHE "${_variable}" PROPERTY TYPE SET)
-    if(NOT _is_cache)
-      _besa_fatal("besa_register_options" "'${_variable}' is not a CMake cache variable")
-    endif()
-    get_property(_existing GLOBAL PROPERTY "BESA_OPTION_GROUP_${_variable}")
-    if(_existing)
-      _besa_fatal("besa_register_options" "'${_variable}' already registered")
-    endif()
-    set_property(GLOBAL PROPERTY "BESA_OPTION_GROUP_${_variable}" "${ARG_GROUP}")
-    set_property(GLOBAL APPEND PROPERTY BESA_REGISTERED_OPTIONS "${_variable}")
-  endforeach()
 endfunction()
 
 function(_besa_manifest_options_json OUTPUT_VARIABLE)

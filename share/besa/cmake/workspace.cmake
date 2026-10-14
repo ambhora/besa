@@ -2,6 +2,20 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2026 besa developers
 # --------------------------------------------------------------------------------------------------
+# Manage BESA-owned working files in one build-tree namespace.
+#
+# Generated source, documentation for multiple configurations or versions,
+# and persistent configure-time caches should not be mixed with source files
+# or ordinary CMake build products. By default BESA organizes them under:
+#
+#   <build>/besa/codegen/           generated source and header trees
+#   <build>/besa/docs/              current and versioned documentation
+#   <build>/besa/configure_cache/   configure-time reusable artifacts
+#
+# BESA_WORKSPACE may override this root. All derived locations are published
+# as internal cache variables for other BESA modules to consume. Initialization
+# is normally performed by besa_finalize_options(); projects need not call it.
+
 include_guard(GLOBAL)
 
 # Initialize BESA-owned paths strictly within the build tree by default:
@@ -12,6 +26,13 @@ include_guard(GLOBAL)
 #     configure_cache/    configure-time caches
 #
 # besa_finalize_options() calls this, so projects normally never call it directly.
+
+# --------------------------------------------------------------------------------------------------
+# Public API
+# --------------------------------------------------------------------------------------------------
+
+# Initialize the workspace paths and create codegen/, docs/, and configure_cache/.
+# Usually called by besa_finalize_options(); BESA_WORKSPACE overrides the root.
 function(besa_workspace_initialize)
   if(NOT DEFINED BESA_WORKSPACE OR "${BESA_WORKSPACE}" STREQUAL "")
     set(_workspace "${PROJECT_BINARY_DIR}/besa")

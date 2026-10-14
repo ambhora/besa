@@ -2,11 +2,21 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2026 besa developers
 # --------------------------------------------------------------------------------------------------
+# Shared internal validation and state helpers.
+#
+# These helpers do not form the project-facing BESA API. They enforce consistent
+# argument checking and configuration lifecycle diagnostics, normalize identifiers
+# used in global properties, and publish small canonical representations.
+
 include_guard(GLOBAL)
 
 # Internal helpers.  Public BESA functions always use named arguments; small internal helpers may
 # use positional arguments because they are implementation details and are never part of a project
 # build description.
+
+# --------------------------------------------------------------------------------------------------
+# Internal implementation
+# --------------------------------------------------------------------------------------------------
 
 function(_besa_fatal FUNCTION_NAME TEXT)
   message(FATAL_ERROR "${FUNCTION_NAME}: ${TEXT}")

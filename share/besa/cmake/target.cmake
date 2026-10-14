@@ -2,39 +2,25 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2026 besa developers
 # --------------------------------------------------------------------------------------------------
+# Create BESA-managed library and executable targets.
+#
+# Target creation remains independent of directory discovery. Libraries can
+# receive multiple besa_add_directory() roots; installation is selected per
+# library. Shared instrumentation/warnings are applied when the project source
+# languages have been enabled (deferred for libraries). The install registry is
+# consumed by package.cmake at project finalization.
+
 include_guard(GLOBAL)
 include("${CMAKE_CURRENT_LIST_DIR}/internal.cmake")
 
-function(_besa_register_install_target TARGET_NAME)
-  get_property(_targets GLOBAL PROPERTY BESA_INSTALL_TARGETS)
-  if(NOT "${TARGET_NAME}" IN_LIST _targets)
-    set_property(GLOBAL APPEND PROPERTY BESA_INSTALL_TARGETS "${TARGET_NAME}")
-  endif()
-endfunction()
+# --------------------------------------------------------------------------------------------------
+# Public API
+# --------------------------------------------------------------------------------------------------
 
-function(_besa_target_common TARGET_NAME)
-  get_target_property(_target_type "${TARGET_NAME}" TYPE)
-  if(_target_type STREQUAL "INTERFACE_LIBRARY")
-    # An interface target has no compilation step to instrument.
-    return()
-  endif()
-  _besa_devtools_activate()
-  # ``projectdocs`` is a BESA/Doxygen alias used in C++ documentation comments. Clang otherwise
-  # diagnoses it as an unknown documentation command when -Wdocumentation is enabled (for example
-  # by the ``everything`` warning policy). Register only the custom command instead of suppressing
-  # unknown-command diagnostics globally, so misspelled standard Doxygen commands still warn.
-  target_compile_options(
-    "${TARGET_NAME}" PRIVATE
-    $<$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>:-fcomment-block-commands=projectdocs>
-  )
-
-  _besa_target_apply_warning_policy("${TARGET_NAME}")
-  _besa_target_apply_devtools("${TARGET_NAME}")
-endfunction()
-
-# Add a CMake library target, using BESA's output name and installation conventions.
-# Source and public-header discovery is handled separately by besa_add_directory().
-# NAME libfoo produces libfoo.a/.so (rather than liblibfoo.a/.so).
+# Create a library target with optional TYPE and INSTALL YES/NO.
+#   besa_add_library(NAME <target> [TYPE STATIC|SHARED|MODULE|OBJECT|INTERFACE] [INSTALL YES|NO])
+# Omitting TYPE delegates STATIC/SHARED selection to BUILD_SHARED_LIBS.
+# NAME libfoo yields the output filename libfoo, not liblibfoo.
 function(besa_add_library)
   _besa_require_config_complete("besa_add_library")
   # TYPE is optional. Without it, CMake chooses STATIC or SHARED using
@@ -83,6 +69,8 @@ function(besa_add_library)
   endif()
 endfunction()
 
+# Create an executable and register it for installation when requested.
+#   besa_add_executable(NAME <name> [INSTALL <bool>] [SOURCES ...] [LINK_LIBRARIES ...])
 function(besa_add_executable)
   _besa_require_config_complete("besa_add_executable")
   cmake_parse_arguments(ARG "" "NAME;INSTALL" "SOURCES;LINK_LIBRARIES" ${ARGN})
@@ -100,4 +88,37 @@ function(besa_add_executable)
   if(ARG_INSTALL)
     _besa_register_install_target("${ARG_NAME}")
   endif()
+endfunction()
+
+# --------------------------------------------------------------------------------------------------
+# Internal implementation
+# --------------------------------------------------------------------------------------------------
+
+function(_besa_register_install_target TARGET_NAME)
+  get_property(_targets GLOBAL PROPERTY BESA_INSTALL_TARGETS)
+  if(NOT "${TARGET_NAME}" IN_LIST _targets)
+    set_property(GLOBAL APPEND PROPERTY BESA_INSTALL_TARGETS "${TARGET_NAME}")
+  endif()
+endfunction()
+
+# Attach warnings and devtools to a compiled target.
+# Library invocation is deferred because languages may be enabled later.
+function(_besa_target_common TARGET_NAME)
+  get_target_property(_target_type "${TARGET_NAME}" TYPE)
+  if(_target_type STREQUAL "INTERFACE_LIBRARY")
+    # An interface target has no compilation step to instrument.
+    return()
+  endif()
+  _besa_devtools_activate()
+  # ``projectdocs`` is a BESA/Doxygen alias used in C++ documentation comments. Clang otherwise
+  # diagnoses it as an unknown documentation command when -Wdocumentation is enabled (for example
+  # by the ``everything`` warning policy). Register only the custom command instead of suppressing
+  # unknown-command diagnostics globally, so misspelled standard Doxygen commands still warn.
+  target_compile_options(
+    "${TARGET_NAME}" PRIVATE
+    $<$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>:-fcomment-block-commands=projectdocs>
+  )
+
+  _besa_target_apply_warning_policy("${TARGET_NAME}")
+  _besa_target_apply_devtools("${TARGET_NAME}")
 endfunction()

@@ -2,8 +2,19 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2026 besa developers
 # --------------------------------------------------------------------------------------------------
+# Resolve source, release and package-maintainer version information.
+#
+# Git describes development versions; release options, prerelease revisions
+# and package-builder metadata are resolved during option finalization.
+# Generated version headers are placed under the BESA code-generation workspace
+# and registered for packaging through codegen.cmake.
+
 include_guard(GLOBAL)
 include("${CMAKE_CURRENT_LIST_DIR}/internal.cmake")
+
+# --------------------------------------------------------------------------------------------------
+# Internal implementation
+# --------------------------------------------------------------------------------------------------
 
 function(_besa_git_value OUTPUT_VARIABLE)
   cmake_parse_arguments(ARG "" "COMMAND;FALLBACK" "" ${ARGN})

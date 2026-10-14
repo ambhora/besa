@@ -2,7 +2,13 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2026 besa developers
 # --------------------------------------------------------------------------------------------------
-# Native provider for the cpdocs feature-set/manifest protocol.
+# Build metadata consumed by the cpdocs API documentation provider.
+#
+# During configuration BESA records active feature-set information and emits
+# the metadata needed for versioned API documentation. The manifest describes
+# the semantic units from manifest.cmake. Generation runs at finalization;
+# project-facing documentation build targets are defined in userdocs.cmake.
+
 include_guard(GLOBAL)
 include("${CMAKE_CURRENT_LIST_DIR}/internal.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/keyso.cmake")
@@ -10,6 +16,11 @@ include("${CMAKE_CURRENT_LIST_DIR}/manifest.cmake")
 
 # cpdocs passes one concrete feature set back to BESA. Feature sets are deliberately unnamed: the
 # selected object contains only the concrete features needed to reproduce that configuration.
+
+# --------------------------------------------------------------------------------------------------
+# Internal implementation
+# --------------------------------------------------------------------------------------------------
+
 function(_besa_cpdocs_apply_feature_set)
   if(NOT DEFINED BESA_CPDOCS_FEATURE_SET OR "${BESA_CPDOCS_FEATURE_SET}" STREQUAL "")
     return()

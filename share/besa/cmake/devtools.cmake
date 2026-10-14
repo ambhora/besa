@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2026 besa developers
 # --------------------------------------------------------------------------------------------------
+# Resolve and apply BESA-owned development and instrumentation capabilities.
+#
+# BUILD_DEVTOOLS is the project-facing selection; tools are not redeclared in
+# project-specific CMake files. User constraint callbacks run during finalization
+# before compiler instrumentation targets are activated. Target instrumentation
+# is attached later, once source languages are enabled. CTest tools are added
+# during deferred project finalization.
+
 include_guard(GLOBAL)
 include("${CMAKE_CURRENT_LIST_DIR}/internal.cmake")
 
@@ -20,6 +28,15 @@ set(_BESA_COMPILER_DEVTOOLS asan lsan ubsan coverage)
 #
 # It reads ARG_DEVTOOLS and writes TRUE/FALSE to ${ARG_OUTPUT_VARIABLE} and an optional diagnostic to
 # ${ARG_ERROR_VARIABLE}, both in PARENT_SCOPE.
+
+# --------------------------------------------------------------------------------------------------
+# Public API
+# --------------------------------------------------------------------------------------------------
+
+# Parse the named devtool constraint callback arguments.
+#   besa_devtool_constraint_arguments_parse(PREFIX <prefix> ARGUMENTS ${ARGN})
+# Exposes <prefix>_DEVTOOLS, <prefix>_OUTPUT_VARIABLE and <prefix>_ERROR_VARIABLE
+# in the caller scope; the callback reports results via PARENT_SCOPE.
 function(besa_devtool_constraint_arguments_parse)
   cmake_parse_arguments(ARG "" "PREFIX" "ARGUMENTS" ${ARGN})
   _besa_require_no_unparsed(
@@ -41,6 +58,10 @@ function(besa_devtool_constraint_arguments_parse)
   set("${ARG_PREFIX}_DEVTOOLS" "${PARSED_DEVTOOLS}" PARENT_SCOPE)
 endfunction()
 
+# Register a project callback to validate the selected BUILD_DEVTOOLS set.
+#   besa_register_devtool_constraint(FUNCTION <callback>)
+# Register before besa_finalize_options(); callbacks receive DEVTOOLS,
+# OUTPUT_VARIABLE and ERROR_VARIABLE via named arguments.
 function(besa_register_devtool_constraint)
   _besa_require_config_open("besa_register_devtool_constraint")
   cmake_parse_arguments(ARG "" "FUNCTION" "" ${ARGN})
@@ -54,6 +75,46 @@ function(besa_register_devtool_constraint)
   endif()
   _besa_append_unique(BESA_DEVTOOL_CONSTRAINTS "${ARG_FUNCTION}" "besa_register_devtool_constraint")
 endfunction()
+
+# Query whether at least one requested devtool is enabled.
+#   besa_devtools_check(OUTPUT_VARIABLE <var> [DEVTOOLS <name>...])
+# Selection uses ANY-OF semantics; no DEVTOOLS selector means TRUE.
+# Requires finalized configuration.
+function(besa_devtools_check)
+  _besa_require_config_complete("besa_devtools_check")
+  cmake_parse_arguments(ARG "" "OUTPUT_VARIABLE" "DEVTOOLS" ${ARGN})
+  _besa_require_no_unparsed("besa_devtools_check" "${ARG_UNPARSED_ARGUMENTS}")
+  _besa_require_value("besa_devtools_check" "OUTPUT_VARIABLE" "${ARG_OUTPUT_VARIABLE}")
+  if("DEVTOOLS" IN_LIST ARG_KEYWORDS_MISSING_VALUES)
+    _besa_fatal("besa_devtools_check" "DEVTOOLS requires at least one devtool")
+  endif()
+
+  if(NOT ARG_DEVTOOLS)
+    set("${ARG_OUTPUT_VARIABLE}" TRUE PARENT_SCOPE)
+    return()
+  endif()
+
+  get_property(_enabled GLOBAL PROPERTY BESA_ENABLED_DEVTOOLS)
+  set(_selected FALSE)
+  set(_seen)
+  foreach(_devtool IN LISTS ARG_DEVTOOLS)
+    if(NOT "${_devtool}" IN_LIST _BESA_SUPPORTED_DEVTOOLS)
+      _besa_fatal("besa_devtools_check" "unknown devtool '${_devtool}'")
+    endif()
+    if("${_devtool}" IN_LIST _seen)
+      _besa_fatal("besa_devtools_check" "devtool '${_devtool}' appears more than once")
+    endif()
+    list(APPEND _seen "${_devtool}")
+    if("${_devtool}" IN_LIST _enabled)
+      set(_selected TRUE)
+    endif()
+  endforeach()
+  set("${ARG_OUTPUT_VARIABLE}" "${_selected}" PARENT_SCOPE)
+endfunction()
+
+# --------------------------------------------------------------------------------------------------
+# Internal implementation
+# --------------------------------------------------------------------------------------------------
 
 function(_besa_devtools_resolve OUTPUT_VARIABLE)
   if(NOT DEFINED BUILD_DEVTOOLS)
@@ -109,41 +170,8 @@ function(_besa_devtools_resolve OUTPUT_VARIABLE)
   set("${OUTPUT_VARIABLE}" "${_enabled}" PARENT_SCOPE)
 endfunction()
 
-# Query the resolved, declared instrumentation capabilities. This is also used by test-directory
-# selection: a test binds to a devtool by name, without a second cache variable such as SANITIZER.
-# DEVTOOLS uses ANY-OF semantics, like the MODES selector in besa_test_modes_check().
-function(besa_devtools_check)
-  _besa_require_config_complete("besa_devtools_check")
-  cmake_parse_arguments(ARG "" "OUTPUT_VARIABLE" "DEVTOOLS" ${ARGN})
-  _besa_require_no_unparsed("besa_devtools_check" "${ARG_UNPARSED_ARGUMENTS}")
-  _besa_require_value("besa_devtools_check" "OUTPUT_VARIABLE" "${ARG_OUTPUT_VARIABLE}")
-  if("DEVTOOLS" IN_LIST ARG_KEYWORDS_MISSING_VALUES)
-    _besa_fatal("besa_devtools_check" "DEVTOOLS requires at least one devtool")
-  endif()
-
-  if(NOT ARG_DEVTOOLS)
-    set("${ARG_OUTPUT_VARIABLE}" TRUE PARENT_SCOPE)
-    return()
-  endif()
-
-  get_property(_enabled GLOBAL PROPERTY BESA_ENABLED_DEVTOOLS)
-  set(_selected FALSE)
-  set(_seen)
-  foreach(_devtool IN LISTS ARG_DEVTOOLS)
-    if(NOT "${_devtool}" IN_LIST _BESA_SUPPORTED_DEVTOOLS)
-      _besa_fatal("besa_devtools_check" "unknown devtool '${_devtool}'")
-    endif()
-    if("${_devtool}" IN_LIST _seen)
-      _besa_fatal("besa_devtools_check" "devtool '${_devtool}' appears more than once")
-    endif()
-    list(APPEND _seen "${_devtool}")
-    if("${_devtool}" IN_LIST _enabled)
-      set(_selected TRUE)
-    endif()
-  endforeach()
-  set("${ARG_OUTPUT_VARIABLE}" "${_selected}" PARENT_SCOPE)
-endfunction()
-
+# Invoke each registered devtool constraint after resolution.
+# Callback output and diagnostic variable names belong to the invocation scope.
 function(_besa_run_devtool_constraints ENABLED_DEVTOOLS)
   get_property(_constraints GLOBAL PROPERTY BESA_DEVTOOL_CONSTRAINTS)
   foreach(_constraint IN LISTS _constraints)
@@ -166,8 +194,8 @@ function(_besa_run_devtool_constraints ENABLED_DEVTOOLS)
   endforeach()
 endfunction()
 
-# Create compiler/link policy targets only after all configuration constraints have succeeded and
-# toolchain-* languages have been enabled.  This keeps rejected configurations side-effect free.
+# Instantiate compiler instrumentation targets after languages are enabled.
+# Activation occurs once; no compiler policy targets are created on failure.
 function(_besa_devtools_activate)
   get_property(_activated GLOBAL PROPERTY BESA_DEVTOOLS_ACTIVATED)
   if(_activated)

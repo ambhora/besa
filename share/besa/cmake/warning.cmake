@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2026 besa developers
 # --------------------------------------------------------------------------------------------------
+# Composable compiler-warning policies selected by BUILD_WARNINGS.
+#
+# minimal, extra and everything form one increasing warning level; werror is
+# independent and can be combined with one level. `none` disables all levels.
+# The interface targets carry compiler-dependent usage requirements. Selection
+# is resolved during option finalization and applied to local compiled targets.
+# The option syntax, validation and published cache variables are unchanged.
+
 include_guard(GLOBAL)
 include("${CMAKE_CURRENT_LIST_DIR}/internal.cmake")
 
@@ -20,11 +28,13 @@ target_compile_options(
 
 add_library(besa.warning.extra INTERFACE)
 add_library(besa::warning.extra ALIAS besa.warning.extra)
+# Only incremental options: extra includes minimal transitively.
+target_link_libraries(besa.warning.extra INTERFACE besa::warning.minimal)
 target_compile_options(
   besa.warning.extra INTERFACE
-  $<$<COMPILE_LANG_AND_ID:C,GNU,Clang>:-Wall;-Wextra;-Wpedantic;-Wdeprecated>
-  $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang>:-Wall;-Wextra;-Wpedantic;-Wdeprecated>
-  $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:-Xcompiler=-Wall,-Wextra,-Wpedantic>
+  $<$<COMPILE_LANG_AND_ID:C,GNU,Clang>:-Wextra;-Wpedantic;-Wdeprecated>
+  $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang>:-Wextra;-Wpedantic;-Wdeprecated>
+  $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:-Xcompiler=-Wextra,-Wpedantic>
 )
 
 add_library(besa.warning.werror INTERFACE)
@@ -37,14 +47,20 @@ target_compile_options(
 
 add_library(besa.warning.everything INTERFACE)
 add_library(besa::warning.everything ALIAS besa.warning.everything)
+# GCC everything adds no options beyond extra; Clang adds its full warning set.
+target_link_libraries(besa.warning.everything INTERFACE besa::warning.extra)
 target_compile_options(
   besa.warning.everything INTERFACE
-  $<$<COMPILE_LANG_AND_ID:C,GNU>:-Wall;-Wextra;-Wpedantic;-Wdeprecated>
-  $<$<COMPILE_LANG_AND_ID:CXX,GNU>:-Wall;-Wextra;-Wpedantic;-Wdeprecated>
   $<$<COMPILE_LANG_AND_ID:C,Clang>:-Weverything;-Wno-padded>
   $<$<COMPILE_LANG_AND_ID:CXX,Clang>:-Weverything;-Wno-c++98-compat;-Wno-c++98-compat-pedantic;-Wno-padded;-Wno-weak-vtables>
 )
 
+# --------------------------------------------------------------------------------------------------
+# Internal implementation
+# --------------------------------------------------------------------------------------------------
+
+# Validate mutually exclusive warning levels and publish normalized policy
+# booleans. `none` selects no target and cannot be mixed with other policies.
 function(_besa_warnings_resolve OUTPUT_VARIABLE)
   if(NOT DEFINED BUILD_WARNINGS)
     if(DEFINED PROJECT_WARNINGS)

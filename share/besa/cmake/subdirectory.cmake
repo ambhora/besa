@@ -2,58 +2,29 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2026 besa developers
 # --------------------------------------------------------------------------------------------------
-# Semantic project units and extensible directory types.
+# Attach semantic directory trees to user-selected build targets.
+#
+# Public APIs create source units from ROOT/DIRECTORY with lib/, include/, and
+# optional module/ or mod/ subtrees. Built-in types enable C, C++, CUDA, HIP
+# or Fortran; generated types invoke registered callbacks and then lower the
+# resulting source tree in the same way. Generated-output ownership belongs to
+# codegen.cmake; this module owns type registration, selection and attachment.
+# The public entry points are macros where enable_language() must execute in
+# the calling CMake directory scope, not inside a function scope.
+
 include_guard(GLOBAL)
 include("${CMAKE_CURRENT_LIST_DIR}/internal.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/keyso.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/manifest.cmake")
 
-function(_besa_subdir_type_property TYPE FIELD OUTPUT_VARIABLE)
-  _besa_normalize_name("${TYPE}" _type)
-  set("${OUTPUT_VARIABLE}" "BESA_SUBDIR_TYPE_${_type}_${FIELD}" PARENT_SCOPE)
-endfunction()
+# --------------------------------------------------------------------------------------------------
+# Public API
+# --------------------------------------------------------------------------------------------------
 
-# The registry stores each field in one global property. Centralize writes so builtin
-# and generated types follow the same representation, without packing/unpacking records.
-function(_besa_subdir_type_set TYPE FIELD VALUE)
-  _besa_subdir_type_property("${TYPE}" "${FIELD}" _property)
-  set_property(GLOBAL PROPERTY "${_property}" "${VALUE}")
-endfunction()
-
-function(_besa_subdir_register_builtin TYPE LANGUAGE)
-  _besa_subdir_type_set("${TYPE}" KIND builtin)
-  _besa_subdir_type_set("${TYPE}" LANGUAGE "${LANGUAGE}")
-  set_property(GLOBAL APPEND PROPERTY BESA_SUBDIR_TYPES "${TYPE}")
-endfunction()
-
-function(_besa_subdir_type_get TYPE FIELD OUTPUT_VARIABLE)
-  _besa_subdir_type_property("${TYPE}" "${FIELD}" _property)
-  get_property(_set GLOBAL PROPERTY "${_property}" SET)
-  if(NOT _set)
-    set("${OUTPUT_VARIABLE}" "" PARENT_SCOPE)
-    return()
-  endif()
-  get_property(_value GLOBAL PROPERTY "${_property}")
-  set("${OUTPUT_VARIABLE}" "${_value}" PARENT_SCOPE)
-endfunction()
-
-function(_besa_subdir_initialize_types)
-  get_property(_done GLOBAL PROPERTY BESA_SUBDIR_TYPES_INITIALIZED)
-  if(_done)
-    return()
-  endif()
-  _besa_subdir_register_builtin(c C)
-  _besa_subdir_register_builtin(cpp CXX)
-  _besa_subdir_register_builtin(cuda CUDA)
-  _besa_subdir_register_builtin(hip HIP)
-  _besa_subdir_register_builtin(fortran Fortran)
-  _besa_subdir_register_builtin(bin "")
-  set_property(GLOBAL PROPERTY BESA_SUBDIR_TYPES_INITIALIZED TRUE)
-endfunction()
-
-# Register an extension type. GENERATED types receive a BESA-owned output prefix and must resolve to
-# one of the concrete built-in types. The callback may define its own additional arguments; BESA
-# always passes SOURCE_DIR, BUILD_DIR, OUTPUT_DIR, and OUTPUT_TARGET_VARIABLE.
+# Register a generated source-directory type before option finalization.
+#   besa_register_subdirectory_type(<type> GENERATED FUNCTION <callback> RESOLVES_TO <builtin>)
+# The callback receives SOURCE_DIR, BUILD_DIR, OUTPUT_DIR and OUTPUT_TARGET_VARIABLE.
+# The resolved built-in type determines language activation and source discovery.
 function(besa_register_subdirectory_type TYPE)
   _besa_require_config_open("besa_register_subdirectory_type")
   if("${TYPE}" STREQUAL "")
@@ -87,134 +58,11 @@ function(besa_register_subdirectory_type TYPE)
   set_property(GLOBAL APPEND PROPERTY BESA_SUBDIR_TYPES "${TYPE}")
 endfunction()
 
-
-
-macro(_besa_subdir_enable_language TYPE)
-  if(NOT "${TYPE}" STREQUAL "bin")
-    _besa_subdir_type_get("${TYPE}" LANGUAGE _besa_language)
-    if(_besa_language)
-      get_property(_besa_enabled_languages GLOBAL PROPERTY ENABLED_LANGUAGES)
-      if(NOT "${_besa_language}" IN_LIST _besa_enabled_languages)
-        enable_language("${_besa_language}")
-      endif()
-    endif()
-  endif()
-endmacro()
-
-macro(_besa_subdir_enable_bin_languages ROOT)
-  file(GLOB _besa_bin_sources LIST_DIRECTORIES FALSE "${ROOT}/*.c" "${ROOT}/*.cc" "${ROOT}/*.cpp" "${ROOT}/*.cxx")
-  set(_besa_need_c FALSE)
-  set(_besa_need_cxx FALSE)
-  foreach(_besa_source IN LISTS _besa_bin_sources)
-    get_filename_component(_besa_extension "${_besa_source}" EXT)
-    if(_besa_extension STREQUAL ".c")
-      set(_besa_need_c TRUE)
-    else()
-      set(_besa_need_cxx TRUE)
-    endif()
-  endforeach()
-  get_property(_besa_enabled_languages GLOBAL PROPERTY ENABLED_LANGUAGES)
-  if(_besa_need_c AND NOT "C" IN_LIST _besa_enabled_languages)
-    enable_language(C)
-  endif()
-  get_property(_besa_enabled_languages GLOBAL PROPERTY ENABLED_LANGUAGES)
-  if(_besa_need_cxx AND NOT "CXX" IN_LIST _besa_enabled_languages)
-    enable_language(CXX)
-  endif()
-endmacro()
-
-# enable_language() must run in the caller's directory scope; keep this a macro.
-# Both generated and builtin units need exactly the same language-selection logic.
-macro(_besa_subdir_enable_type_languages TYPE ROOT)
-  if("${TYPE}" STREQUAL "bin")
-    _besa_subdir_enable_bin_languages("${ROOT}")
-  else()
-    _besa_subdir_enable_language("${TYPE}")
-  endif()
-endmacro()
-
-function(_besa_subdir_filter_metadata LIST_VARIABLE)
-  set(_values ${${LIST_VARIABLE}})
-  list(FILTER _values EXCLUDE REGEX "/\\.[^/]+$")
-  set("${LIST_VARIABLE}" "${_values}" PARENT_SCOPE)
-endfunction()
-
-function(_besa_subdir_lower_library LIBRARY ROOT TYPE GENERATED)
-  if(NOT LIBRARY OR NOT TARGET "${LIBRARY}")
-    _besa_fatal("besa_add_subdirectory" "LIBRARY must name an existing target; call besa_add_library first")
-  endif()
-  set(_library "${LIBRARY}")
-  file(GLOB_RECURSE _headers LIST_DIRECTORIES FALSE CONFIGURE_DEPENDS "${ROOT}/include/*")
-  file(GLOB_RECURSE _sources LIST_DIRECTORIES FALSE CONFIGURE_DEPENDS "${ROOT}/lib/*")
-  if(TYPE STREQUAL "cpp")
-    file(GLOB_RECURSE _cpp_modules LIST_DIRECTORIES FALSE CONFIGURE_DEPENDS "${ROOT}/module/*.cppm")
-  endif()
-  if(TYPE STREQUAL "fortran")
-    file(GLOB_RECURSE _modules LIST_DIRECTORIES FALSE CONFIGURE_DEPENDS "${ROOT}/mod/*")
-  else()
-    set(_modules)
-  endif()
-  _besa_subdir_filter_metadata(_headers)
-  _besa_subdir_filter_metadata(_sources)
-  _besa_subdir_filter_metadata(_modules)
-  _besa_subdir_filter_metadata(_cpp_modules)
-
-  if(_headers OR _sources OR _modules OR _cpp_modules)
-    get_target_property(_library_type "${_library}" TYPE)
-    if(_library_type STREQUAL "INTERFACE_LIBRARY")
-      if(_sources OR _modules OR _cpp_modules)
-        _besa_fatal("besa_add_directory" "INTERFACE library '${_library}' cannot contain compiled sources")
-      endif()
-      set(_visibility INTERFACE)
-    else()
-      set(_visibility PUBLIC)
-      if(_sources OR _modules)
-        target_sources("${_library}" PRIVATE ${_sources} ${_modules})
-      endif()
-    endif()
-    if(_cpp_modules)
-      target_compile_features("${_library}" PUBLIC cxx_std_20)
-      target_sources("${_library}" PUBLIC FILE_SET CXX_MODULES BASE_DIRS "${ROOT}/module" FILES ${_cpp_modules})
-    endif()
-    if(_headers)
-      target_sources("${_library}" ${_visibility} FILE_SET HEADERS BASE_DIRS "${ROOT}/include" FILES ${_headers})
-    endif()
-    if(IS_DIRECTORY "${ROOT}/include" OR GENERATED)
-      target_include_directories(
-        "${_library}" ${_visibility}
-        $<BUILD_INTERFACE:${ROOT}/include>
-        $<INSTALL_INTERFACE:include>
-      )
-    endif()
-    if(GENERATED AND TARGET codegen)
-      add_dependencies("${_library}" codegen)
-    endif()
-  endif()
-endfunction()
-
-function(_besa_subdir_lower_bin ROOT)
-  file(GLOB _sources LIST_DIRECTORIES FALSE CONFIGURE_DEPENDS "${ROOT}/*.c" "${ROOT}/*.cc" "${ROOT}/*.cpp" "${ROOT}/*.cxx")
-  _besa_subdir_filter_metadata(_sources)
-  foreach(_source IN LISTS _sources)
-    get_filename_component(_target "${_source}" NAME_WE)
-    set(_links)
-    if(TARGET "lib${PROJECT_NAME}")
-      list(APPEND _links "${PROJECT_NAME}::lib${PROJECT_NAME}")
-    endif()
-    besa_add_executable(NAME "${_target}" SOURCES "${_source}" LINK_LIBRARIES ${_links})
-  endforeach()
-endfunction()
-
-function(_besa_subdir_lower ROOT TYPE GENERATED LIBRARY)
-  if(TYPE STREQUAL "bin")
-    _besa_subdir_lower_bin("${ROOT}")
-  else()
-    _besa_subdir_lower_library("${LIBRARY}" "${ROOT}" "${TYPE}" "${GENERATED}")
-  endif()
-endfunction()
-
-# Add one semantic project unit. CONDITION names a Keyso feature space; the unit is selected when
-# the concrete enabled feature set matches at least one pattern in that space.
+# Add a semantic unit without the library-only validation of besa_add_directory.
+#   besa_add_subdirectory(DIRECTORY <path> TYPE <type> [LIBRARY <target>]
+#                         [CONDITION <feature-space>] [ARGS ...])
+# The bin type discovers standalone executables; other types require LIBRARY.
+# A generated type invokes its registered callback before source discovery.
 macro(besa_add_subdirectory)
   _besa_require_config_complete("besa_add_subdirectory")
   cmake_parse_arguments(BESA_SUBDIR "" "DIRECTORY;TYPE;CONDITION;LIBRARY" "ARGS" ${ARGN})
@@ -300,11 +148,12 @@ macro(besa_add_subdirectory)
   unset(BESA_SUBDIR_ARGS)
 endmacro()
 
-_besa_subdir_initialize_types()
-
-# Attach a semantic source tree to a library target. Repeated calls may attach different
-# directories to the same library, and different libraries may have independent roots.
-# ROOT contains lib/, include/ and (when applicable) module/ or mod/.
+# Attach a semantic ROOT directory to a previously created library.
+#   besa_add_directory(LIBRARY <target> ROOT <path> TYPE <type>
+#                      [CONDITION <feature-space>] [ARGS ...])
+# Each call adds lib/ implementations, public include/ headers, and optional
+# C++ module/ or Fortran mod/ files. Calls can target different libraries.
+# CONDITION is matched against the finalized feature configuration.
 macro(besa_add_directory)
   _besa_require_config_complete("besa_add_directory")
   cmake_parse_arguments(BESA_DIRECTORY "" "LIBRARY;ROOT;TYPE;CONDITION" "ARGS" ${ARGN})
@@ -353,3 +202,179 @@ macro(besa_add_directory)
   unset(BESA_DIRECTORY_CONDITION)
   unset(BESA_DIRECTORY_ARGS)
 endmacro()
+
+# --------------------------------------------------------------------------------------------------
+# Internal implementation
+# --------------------------------------------------------------------------------------------------
+
+function(_besa_subdir_type_property TYPE FIELD OUTPUT_VARIABLE)
+  _besa_normalize_name("${TYPE}" _type)
+  set("${OUTPUT_VARIABLE}" "BESA_SUBDIR_TYPE_${_type}_${FIELD}" PARENT_SCOPE)
+endfunction()
+
+# Store a named type-registry field in a global property.
+# Built-in and generated types use the same representation.
+function(_besa_subdir_type_set TYPE FIELD VALUE)
+  _besa_subdir_type_property("${TYPE}" "${FIELD}" _property)
+  set_property(GLOBAL PROPERTY "${_property}" "${VALUE}")
+endfunction()
+
+function(_besa_subdir_register_builtin TYPE LANGUAGE)
+  _besa_subdir_type_set("${TYPE}" KIND builtin)
+  _besa_subdir_type_set("${TYPE}" LANGUAGE "${LANGUAGE}")
+  set_property(GLOBAL APPEND PROPERTY BESA_SUBDIR_TYPES "${TYPE}")
+endfunction()
+
+function(_besa_subdir_type_get TYPE FIELD OUTPUT_VARIABLE)
+  _besa_subdir_type_property("${TYPE}" "${FIELD}" _property)
+  get_property(_set GLOBAL PROPERTY "${_property}" SET)
+  if(NOT _set)
+    set("${OUTPUT_VARIABLE}" "" PARENT_SCOPE)
+    return()
+  endif()
+  get_property(_value GLOBAL PROPERTY "${_property}")
+  set("${OUTPUT_VARIABLE}" "${_value}" PARENT_SCOPE)
+endfunction()
+
+function(_besa_subdir_initialize_types)
+  get_property(_done GLOBAL PROPERTY BESA_SUBDIR_TYPES_INITIALIZED)
+  if(_done)
+    return()
+  endif()
+  _besa_subdir_register_builtin(c C)
+  _besa_subdir_register_builtin(cpp CXX)
+  _besa_subdir_register_builtin(cuda CUDA)
+  _besa_subdir_register_builtin(hip HIP)
+  _besa_subdir_register_builtin(fortran Fortran)
+  _besa_subdir_register_builtin(bin "")
+  set_property(GLOBAL PROPERTY BESA_SUBDIR_TYPES_INITIALIZED TRUE)
+endfunction()
+
+macro(_besa_subdir_enable_language TYPE)
+  if(NOT "${TYPE}" STREQUAL "bin")
+    _besa_subdir_type_get("${TYPE}" LANGUAGE _besa_language)
+    if(_besa_language)
+      get_property(_besa_enabled_languages GLOBAL PROPERTY ENABLED_LANGUAGES)
+      if(NOT "${_besa_language}" IN_LIST _besa_enabled_languages)
+        enable_language("${_besa_language}")
+      endif()
+    endif()
+  endif()
+endmacro()
+
+macro(_besa_subdir_enable_bin_languages ROOT)
+  file(GLOB _besa_bin_sources LIST_DIRECTORIES FALSE "${ROOT}/*.c" "${ROOT}/*.cc" "${ROOT}/*.cpp" "${ROOT}/*.cxx")
+  set(_besa_need_c FALSE)
+  set(_besa_need_cxx FALSE)
+  foreach(_besa_source IN LISTS _besa_bin_sources)
+    get_filename_component(_besa_extension "${_besa_source}" EXT)
+    if(_besa_extension STREQUAL ".c")
+      set(_besa_need_c TRUE)
+    else()
+      set(_besa_need_cxx TRUE)
+    endif()
+  endforeach()
+  get_property(_besa_enabled_languages GLOBAL PROPERTY ENABLED_LANGUAGES)
+  if(_besa_need_c AND NOT "C" IN_LIST _besa_enabled_languages)
+    enable_language(C)
+  endif()
+  get_property(_besa_enabled_languages GLOBAL PROPERTY ENABLED_LANGUAGES)
+  if(_besa_need_cxx AND NOT "CXX" IN_LIST _besa_enabled_languages)
+    enable_language(CXX)
+  endif()
+endmacro()
+
+# Enable source languages in the caller directory scope, hence a macro.
+macro(_besa_subdir_enable_type_languages TYPE ROOT)
+  if("${TYPE}" STREQUAL "bin")
+    _besa_subdir_enable_bin_languages("${ROOT}")
+  else()
+    _besa_subdir_enable_language("${TYPE}")
+  endif()
+endmacro()
+
+function(_besa_subdir_filter_metadata LIST_VARIABLE)
+  set(_values ${${LIST_VARIABLE}})
+  list(FILTER _values EXCLUDE REGEX "/\\.[^/]+$")
+  set("${LIST_VARIABLE}" "${_values}" PARENT_SCOPE)
+endfunction()
+
+# Discover the lib/, include/, mod/ and module/ trees beneath ROOT.
+# PRIVATE compiled sources and PUBLIC/INTERFACE header file sets use the
+# supplied LIBRARY, which may differ from the project default.
+function(_besa_subdir_lower_library LIBRARY ROOT TYPE GENERATED)
+  if(NOT LIBRARY OR NOT TARGET "${LIBRARY}")
+    _besa_fatal("besa_add_subdirectory" "LIBRARY must name an existing target; call besa_add_library first")
+  endif()
+  set(_library "${LIBRARY}")
+  file(GLOB_RECURSE _headers LIST_DIRECTORIES FALSE CONFIGURE_DEPENDS "${ROOT}/include/*")
+  file(GLOB_RECURSE _sources LIST_DIRECTORIES FALSE CONFIGURE_DEPENDS "${ROOT}/lib/*")
+  if(TYPE STREQUAL "cpp")
+    file(GLOB_RECURSE _cpp_modules LIST_DIRECTORIES FALSE CONFIGURE_DEPENDS "${ROOT}/module/*.cppm")
+  endif()
+  if(TYPE STREQUAL "fortran")
+    file(GLOB_RECURSE _modules LIST_DIRECTORIES FALSE CONFIGURE_DEPENDS "${ROOT}/mod/*")
+  else()
+    set(_modules)
+  endif()
+  _besa_subdir_filter_metadata(_headers)
+  _besa_subdir_filter_metadata(_sources)
+  _besa_subdir_filter_metadata(_modules)
+  _besa_subdir_filter_metadata(_cpp_modules)
+
+  if(_headers OR _sources OR _modules OR _cpp_modules)
+    get_target_property(_library_type "${_library}" TYPE)
+    if(_library_type STREQUAL "INTERFACE_LIBRARY")
+      if(_sources OR _modules OR _cpp_modules)
+        _besa_fatal("besa_add_directory" "INTERFACE library '${_library}' cannot contain compiled sources")
+      endif()
+      set(_visibility INTERFACE)
+    else()
+      set(_visibility PUBLIC)
+      if(_sources OR _modules)
+        target_sources("${_library}" PRIVATE ${_sources} ${_modules})
+      endif()
+    endif()
+    if(_cpp_modules)
+      target_compile_features("${_library}" PUBLIC cxx_std_20)
+      target_sources("${_library}" PUBLIC FILE_SET CXX_MODULES BASE_DIRS "${ROOT}/module" FILES ${_cpp_modules})
+    endif()
+    if(_headers)
+      target_sources("${_library}" ${_visibility} FILE_SET HEADERS BASE_DIRS "${ROOT}/include" FILES ${_headers})
+    endif()
+    if(IS_DIRECTORY "${ROOT}/include" OR GENERATED)
+      target_include_directories(
+        "${_library}" ${_visibility}
+        $<BUILD_INTERFACE:${ROOT}/include>
+        $<INSTALL_INTERFACE:include>
+      )
+    endif()
+    if(GENERATED AND TARGET codegen)
+      add_dependencies("${_library}" codegen)
+    endif()
+  endif()
+endfunction()
+
+function(_besa_subdir_lower_bin ROOT)
+  file(GLOB _sources LIST_DIRECTORIES FALSE CONFIGURE_DEPENDS "${ROOT}/*.c" "${ROOT}/*.cc" "${ROOT}/*.cpp" "${ROOT}/*.cxx")
+  _besa_subdir_filter_metadata(_sources)
+  foreach(_source IN LISTS _sources)
+    get_filename_component(_target "${_source}" NAME_WE)
+    set(_links)
+    if(TARGET "lib${PROJECT_NAME}")
+      list(APPEND _links "${PROJECT_NAME}::lib${PROJECT_NAME}")
+    endif()
+    besa_add_executable(NAME "${_target}" SOURCES "${_source}" LINK_LIBRARIES ${_links})
+  endforeach()
+endfunction()
+
+function(_besa_subdir_lower ROOT TYPE GENERATED LIBRARY)
+  if(TYPE STREQUAL "bin")
+    _besa_subdir_lower_bin("${ROOT}")
+  else()
+    _besa_subdir_lower_library("${LIBRARY}" "${ROOT}" "${TYPE}" "${GENERATED}")
+  endif()
+endfunction()
+
+# Initialize built-in source types when the module is loaded.
+_besa_subdir_initialize_types()

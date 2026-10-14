@@ -2,8 +2,19 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2026 besa developers
 # --------------------------------------------------------------------------------------------------
+# Generate installation/export metadata for BESA-managed targets.
+#
+# BESA records installable targets as they are declared, then generates CMake
+# exports and package configuration at deferred project finalization. Public
+# header sets and transitive dependencies must be preserved for downstream
+# find_package() consumers. Targets marked INSTALL NO stay build-local.
+
 include_guard(GLOBAL)
 include(CMakePackageConfigHelpers)
+
+# --------------------------------------------------------------------------------------------------
+# Internal implementation
+# --------------------------------------------------------------------------------------------------
 
 function(_besa_generate_dependency_block OUTPUT_VARIABLE)
   get_property(_dependencies GLOBAL PROPERTY BESA_NORMAL_DEPENDENCIES)

@@ -2,11 +2,25 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2026 besa developers
 # --------------------------------------------------------------------------------------------------
-# Atomic features, project feature spaces, and configuration resolution.
+# Declare atomic features and valid project configurations.
+#
+# Users declare features and optional Keyso spaces while configuration is open.
+# besa_finalize_options() resolves the project cache selection, checks feature,
+# devtool and test-mode constraints, publishes resolved values, and schedules
+# project finalization. Target and test declarations follow finalization.
+# The finalizer is a macro because CMake project-wide option visibility and
+# language-enabling lifecycle depend on the caller scope.
+
 include_guard(GLOBAL)
 include("${CMAKE_CURRENT_LIST_DIR}/internal.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/keyso.cmake")
 
+# --------------------------------------------------------------------------------------------------
+# Public API
+# --------------------------------------------------------------------------------------------------
+
+# Declare an atomic feature and its singleton Keyso space before finalization.
+#   besa_add_feature(<name>)
 function(besa_add_feature NAME)
   _besa_require_config_open("besa_add_feature")
   if("${NAME}" STREQUAL "")
@@ -21,13 +35,9 @@ function(besa_add_feature NAME)
   _besa_keyso_space_set("${NAME}" "${_singleton}")
 endfunction()
 
-# Select the named feature space as the set of valid project configurations:
-#
-#   besa_set_feature_space(supported)
-#   besa_set_feature_space(supported DEFAULT alpha)
-#
-# DEFAULT names a feature space containing exactly one concrete set. When omitted, the empty set is
-# preferred when allowed; otherwise the first canonical member is used.
+# Set the named Keyso space of permitted concrete project configurations.
+#   besa_set_feature_space(<space> [DEFAULT <singleton-space>])
+# Without DEFAULT, the empty set is preferred if present.
 function(besa_set_feature_space NAME)
   _besa_require_config_open("besa_set_feature_space")
   if("${NAME}" STREQUAL "")
@@ -60,7 +70,8 @@ function(besa_set_feature_space NAME)
   set_property(GLOBAL PROPERTY BESA_PROJECT_DEFAULT_FEATURE_SET "${_default}")
 endfunction()
 
-# The project owns this ordinary CACHE STRING; BESA only knows its name.
+# Connect an ordinary project CACHE STRING to feature resolution.
+#   besa_set_feature_variable(<cache-variable-name>)
 function(besa_set_feature_variable VARIABLE)
   _besa_require_config_open("besa_set_feature_variable")
   if(NOT VARIABLE MATCHES "^[A-Za-z_][A-Za-z_0-9]*$")
@@ -69,7 +80,8 @@ function(besa_set_feature_variable VARIABLE)
   set_property(GLOBAL PROPERTY BESA_FEATURE_VARIABLE "${VARIABLE}")
 endfunction()
 
-# A symmetric pairwise exclusion.  Other Keyso feature spaces remain available.
+# Declare two mutually incompatible atomic features.
+#   besa_features_conflict(<first> <second>)
 function(besa_features_conflict FIRST SECOND)
   _besa_require_config_open("besa_features_conflict")
   if(NOT ARGC EQUAL 2 OR FIRST STREQUAL SECOND)
@@ -89,6 +101,55 @@ function(besa_features_conflict FIRST SECOND)
     set_property(GLOBAL APPEND PROPERTY BESA_FEATURE_CONFLICTS "${_record}")
   endif()
 endfunction()
+
+# Resolve declared options, validate constraints and publish internal state.
+#   besa_finalize_options()
+# Must be called before sources/tests; schedules deferred project finalization.
+macro(besa_finalize_options)
+  cmake_parse_arguments(ARG "" "" "" ${ARGN})
+  _besa_require_no_unparsed("besa_finalize_options" "${ARG_UNPARSED_ARGUMENTS}")
+  _besa_require_config_open("besa_finalize_options")
+
+  besa_workspace_initialize()
+  if(COMMAND _besa_cpdocs_apply_feature_set)
+    _besa_cpdocs_apply_feature_set()
+  endif()
+  _besa_resolve_features(_enabled_features)
+  _besa_devtools_resolve(_enabled_devtools)
+  _besa_resolve_test_modes(_enabled_test_modes)
+  _besa_warnings_resolve(_enabled_warnings)
+  _besa_run_devtool_constraints("${_enabled_devtools}")
+  _besa_run_test_mode_constraints("${_enabled_test_modes}")
+
+  set_property(GLOBAL PROPERTY BESA_ENABLED_FEATURES "${_enabled_features}")
+  set(BESA_ENABLED_FEATURES "${_enabled_features}" CACHE INTERNAL "Resolved enabled BESA features")
+  _besa_publish_feature_booleans("${_enabled_features}")
+  _besa_publish_test_modes("${_enabled_test_modes}")
+  _besa_version_resolve()
+
+  # The compile database is the preferred C/C++ parser environment for cpdocs. Make it available
+  # whenever the active generator supports it; projects do not need to opt in separately.
+  set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE BOOL "Export compile commands for tooling" FORCE)
+
+  _besa_configuration_summary(
+    "${_enabled_features}" "${_enabled_devtools}" "${_enabled_test_modes}" "${_enabled_warnings}"
+  )
+  set_property(GLOBAL PROPERTY BESA_CONFIGURATION_COMPLETE TRUE)
+
+  cmake_language(EVAL CODE
+    "cmake_language(DEFER DIRECTORY [[${PROJECT_SOURCE_DIR}]] CALL _besa_project_finalize)"
+  )
+endmacro()
+
+# Alternate entry point forwarding to besa_finalize_options().
+#   besa_configure_complete()
+macro(besa_configure_complete)
+  besa_finalize_options(${ARGN})
+endmacro()
+
+# --------------------------------------------------------------------------------------------------
+# Internal implementation
+# --------------------------------------------------------------------------------------------------
 
 function(_besa_feature_set_is_valid ENABLED OUTPUT_VARIABLE)
   get_property(_conflicts GLOBAL PROPERTY BESA_FEATURE_CONFLICTS)
@@ -184,46 +245,3 @@ function(_besa_configuration_summary LIST_FEATURES LIST_DEVTOOLS LIST_TEST_MODES
   message(STATUS "  Package revision  : ${PKGBUILDER_REVISION}")
   message(STATUS "  Version           : ${PROJECT_SEMVER}")
 endfunction()
-
-macro(besa_finalize_options)
-  cmake_parse_arguments(ARG "" "" "" ${ARGN})
-  _besa_require_no_unparsed("besa_finalize_options" "${ARG_UNPARSED_ARGUMENTS}")
-  _besa_require_config_open("besa_finalize_options")
-
-  besa_workspace_initialize()
-  if(COMMAND _besa_cpdocs_apply_feature_set)
-    _besa_cpdocs_apply_feature_set()
-  endif()
-  _besa_resolve_features(_enabled_features)
-  _besa_devtools_resolve(_enabled_devtools)
-  _besa_resolve_test_modes(_enabled_test_modes)
-  _besa_warnings_resolve(_enabled_warnings)
-  _besa_run_devtool_constraints("${_enabled_devtools}")
-  _besa_run_test_mode_constraints("${_enabled_test_modes}")
-
-  set_property(GLOBAL PROPERTY BESA_ENABLED_FEATURES "${_enabled_features}")
-  set(BESA_ENABLED_FEATURES "${_enabled_features}" CACHE INTERNAL "Resolved enabled BESA features")
-  _besa_publish_feature_booleans("${_enabled_features}")
-  _besa_publish_test_modes("${_enabled_test_modes}")
-  _besa_version_resolve()
-
-  # The compile database is the preferred C/C++ parser environment for cpdocs. Make it available
-  # whenever the active generator supports it; projects do not need to opt in separately.
-  set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE BOOL "Export compile commands for tooling" FORCE)
-
-  _besa_configuration_summary(
-    "${_enabled_features}" "${_enabled_devtools}" "${_enabled_test_modes}" "${_enabled_warnings}"
-  )
-  set_property(GLOBAL PROPERTY BESA_CONFIGURATION_COMPLETE TRUE)
-
-  _besa_codegen_initialize()
-
-  cmake_language(EVAL CODE
-    "cmake_language(DEFER DIRECTORY [[${PROJECT_SOURCE_DIR}]] CALL _besa_project_finalize)"
-  )
-endmacro()
-
-# Compatibility alias for existing projects; new projects call besa_finalize_options().
-macro(besa_configure_complete)
-  besa_finalize_options(${ARGN})
-endmacro()
