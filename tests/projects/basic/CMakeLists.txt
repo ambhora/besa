@@ -10,14 +10,13 @@ find_package(besa CONFIG REQUIRED)
 include(cmake/options.cmake)
 include(CTest)
 
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 besa_add_library(NAME libbasic TYPE STATIC INSTALL YES)
 besa_add_directory(LIBRARY libbasic ROOT cpp TYPE cpp)
 besa_dependency_add(NAME Threads KIND NORMAL)
 target_link_libraries(libbasic PRIVATE Threads::Threads)
 besa_add_subdirectory(DIRECTORY bin TYPE bin)
+target_link_libraries(basic-cli PRIVATE basic::libbasic)
 
 if(BUILD_TESTING)
   besa_test_add_directory(NAME tests PREFIX basic TARGET_LIST basic::libbasic LABELS unit)

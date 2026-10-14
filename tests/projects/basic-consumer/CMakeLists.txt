@@ -9,6 +9,5 @@ include(CTest)
 find_package(basic 1.2 CONFIG REQUIRED)
 
 add_executable(consumer main.cpp)
-target_compile_features(consumer PRIVATE cxx_std_20)
 target_link_libraries(consumer PRIVATE basic::libbasic)
 add_test(NAME consumer COMMAND consumer)

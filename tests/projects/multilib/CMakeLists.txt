@@ -14,15 +14,6 @@ besa_add_library(NAME libheaders TYPE INTERFACE INSTALL YES)
 
 # With no explicit kind, use CMake's BUILD_SHARED_LIBS selection.
 besa_add_library(NAME libdefault INSTALL YES)
-if(BUILD_SHARED_LIBS)
-  set(_expected_kind SHARED_LIBRARY)
-else()
-  set(_expected_kind STATIC_LIBRARY)
-endif()
-get_target_property(_actual_kind libdefault TYPE)
-if(NOT _actual_kind STREQUAL _expected_kind)
-  message(FATAL_ERROR "Expected ${_expected_kind} for default library, got ${_actual_kind}")
-endif()
 
 besa_add_directory(LIBRARY libone ROOT first TYPE cpp)
 besa_add_directory(LIBRARY libone ROOT extra TYPE cpp)
@@ -31,3 +22,20 @@ besa_add_directory(LIBRARY libhidden ROOT hidden TYPE cpp)
 besa_add_directory(LIBRARY libheaders ROOT headers TYPE cpp)
 
 besa_add_directory(LIBRARY libdefault ROOT default TYPE cpp)
+
+# --------------------------------------------------------------------------------------------------
+# TESTING
+# --------------------------------------------------------------------------------------------------
+# Verify CMake's BUILD_SHARED_LIBS choice for the library without an explicit TYPE.
+# This is a fixture assertion, not part of the normal BESA library declaration.
+if(BUILD_SHARED_LIBS)
+  set(EXPECTED_LIBRARY_TYPE SHARED_LIBRARY)
+else()
+  set(EXPECTED_LIBRARY_TYPE STATIC_LIBRARY)
+endif()
+get_target_property(ACTUAL_LIBRARY_TYPE libdefault TYPE)
+if(NOT ACTUAL_LIBRARY_TYPE STREQUAL EXPECTED_LIBRARY_TYPE)
+  message(FATAL_ERROR
+    "Expected ${EXPECTED_LIBRARY_TYPE} for libdefault, got ${ACTUAL_LIBRARY_TYPE}"
+  )
+endif()

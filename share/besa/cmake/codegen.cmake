@@ -11,7 +11,7 @@
 #
 # Generated outputs live under BESA_CODEGEN_DIRECTORY, never under the source
 # tree. CMake 4.3 provides the reserved `codegen` build target. Finalization
-# integrates generated metadata headers into the project library if it exists.
+# integrates generated metadata headers with all BESA-managed libraries.
 
 include_guard(GLOBAL)
 include("${CMAKE_CURRENT_LIST_DIR}/workspace.cmake")
@@ -54,25 +54,35 @@ function(_besa_codegen_include NAME OUTPUT_VARIABLE)
   set("${OUTPUT_VARIABLE}" "${_include}" PARENT_SCOPE)
 endfunction()
 
-# Attach registered generated include roots to the conventional project
-# library, when it exists, and install generated public headers.
+# Public generated metadata can be included by every BESA library. Attach
+# those header roots to all explicitly created libraries, instead of guessing
+# a special lib${PROJECT_NAME} target. Install each root only once.
 function(_besa_codegen_finalize)
   get_property(_roots GLOBAL PROPERTY BESA_INTERNAL_GENERATED_INCLUDE_ROOTS)
-  if(NOT _roots OR NOT TARGET "lib${PROJECT_NAME}")
+  get_property(_libraries GLOBAL PROPERTY BESA_LIBRARY_TARGETS)
+  if(NOT _roots OR NOT _libraries)
     return()
   endif()
   include(GNUInstallDirs)
   list(REMOVE_DUPLICATES _roots)
+  list(REMOVE_DUPLICATES _libraries)
   foreach(_root IN LISTS _roots)
     file(GLOB_RECURSE _headers LIST_DIRECTORIES FALSE CONFIGURE_DEPENDS "${_root}/*")
-    if(_headers)
-      target_sources("lib${PROJECT_NAME}" PUBLIC FILE_SET HEADERS BASE_DIRS "${_root}" FILES ${_headers})
-    endif()
-    target_include_directories(
-      "lib${PROJECT_NAME}" PUBLIC
-      $<BUILD_INTERFACE:${_root}>
-      $<INSTALL_INTERFACE:include>
-    )
+    foreach(_library IN LISTS _libraries)
+      get_target_property(_library_type "${_library}" TYPE)
+      if(_library_type STREQUAL "INTERFACE_LIBRARY")
+        set(_visibility INTERFACE)
+      else()
+        set(_visibility PUBLIC)
+      endif()
+      if(_headers)
+        target_sources("${_library}" ${_visibility}
+          FILE_SET HEADERS BASE_DIRS "${_root}" FILES ${_headers})
+      endif()
+      target_include_directories("${_library}" ${_visibility}
+        $<BUILD_INTERFACE:${_root}>
+        $<INSTALL_INTERFACE:include>)
+    endforeach()
     install(DIRECTORY "${_root}/" DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}" OPTIONAL)
   endforeach()
 endfunction()

@@ -10,5 +10,4 @@ find_package(besa CONFIG REQUIRED)
 include(cmake/options.cmake)
 include(CTest)
 
-set(CMAKE_CXX_STANDARD 20)
 besa_compile_test_add_directory(NAME checks PREFIX compile LABELS compile)

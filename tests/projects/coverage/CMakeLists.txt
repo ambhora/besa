@@ -10,7 +10,6 @@ find_package(besa CONFIG REQUIRED)
 include(cmake/options.cmake)
 include(CTest)
 
-set(CMAKE_CXX_STANDARD 20)
 besa_add_library(NAME libcoverage TYPE STATIC INSTALL YES)
 besa_add_directory(LIBRARY libcoverage ROOT cpp TYPE cpp)
 besa_test_add_directory(

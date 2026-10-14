@@ -16,6 +16,9 @@
 #   CHECK        cmake -P script run after configure with -DBINARY_DIR=<build tree>
 #   INSTALL      ON to install the project into WORK/install
 #   CONSUMER     source directory of a downstream project built against the installed project
+#
+# The test harness supplies its compiler standard through configure arguments,
+# never through project CMakeLists.txt or BESA target requirements.
 
 foreach(_required SOURCE WORK PREFIX EXPECT)
   if(NOT DEFINED ${_required})
@@ -87,6 +90,7 @@ endif()
 _step(configure CONFIGURE_FAIL
   "${CMAKE_COMMAND}" -S "${SOURCE}" -B "${_build}" ${_generator}
   -C "${_preload}" "-DCMAKE_PREFIX_PATH=${PREFIX}" -DCMAKE_BUILD_TYPE=Debug
+  -DCMAKE_CXX_STANDARD=20
   ${_project_test_include} ${_args}
 )
 if(_besa_driver_done)
@@ -125,7 +129,8 @@ if(CONSUMER)
   endif()
   _step(consumer-configure NONE
     "${CMAKE_COMMAND}" -S "${CONSUMER}" -B "${_consumer}/build" ${_generator}
-    -C "${_consumer_preload}" -DCMAKE_BUILD_TYPE=Debug ${_consumer_test_include}
+    -C "${_consumer_preload}" -DCMAKE_BUILD_TYPE=Debug
+    -DCMAKE_CXX_STANDARD=20 ${_consumer_test_include}
   )
   _step(consumer-build NONE "${CMAKE_COMMAND}" --build "${_consumer}/build")
   _step(consumer-test NONE

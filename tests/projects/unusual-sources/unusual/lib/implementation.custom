@@ -1,0 +1,1 @@
+int unusual_source_is_compiled() { return 42; }

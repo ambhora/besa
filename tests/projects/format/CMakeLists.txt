@@ -10,5 +10,4 @@ find_package(besa CONFIG REQUIRED)
 include(cmake/options.cmake)
 include(CTest)
 
-set(CMAKE_CXX_STANDARD 20)
 besa_add_executable(NAME tidy SOURCES tidy.cpp)

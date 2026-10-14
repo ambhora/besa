@@ -61,7 +61,9 @@ endfunction()
 # Add a semantic unit without the library-only validation of besa_add_directory.
 #   besa_add_subdirectory(DIRECTORY <path> TYPE <type> [LIBRARY <target>]
 #                         [CONDITION <feature-space>] [ARGS ...])
-# The bin type discovers standalone executables; other types require LIBRARY.
+# The bin type creates standalone executables and leaves source-language
+# inference to CMake. Other types require LIBRARY and use TYPE to enable a
+# language; file extensions do not determine semantic types.
 # A generated type invokes its registered callback before source discovery.
 macro(besa_add_subdirectory)
   _besa_require_config_complete("besa_add_subdirectory")
@@ -97,7 +99,7 @@ macro(besa_add_subdirectory)
     file(MAKE_DIRECTORY "${_besa_build}")
     if(_besa_kind STREQUAL "builtin")
       _besa_manifest_register_unit(ID "${_besa_relative}" TYPE "${BESA_SUBDIR_TYPE}" ROOT "${_besa_source}")
-      _besa_subdir_enable_type_languages("${BESA_SUBDIR_TYPE}" "${_besa_source}")
+      _besa_subdir_enable_type_languages("${BESA_SUBDIR_TYPE}")
       _besa_subdir_lower("${_besa_source}" "${BESA_SUBDIR_TYPE}" FALSE "${BESA_SUBDIR_LIBRARY}")
 
     else()
@@ -134,7 +136,7 @@ macro(besa_add_subdirectory)
         ID "${_besa_relative}" TYPE "${_besa_resolved}" ROOT "${_besa_output}"
         SOURCE_TYPE "${BESA_SUBDIR_TYPE}" GENERATED
       )
-      _besa_subdir_enable_type_languages("${_besa_resolved}" "${_besa_output}")
+      _besa_subdir_enable_type_languages("${_besa_resolved}")
       _besa_subdir_lower("${_besa_output}" "${_besa_resolved}" TRUE "${BESA_SUBDIR_LIBRARY}")
       if(_besa_target AND NOT BESA_SUBDIR_TYPE STREQUAL "bin")
         add_dependencies("${BESA_SUBDIR_LIBRARY}" "${_besa_target}")
@@ -262,41 +264,22 @@ macro(_besa_subdir_enable_language TYPE)
   endif()
 endmacro()
 
-macro(_besa_subdir_enable_bin_languages ROOT)
-  file(GLOB _besa_bin_sources LIST_DIRECTORIES FALSE "${ROOT}/*.c" "${ROOT}/*.cc" "${ROOT}/*.cpp" "${ROOT}/*.cxx")
-  set(_besa_need_c FALSE)
-  set(_besa_need_cxx FALSE)
-  foreach(_besa_source IN LISTS _besa_bin_sources)
-    get_filename_component(_besa_extension "${_besa_source}" EXT)
-    if(_besa_extension STREQUAL ".c")
-      set(_besa_need_c TRUE)
-    else()
-      set(_besa_need_cxx TRUE)
-    endif()
-  endforeach()
-  get_property(_besa_enabled_languages GLOBAL PROPERTY ENABLED_LANGUAGES)
-  if(_besa_need_c AND NOT "C" IN_LIST _besa_enabled_languages)
-    enable_language(C)
-  endif()
-  get_property(_besa_enabled_languages GLOBAL PROPERTY ENABLED_LANGUAGES)
-  if(_besa_need_cxx AND NOT "CXX" IN_LIST _besa_enabled_languages)
-    enable_language(CXX)
-  endif()
-endmacro()
-
-# Enable source languages in the caller directory scope, hence a macro.
-macro(_besa_subdir_enable_type_languages TYPE ROOT)
-  if("${TYPE}" STREQUAL "bin")
-    _besa_subdir_enable_bin_languages("${ROOT}")
-  else()
+# Only the explicitly declared semantic type may activate a language.
+# Executables have no semantic language type: CMake infers their language from
+# the source files and the languages enabled by the project/other units.
+macro(_besa_subdir_enable_type_languages TYPE)
+  if(NOT "${TYPE}" STREQUAL "bin")
     _besa_subdir_enable_language("${TYPE}")
   endif()
 endmacro()
 
-function(_besa_subdir_filter_metadata LIST_VARIABLE)
-  set(_values ${${LIST_VARIABLE}})
-  list(FILTER _values EXCLUDE REGEX "/\\.[^/]+$")
-  set("${LIST_VARIABLE}" "${_values}" PARENT_SCOPE)
+# All files in implementation trees are sources. Assign the semantic language
+# explicitly so even an unconventional extension is passed to that compiler,
+# rather than silently classified by CMake as a noncompiled attachment.
+function(_besa_subdir_assign_source_language SOURCES LANGUAGE)
+  if(SOURCES)
+    set_source_files_properties(${SOURCES} PROPERTIES LANGUAGE "${LANGUAGE}")
+  endif()
 endfunction()
 
 # Discover the lib/, include/, mod/ and module/ trees beneath ROOT.
@@ -310,17 +293,13 @@ function(_besa_subdir_lower_library LIBRARY ROOT TYPE GENERATED)
   file(GLOB_RECURSE _headers LIST_DIRECTORIES FALSE CONFIGURE_DEPENDS "${ROOT}/include/*")
   file(GLOB_RECURSE _sources LIST_DIRECTORIES FALSE CONFIGURE_DEPENDS "${ROOT}/lib/*")
   if(TYPE STREQUAL "cpp")
-    file(GLOB_RECURSE _cpp_modules LIST_DIRECTORIES FALSE CONFIGURE_DEPENDS "${ROOT}/module/*.cppm")
+    file(GLOB_RECURSE _cpp_modules LIST_DIRECTORIES FALSE CONFIGURE_DEPENDS "${ROOT}/module/*")
   endif()
   if(TYPE STREQUAL "fortran")
     file(GLOB_RECURSE _modules LIST_DIRECTORIES FALSE CONFIGURE_DEPENDS "${ROOT}/mod/*")
   else()
     set(_modules)
   endif()
-  _besa_subdir_filter_metadata(_headers)
-  _besa_subdir_filter_metadata(_sources)
-  _besa_subdir_filter_metadata(_modules)
-  _besa_subdir_filter_metadata(_cpp_modules)
 
   if(_headers OR _sources OR _modules OR _cpp_modules)
     get_target_property(_library_type "${_library}" TYPE)
@@ -331,18 +310,30 @@ function(_besa_subdir_lower_library LIBRARY ROOT TYPE GENERATED)
       set(_visibility INTERFACE)
     else()
       set(_visibility PUBLIC)
+      _besa_subdir_type_get("${TYPE}" LANGUAGE _source_language)
+      _besa_subdir_assign_source_language("${_sources}" "${_source_language}")
+      _besa_subdir_assign_source_language("${_modules}" "${_source_language}")
       if(_sources OR _modules)
         target_sources("${_library}" PRIVATE ${_sources} ${_modules})
       endif()
     endif()
     if(_cpp_modules)
-      target_compile_features("${_library}" PUBLIC cxx_std_20)
+      # CMake CXX_MODULES file sets remain subject to the toolchain/preset
+      # standard. BESA never adds target_compile_features() here.
+      _besa_subdir_assign_source_language("${_cpp_modules}" CXX)
       target_sources("${_library}" PUBLIC FILE_SET CXX_MODULES BASE_DIRS "${ROOT}/module" FILES ${_cpp_modules})
     endif()
     if(_headers)
       target_sources("${_library}" ${_visibility} FILE_SET HEADERS BASE_DIRS "${ROOT}/include" FILES ${_headers})
     endif()
     if(IS_DIRECTORY "${ROOT}/include" OR GENERATED)
+      # Used by deferred surrogate checks: headers inherit the declared
+      # semantic language of their source tree, never their suffix.
+      _besa_subdir_type_get("${TYPE}" LANGUAGE _header_language)
+      set_property(TARGET "${_library}" APPEND PROPERTY
+        BESA_INTERNAL_HEADER_ROOTS "${ROOT}/include")
+      set_property(TARGET "${_library}" APPEND PROPERTY
+        BESA_INTERNAL_HEADER_LANGUAGES "${_header_language}")
       target_include_directories(
         "${_library}" ${_visibility}
         $<BUILD_INTERFACE:${ROOT}/include>
@@ -356,15 +347,12 @@ function(_besa_subdir_lower_library LIBRARY ROOT TYPE GENERATED)
 endfunction()
 
 function(_besa_subdir_lower_bin ROOT)
-  file(GLOB _sources LIST_DIRECTORIES FALSE CONFIGURE_DEPENDS "${ROOT}/*.c" "${ROOT}/*.cc" "${ROOT}/*.cpp" "${ROOT}/*.cxx")
-  _besa_subdir_filter_metadata(_sources)
+  # Every regular file in bin/ declares an executable. Do not filter by
+  # extension, guess a language, or link to a conventional project library.
+  file(GLOB _sources LIST_DIRECTORIES FALSE CONFIGURE_DEPENDS "${ROOT}/*")
   foreach(_source IN LISTS _sources)
     get_filename_component(_target "${_source}" NAME_WE)
-    set(_links)
-    if(TARGET "lib${PROJECT_NAME}")
-      list(APPEND _links "${PROJECT_NAME}::lib${PROJECT_NAME}")
-    endif()
-    besa_add_executable(NAME "${_target}" SOURCES "${_source}" LINK_LIBRARIES ${_links})
+    besa_add_executable(NAME "${_target}" SOURCES "${_source}")
   endforeach()
 endfunction()
 

@@ -12,8 +12,9 @@ variables, registers metadata with `besa_register_options()`, and calls
 `besa_finalize_options()` once. The main `CMakeLists.txt` includes the file immediately after
 `find_package(besa CONFIG REQUIRED)`, before creating libraries, executables, or tests.
 
-The test driver overrides only the project-declared options (`BUILD_DEVTOOLS`, `BUILD_WARNINGS`,
-`TEST_MODE`, `PROJECT_FEATURE`, `RELEASE_TYPE`, etc.). No test-specific `SANITIZER`,
+The test driver selects C++20 using a configure command-line argument, independently
+of the example projects. It overrides project-declared options (`BUILD_DEVTOOLS`,
+`BUILD_WARNINGS`, `TEST_MODE`, `PROJECT_FEATURE`, `RELEASE_TYPE`, etc.). No test-specific `SANITIZER`,
 `SURROGATE_BROKEN`, or `EXPECT_MERGE_TESTS` selector is accepted. Test directories may be
 registered conditionally based on resolved options. For example:
 
@@ -26,13 +27,19 @@ besa_finalize_options()
 
 ```cmake
 # CMakeLists.txt, after include(cmake/options.cmake)
-foreach(_sanitizer IN ITEMS asan ubsan)
-  besa_devtools_check(OUTPUT_VARIABLE _enabled DEVTOOLS "${_sanitizer}")
-  if(_enabled)
-    besa_test_add_directory(NAME "${_sanitizer}" PREFIX sanitizers)
+foreach(DEVTOOL_NAME IN ITEMS asan ubsan)
+  besa_devtools_check(OUTPUT_VARIABLE DEVTOOL_ENABLED DEVTOOLS "${DEVTOOL_NAME}")
+  if(DEVTOOL_ENABLED)
+    besa_test_add_directory(NAME "${DEVTOOL_NAME}" PREFIX sanitizers)
   endif()
 endforeach()
 ```
+
+Example `CMakeLists.txt` files use descriptive variable names without leading underscores. Keep
+project setup and ordinary BESA declarations together; place fixture-only assertions **after** the
+example, separated by a `# TESTING` heading and horizontal comment dividers. For checks that are
+only useful to the test harness, prefer an explicitly labeled `test.cmake` or `check-*.cmake`
+file rather than cluttering the project setup.
 
 Test-directory `MODES` and `CONDITION` still describe which declared test modes and features
 support a test, rather than adding options to configure. The same distinction applies to the

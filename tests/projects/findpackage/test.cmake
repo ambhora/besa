@@ -7,7 +7,7 @@ function(_besa_test_findpackage)
   if(NOT besa_VERSION VERSION_GREATER_EQUAL REQUESTED_VERSION)
     message(FATAL_ERROR "besa_VERSION '${besa_VERSION}' does not satisfy '${REQUESTED_VERSION}'")
   endif()
-  set(_commands
+  set(REQUIRED_COMMANDS
     besa_configure_complete
     besa_add_feature
     besa_keyso_one_of
@@ -17,9 +17,9 @@ function(_besa_test_findpackage)
     besa_add_subdirectory
     besa_workspace_initialize
   )
-  foreach(_command IN LISTS _commands)
-    if(NOT COMMAND "${_command}")
-      message(FATAL_ERROR "besa does not provide ${_command}")
+  foreach(REQUIRED_COMMAND IN LISTS REQUIRED_COMMANDS)
+    if(NOT COMMAND "${REQUIRED_COMMAND}")
+      message(FATAL_ERROR "besa does not provide ${REQUIRED_COMMAND}")
     endif()
   endforeach()
 endfunction()

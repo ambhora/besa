@@ -49,6 +49,10 @@ function(besa_add_library)
     add_library("${ARG_NAME}")
   endif()
 
+  # Internal registry for framework-wide generated headers. All BESA
+  # libraries are peers; there is no implied lib${PROJECT_NAME} target.
+  set_property(GLOBAL APPEND PROPERTY BESA_LIBRARY_TARGETS "${ARG_NAME}")
+
   if(ARG_NAME MATCHES "^lib(.+)$")
     set_target_properties("${ARG_NAME}" PROPERTIES OUTPUT_NAME "${CMAKE_MATCH_1}")
   endif()
@@ -110,15 +114,6 @@ function(_besa_target_common TARGET_NAME)
     return()
   endif()
   _besa_devtools_activate()
-  # ``projectdocs`` is a BESA/Doxygen alias used in C++ documentation comments. Clang otherwise
-  # diagnoses it as an unknown documentation command when -Wdocumentation is enabled (for example
-  # by the ``everything`` warning policy). Register only the custom command instead of suppressing
-  # unknown-command diagnostics globally, so misspelled standard Doxygen commands still warn.
-  target_compile_options(
-    "${TARGET_NAME}" PRIVATE
-    $<$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>:-fcomment-block-commands=projectdocs>
-  )
-
   _besa_target_apply_warning_policy("${TARGET_NAME}")
   _besa_target_apply_devtools("${TARGET_NAME}")
 endfunction()

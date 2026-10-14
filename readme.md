@@ -41,12 +41,21 @@ when `INSTALL YES` (the default). `INSTALL NO` keeps the target build-only. The 
 library. It recursively adds files under `path/lib/` as private sources and publishes files under
 `path/include/` through a header file set and the public include path. Multiple directory trees may
 be attached to one library, and a project may define any number of independent libraries. `ROOT`
-is relative to the current source directory. A C++ root may also provide `module/*.cppm`;
+is relative to the current source directory. A C++ root may also provide `module/` files;
 Fortran additionally uses `mod/`. Built-in semantic language types are `c`, `cpp`, `cuda`, `hip`,
 and `fortran`.
 
-`besa_add_subdirectory(DIRECTORY path TYPE bin)` creates top-level C/C++ executables.
-For library source units, a previously declared `LIBRARY` target must be specified.
+`besa_add_subdirectory(DIRECTORY path TYPE bin)` creates one executable for every
+regular file directly in `path/`, without selecting source extensions or
+implicitly linking any library. CMake determines the executable language from
+its sources and the languages already enabled in the project. Linking is
+explicit via `target_link_libraries()`; BESA does not infer it. For library
+source units, a previously declared `LIBRARY` target must be specified. Library
+implementations include every file recursively under `lib/` and use the declared
+semantic `TYPE` to choose the source language, even for unusual extensions.
+BESA does not impose any language standard; select compilers, standards and
+related requirements using command-line cache options, toolchain files or
+CMake presets, rather than project `CMakeLists.txt` settings.
 
 Generators register a custom type that resolves to one built-in type:
 
@@ -73,8 +82,9 @@ pairwise exclusion; retain `besa_keyso_*` and `besa_set_feature_space` when prec
 feature spaces are needed. BESA writes its semantic manifest inside the build tree
 (`build/besa/manifest.json`) and exports both CMake and CPS package descriptions
 when public targets are installed. An installation-time JSON manifest enumerates the
-actual installed paths. `src/cpp/module/*.cppm` files are optional and automatically
-attached to the existing library as public C++ module interfaces.
+actual installed paths. `src/cpp/module/` is optional. Every regular file under it is registered
+as a public C++ module interface; the project must select a suitable C++
+standard externally via a preset, toolchain file, or CMake command line.
 
 ## Project options and test selection
 
@@ -105,10 +115,10 @@ only when their corresponding developer tool has been selected through `BUILD_DE
 # CMakeLists.txt
 include(cmake/options.cmake)
 include(CTest)
-foreach(_sanitizer IN ITEMS asan ubsan)
-  besa_devtools_check(OUTPUT_VARIABLE _enabled DEVTOOLS "${_sanitizer}")
-  if(_enabled)
-    besa_test_add_directory(NAME "${_sanitizer}" PREFIX sanitizers)
+foreach(DEVTOOL_NAME IN ITEMS asan ubsan)
+  besa_devtools_check(OUTPUT_VARIABLE DEVTOOL_ENABLED DEVTOOLS "${DEVTOOL_NAME}")
+  if(DEVTOOL_ENABLED)
+    besa_test_add_directory(NAME "${DEVTOOL_NAME}" PREFIX sanitizers)
   endif()
 endforeach()
 ```

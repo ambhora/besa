@@ -11,26 +11,28 @@ find_package(besa CONFIG REQUIRED)
 include(cmake/options.cmake)
 include(CTest)
 
-set(CMAKE_CXX_STANDARD 20)
-# The user chooses instrumentation only through BUILD_DEVTOOLS. Besa resolves the
-# selected tools in cmake/options.cmake; no second sanitizer selector is needed.
-foreach(_sanitizer IN ITEMS asan ubsan)
-  besa_devtools_check(OUTPUT_VARIABLE _enabled DEVTOOLS "${_sanitizer}")
-  if(_enabled)
-    besa_test_add_directory(NAME "${_sanitizer}" PREFIX sanitizers)
+# The user chooses instrumentation only through BUILD_DEVTOOLS in cmake/options.cmake.
+# Register test directories for the selected tools without another configuration selector.
+foreach(DEVTOOL_NAME IN ITEMS asan ubsan)
+  besa_devtools_check(OUTPUT_VARIABLE DEVTOOL_ENABLED DEVTOOLS "${DEVTOOL_NAME}")
+  if(DEVTOOL_ENABLED)
+    besa_test_add_directory(NAME "${DEVTOOL_NAME}" PREFIX sanitizers)
   endif()
 endforeach()
 
-# Verify that only tests for the actually enabled instrumentation have been registered.
-besa_devtools_check(OUTPUT_VARIABLE _asan_selected DEVTOOLS asan)
-besa_devtools_check(OUTPUT_VARIABLE _ubsan_selected DEVTOOLS ubsan)
-if(_asan_selected AND NOT TEST sanitizers.overflow.fail.t)
+# --------------------------------------------------------------------------------------------------
+# TESTING
+# --------------------------------------------------------------------------------------------------
+# Verify that the registered tests reflect the resolved BUILD_DEVTOOLS selection.
+besa_devtools_check(OUTPUT_VARIABLE ASAN_ENABLED DEVTOOLS asan)
+besa_devtools_check(OUTPUT_VARIABLE UBSAN_ENABLED DEVTOOLS ubsan)
+if(ASAN_ENABLED AND NOT TEST sanitizers.overflow.fail.t)
   message(FATAL_ERROR "asan selected but its test was not registered")
-elseif(NOT _asan_selected AND TEST sanitizers.overflow.fail.t)
+elseif(NOT ASAN_ENABLED AND TEST sanitizers.overflow.fail.t)
   message(FATAL_ERROR "asan test registered without selecting asan")
 endif()
-if(_ubsan_selected AND NOT TEST sanitizers.shift.fail.t)
+if(UBSAN_ENABLED AND NOT TEST sanitizers.shift.fail.t)
   message(FATAL_ERROR "ubsan selected but its test was not registered")
-elseif(NOT _ubsan_selected AND TEST sanitizers.shift.fail.t)
+elseif(NOT UBSAN_ENABLED AND TEST sanitizers.shift.fail.t)
   message(FATAL_ERROR "ubsan test registered without selecting ubsan")
 endif()

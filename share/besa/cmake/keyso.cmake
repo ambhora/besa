@@ -4,16 +4,39 @@
 # --------------------------------------------------------------------------------------------------
 # Finite algebra of project feature spaces (Keyso).
 #
-# A concrete feature set is an unordered set of declared feature names. A
-# feature space is a named set of such concrete sets; it is *not* a namespace.
-# Keyso constructors and set operations build spaces before option finalization.
-# Feature conditions use subset-pattern matching: an enabled feature set matches
-# a space when it contains every feature in at least one member of that space.
-# Exact space membership, used to constrain configurations, is different.
+# A concrete feature set is an unordered collection of enabled atomic features.
+# A named feature space is a set of possible concrete feature sets, not a CMake
+# namespace. Declare atomic features with besa_add_feature() before constructing
+# spaces; construct spaces before besa_finalize_options().
 #
-# Implementation: sets are encoded as sorted `|`-joined feature names, with
-# `@` representing the empty set. Global properties store named spaces.
-# This encoding is private; callers use the public constructors instead.
+# Notation used below (mathematical sets, NOT CMake argument syntax):
+#   {}                  an empty concrete feature set: no features enabled
+#   {mpi}               a singleton concrete set: only 'mpi' enabled
+#   {{}, {mpi}, {gpu}}  a feature space with three possible concrete sets
+#   (empty space)       no possible concrete sets; different from the member {}
+#
+# Keyso spaces have TWO different interpretations depending on the consumer:
+#   - Configuration restrictions use EXACT membership: enabled == a space member.
+#   - Feature conditions use SUBSET matching: a space member only has to be
+#     contained in the enabled features. Additional enabled features are allowed.
+#     In particular, any space containing {} matches EVERY condition, because
+#     the empty set is a subset of every concrete feature set. Such a space is
+#     useful for describing allowed configurations, but is not a useful filter
+#     when interpreted as a condition.
+#
+# Example declarations (all must precede besa_finalize_options()):
+#   besa_add_feature(host)
+#   besa_add_feature(gpu)
+#   besa_add_feature(mpi)
+#   besa_keyso_one_of(backend host gpu)       # {{host}, {gpu}}
+#   besa_keyso_zero_or_one(parallel mpi)      # {{}, {mpi}}
+#   besa_keyso_create_feature_space(supported PRODUCT backend parallel)
+#   # supported = {{host}, {gpu}, {host, mpi}, {gpu, mpi}}
+#   besa_set_feature_space(supported)         # restrict full configurations
+#
+# Implementation detail: individual concrete sets are represented by sorted,
+# deduplicated feature names joined with '|'. The special token '@' encodes {}.
+# Named spaces are held in global properties; the encoding is not public API.
 
 include_guard(GLOBAL)
 include("${CMAKE_CURRENT_LIST_DIR}/internal.cmake")
@@ -24,8 +47,18 @@ set(_BESA_KEYSO_EMPTY "@")
 # Public API
 # --------------------------------------------------------------------------------------------------
 
-# Define a space containing exactly one feature set with all listed features.
+# Define ONE allowed concrete set containing ALL specified features.
+#
 #   besa_keyso_all_of(<space> <feature>...)
+#
+# Example:
+#   besa_keyso_all_of(distributed_gpu mpi gpu)
+#   # distributed_gpu = {{mpi, gpu}}
+#
+# The resulting feature space has one member (the two-feature set {mpi, gpu}),
+# not two members. Exact membership rejects {mpi} or {mpi, gpu, host}; when used
+# as a condition it matches {mpi, gpu, host} because both required features exist.
+# At least one previously declared feature is required.
 function(besa_keyso_all_of NAME)
   _besa_require_config_open("besa_keyso_all_of")
   _besa_keyso_validate_name("besa_keyso_all_of" "${NAME}")
@@ -34,8 +67,19 @@ function(besa_keyso_all_of NAME)
   _besa_keyso_space_set("${NAME}" "${_token}")
 endfunction()
 
-# Define a space of singleton feature sets (exactly one of the inputs).
+# Define one possible concrete set for EACH individual feature.
+#
 #   besa_keyso_one_of(<space> <feature>...)
+#
+# Example:
+#   besa_keyso_one_of(backend host gpu)
+#   # backend = {{host}, {gpu}}
+#
+# A singleton is a concrete set containing exactly one feature; it is not a
+# feature space with one member. As a restriction, 'backend' permits {host} OR
+# {gpu}, but not {} and not {host, gpu}. As a condition, it also matches the
+# larger enabled set {host, gpu}, since one of its singleton members is a subset.
+# At least one previously declared feature is required.
 function(besa_keyso_one_of NAME)
   _besa_require_config_open("besa_keyso_one_of")
   _besa_keyso_validate_name("besa_keyso_one_of" "${NAME}")
@@ -48,8 +92,24 @@ function(besa_keyso_one_of NAME)
   _besa_keyso_space_set("${NAME}" ${_sets})
 endfunction()
 
-# Define a space containing the empty set and each input singleton.
+# Define all choices of ZERO or ONE of the specified features.
+#
 #   besa_keyso_zero_or_one(<space> <feature>...)
+#
+# Example:
+#   besa_keyso_zero_or_one(parallel mpi openmp)
+#   # parallel = {{}, {mpi}, {openmp}}
+#
+# Here {} is ONE valid concrete configuration: neither mpi nor openmp enabled.
+# {mpi} and {openmp} are singleton configurations, each enabling exactly one.
+# The space contains THREE members; it is not an empty space. As an EXACT
+# restriction, {mpi, openmp} is invalid: it enables two alternatives.
+#
+# IMPORTANT: As a feature CONDITION, 'parallel' matches every enabled set,
+# including {mpi, openmp}, because {} is a subset of every set. Use this
+# constructor to describe allowed configurations or as a PRODUCT operand,
+# NOT to test that at most one of these features is currently enabled.
+# At least one previously declared feature is required.
 function(besa_keyso_zero_or_one NAME)
   _besa_require_config_open("besa_keyso_zero_or_one")
   _besa_keyso_validate_name("besa_keyso_zero_or_one" "${NAME}")
@@ -62,8 +122,19 @@ function(besa_keyso_zero_or_one NAME)
   _besa_keyso_space_set("${NAME}" ${_sets})
 endfunction()
 
-# Define all nonempty subsets of the listed features (power set minus empty).
+# Define all NONEMPTY combinations of the specified features.
+#
 #   besa_keyso_any_of(<space> <feature>...)
+#
+# Example:
+#   besa_keyso_any_of(instrumentation tracing profiling)
+#   # instrumentation = {{tracing}, {profiling}, {tracing, profiling}}
+#
+# This is the power set minus {}. As an exact restriction it requires at least
+# one of the listed features and allows any combination of them, but no other
+# features unless combined with other spaces (e.g. via PRODUCT). As a condition
+# it matches whenever one or more listed features is enabled, even alongside
+# additional features. At least one previously declared feature is required.
 function(besa_keyso_any_of NAME)
   _besa_require_config_open("besa_keyso_any_of")
   _besa_keyso_validate_name("besa_keyso_any_of" "${NAME}")
@@ -83,10 +154,36 @@ function(besa_keyso_any_of NAME)
   _besa_keyso_space_set("${NAME}" ${_sets})
 endfunction()
 
-# Compose named feature spaces using finite-set operations.
-#   besa_keyso_create_feature_space(<name> UNION|INTERSECTION|SETMINUS|PRODUCT <space>...)
-# UNION/INTERSECTION/SETMINUS operate on concrete sets; PRODUCT combines each
-# choice across spaces by feature-set union, removing duplicate results.
+# Construct a named feature space from other named feature spaces.
+#
+#   besa_keyso_create_feature_space(
+#     <name> UNION|INTERSECTION|SETMINUS|PRODUCT <space>...
+#   )
+#
+# Operations are on WHOLE concrete sets (members of a space):
+#   UNION         all members from every operand (duplicates removed)
+#   INTERSECTION  only members present in every operand
+#   SETMINUS      members in the first operand minus all subsequent operands
+#   PRODUCT       for each choice of one member per operand, combine the
+#                 selected feature sets by union (duplicates removed)
+#
+# Example (assumes host, gpu, mpi, openmp have been declared):
+#   besa_keyso_one_of(backend host gpu)
+#   besa_keyso_zero_or_one(parallel mpi openmp)
+#   besa_keyso_create_feature_space(supported PRODUCT backend parallel)
+#   # supported = {{host}, {host, mpi}, {host, openmp},
+#   #              {gpu},  {gpu, mpi},  {gpu, openmp}}
+#
+# Example of ordinary set algebra:
+#   besa_keyso_one_of(left host gpu)          # {{host}, {gpu}}
+#   besa_keyso_one_of(right gpu mpi)          # {{gpu}, {mpi}}
+#   besa_keyso_create_feature_space(u UNION left right)        # {{host}, {gpu}, {mpi}}
+#   besa_keyso_create_feature_space(i INTERSECTION left right) # {{gpu}}
+#   besa_keyso_create_feature_space(d SETMINUS left right)     # {{host}}
+#
+# PRODUCT does NOT merely concatenate the operand spaces: it computes unions
+# of each selected pair of concrete sets. A space with no possible members
+# produces no results under PRODUCT. Declare operands before composing them.
 function(besa_keyso_create_feature_space NAME OPERATION)
   _besa_require_config_open("besa_keyso_create_feature_space")
   if("${NAME}" STREQUAL "" OR "${OPERATION}" STREQUAL "")

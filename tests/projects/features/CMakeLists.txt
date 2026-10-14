@@ -14,7 +14,10 @@ besa_add_library(NAME libfeatures TYPE STATIC INSTALL YES)
 besa_add_directory(LIBRARY libfeatures ROOT alpha TYPE cpp CONDITION alpha)
 besa_add_directory(LIBRARY libfeatures ROOT beta TYPE cpp CONDITION beta)
 
-# cpdocs is additive: requesting metadata must not suppress normal targets.
+# --------------------------------------------------------------------------------------------------
+# TESTING
+# --------------------------------------------------------------------------------------------------
+# Verify that cpdocs metadata export does not suppress ordinary build targets.
 if(BESA_CPDOCS_FEATURE_SETS_OUTPUT AND NOT TARGET libfeatures)
   message(FATAL_ERROR "cpdocs feature-set export suppressed normal target 'libfeatures'")
 endif()

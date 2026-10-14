@@ -129,6 +129,7 @@ besa_project_test(NAME layout.multilib.implicit-library-rejected PROJECT library
   EXPECT CONFIGURE_FAIL MATCH "LIBRARY must name an existing target"
   LABELS core
 )
+besa_project_test(NAME layout.unusual-sources PROJECT unusual-sources LABELS core)
 besa_project_test(NAME layout.generated PROJECT generated CHECK generated/check-manifest.cmake LABELS core)
 besa_project_test(NAME layout.compile-tests PROJECT compile LABELS core)
 besa_project_test(NAME layout.freeze PROJECT freeze
