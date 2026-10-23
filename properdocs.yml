@@ -1,0 +1,62 @@
+site_name: BESA
+site_description: A declarative CMake project model for C, C++, CUDA, HIP and Fortran
+site_author: besa developers
+repo_url: https://github.com/ambhora/besa
+repo_name: GitHub
+edit_uri: edit/main/docs/
+copyright: Copyright &copy; 2026 besa developers. Apache-2.0.
+
+theme:
+  name: readthedocs
+  highlightjs: true
+  hljs_languages:
+    - cmake
+    - cpp
+    - json
+    - yaml
+    - bash
+
+docs_dir: docs
+site_dir: site
+strict: true
+use_directory_urls: true
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - tables
+  - toc:
+      permalink: true
+      toc_depth: 3
+
+plugins:
+  - search
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - Installation: getting-started/installation.md
+      - Your first project: getting-started/first-project.md
+      - Project layout at a glance: getting-started/layout.md
+  - Guide:
+      - How a BESA project is configured: guide/lifecycle.md
+      - Libraries and source units: guide/source-units.md
+      - Project options: guide/options.md
+      - Features: guide/features.md
+      - Feature spaces (Keyso): guide/feature-spaces.md
+      - Tests: guide/testing.md
+      - Test modes: guide/test-modes.md
+      - Developer tools: guide/devtools.md
+      - Warning policies: guide/warnings.md
+      - Versions and release metadata: guide/versioning.md
+      - Installation and packaging: guide/packaging.md
+      - Generated source: guide/code-generation.md
+      - Documentation targets: guide/documentation.md
+  - Reference:
+      - Command reference: reference/commands.md
+      - Cache variables: reference/variables.md
+      - Build targets and tests: reference/targets.md
+      - The manifest: reference/manifest.md
+      - The besa command line: reference/cli.md
+  - Contributing: contributing.md

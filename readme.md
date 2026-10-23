@@ -6,123 +6,91 @@ SPDX-FileCopyrightText: 2026 besa developers
 -->
 # BESA
 
-BESA is a declarative CMake project model. Projects describe **features**, **valid feature spaces**, and
-**semantic source units**; BESA lowers that model into CMake targets and a machine-readable manifest.
-The same model is consumed by cpdocs, so documentation does not require a second project description.
-
-Features and source languages are independent concepts. A project feature such as `gpu` may select a
-CUDA source unit, but the feature is still just a project capability while `cuda` is the unit's language.
+**A declarative project model for CMake.** Describe your libraries, their
+source trees, the features they support and how they are tested; BESA turns
+that into CMake targets, CTest tests, an installable package and a manifest
+that documentation tools can read.
 
 ```cmake
 cmake_minimum_required(VERSION 4.3)
-project(example VERSION 1.0.0 LANGUAGES NONE)
+project(greet VERSION 1.2.0 LANGUAGES NONE)
 find_package(besa CONFIG REQUIRED)
-include(cmake/options.cmake) # Native CMake CACHE options and besa_finalize_options()
-
-if(BUILD_SOURCE)
-  besa_add_library(NAME libexample INSTALL YES)
-  besa_add_directory(LIBRARY libexample ROOT src/cpp TYPE cpp)
-endif()
-if(BUILD_TESTING)
-  add_subdirectory(test)
-endif()
-```
-
-`besa_add_library(NAME libexample INSTALL YES)` is a small wrapper around CMake's
-`add_library`: it sets `OUTPUT_NAME` so `libexample` builds as `libexample.a` rather than
-`liblibexample.a`, creates the `example::libexample` alias, and registers the target for installation
-when `INSTALL YES` (the default). `INSTALL NO` keeps the target build-only. The optional
-`TYPE` argument accepts `STATIC`, `SHARED`, `MODULE`, `OBJECT`, or `INTERFACE`:
-`besa_add_library(NAME libexample TYPE STATIC INSTALL YES)`. Without `TYPE`, CMake selects
-`STATIC` or `SHARED` according to `BUILD_SHARED_LIBS`. Bare kinds such as `STATIC` without
-`TYPE` are not accepted.
-
-`besa_add_directory(LIBRARY libexample ROOT path TYPE cpp)` attaches a source tree to an existing
-library. It recursively adds files under `path/lib/` as private sources and publishes files under
-`path/include/` through a header file set and the public include path. Multiple directory trees may
-be attached to one library, and a project may define any number of independent libraries. `ROOT`
-is relative to the current source directory. A C++ root may also provide `module/` files;
-Fortran additionally uses `mod/`. Built-in semantic language types are `c`, `cpp`, `cuda`, `hip`,
-and `fortran`.
-
-`besa_add_subdirectory(DIRECTORY path TYPE bin)` creates one executable for every
-regular file directly in `path/`, without selecting source extensions or
-implicitly linking any library. CMake determines the executable language from
-its sources and the languages already enabled in the project. Linking is
-explicit via `target_link_libraries()`; BESA does not infer it. For library
-source units, a previously declared `LIBRARY` target must be specified. Library
-implementations include every file recursively under `lib/` and use the declared
-semantic `TYPE` to choose the source language, even for unusual extensions.
-BESA does not impose any language standard; select compilers, standards and
-related requirements using command-line cache options, toolchain files or
-CMake presets, rather than project `CMakeLists.txt` settings.
-
-Generators register a custom type that resolves to one built-in type:
-
-```cmake
-besa_register_subdirectory_type(
-  jnum
-  FUNCTION jnum_add_subdirectory
-  RESOLVES_TO cpp
-  GENERATED
-)
-
-besa_add_library(NAME libexample TYPE STATIC INSTALL YES)
-besa_add_directory(LIBRARY libexample ROOT schema TYPE jnum)
-```
-
-BESA owns the generated prefix and the global `codegen` target. The callback receives `SOURCE_DIR`,
-`BUILD_DIR`, `OUTPUT_DIR`, and `OUTPUT_TARGET_VARIABLE`; any extra `ARGS` supplied to
-`besa_add_directory()` are forwarded unchanged. This lets cpdocs build `codegen` on the host and
-then read the generated `include/`, `lib/`, and (for Fortran) `mod/` roots without building the target
-application.
-
-Registered features are independent by default. Use `besa_features_conflict(a b)` for a
-pairwise exclusion; retain `besa_keyso_*` and `besa_set_feature_space` when precise
-feature spaces are needed. BESA writes its semantic manifest inside the build tree
-(`build/besa/manifest.json`) and exports both CMake and CPS package descriptions
-when public targets are installed. An installation-time JSON manifest enumerates the
-actual installed paths. `src/cpp/module/` is optional. Every regular file under it is registered
-as a public C++ module interface; the project must select a suitable C++
-standard externally via a preset, toolchain file, or CMake command line.
-
-## Project options and test selection
-
-As in the Nola project layout, a project declares its user-facing cache variables once in
-`cmake/options.cmake`. BESA registers their metadata and resolves feature, devtool, and test-mode
-selections before any targets or tests are created:
-
-```cmake
-# cmake/options.cmake
-set(PROJECT_FEATURE "none" CACHE STRING "Selected project features")
-besa_set_feature_variable(PROJECT_FEATURE)
-set(BUILD_DEVTOOLS "none" CACHE STRING "Enabled development tools")
-set(BUILD_WARNINGS "minimal" CACHE STRING "Warning policies")
-option(BUILD_TESTING "Build tests" OFF)
-set(TEST_MODE "commit" CACHE STRING "Test mode")
-besa_test_modes_add(MODES commit)
-
-besa_register_options(GROUP project VARIABLES PROJECT_FEATURE)
-besa_register_options(GROUP build VARIABLES BUILD_DEVTOOLS BUILD_WARNINGS BUILD_TESTING TEST_MODE)
-besa_finalize_options()
-```
-
-Source and test declarations use the resolved configuration. There is no second `SANITIZER`
-variable or hidden build option to choose test fixtures. The example below registers tests
-only when their corresponding developer tool has been selected through `BUILD_DEVTOOLS`:
-
-```cmake
-# CMakeLists.txt
-include(cmake/options.cmake)
+include(cmake/options.cmake)                    # declares options, calls besa_finalize_options()
 include(CTest)
-foreach(DEVTOOL_NAME IN ITEMS asan ubsan)
-  besa_devtools_check(OUTPUT_VARIABLE DEVTOOL_ENABLED DEVTOOLS "${DEVTOOL_NAME}")
-  if(DEVTOOL_ENABLED)
-    besa_test_add_directory(NAME "${DEVTOOL_NAME}" PREFIX sanitizers)
-  endif()
-endforeach()
+
+besa_add_library(NAME libgreet)                          # greet::libgreet
+besa_add_directory(LIBRARY libgreet ROOT src TYPE cpp)   # src/include/**, src/lib/**
+besa_add_subdirectory(DIRECTORY bin TYPE bin)            # one executable per file in bin/
+target_link_libraries(greet-cli PRIVATE greet::libgreet)
+
+if(BUILD_TESTING)
+  besa_test_add_directory(NAME tests PREFIX greet TARGET_LIST greet::libgreet)  # tests/**/*.t.cpp
+endif()
 ```
 
-`besa_test_add_directory()` may still express test requirements through `MODES` and `CONDITION`
-when a test supports a subset of declared test modes or project features. These are predicates
-on the already-resolved configuration, not independent user-facing options.
+That is a complete project with public headers, an installed CLI, a
+discovered test suite, a generated `greet/version.hpp`, `make install` with
+`greetConfig.cmake` and a CPS description, and sanitizers, coverage,
+clang-format and clang-tidy one `-D` flag away.
+
+## Highlights
+
+- **Semantic source units** — `include/`, `lib/`, `module/`, `mod/` under a
+  root, compiled in a declared language (`c`, `cpp`, `cuda`, `hip`,
+  `fortran`), attached to any library. Several units per library, several
+  libraries per project.
+- **Features with validated combinations** — declare `gpu`, `mpi`, …; express
+  "exactly one backend, optionally MPI" as a finite feature space; invalid
+  selections fail at configure time with the rule that rejected them.
+- **Tests by convention** — `name.t.cpp` is a test, `name.fail.t.cpp` must
+  fail, `name.disabled.t.cpp` is disabled; compile-only tests; project-defined
+  test modes (`ci-commit`, `ci-merge`).
+- **One devtool switch** — `-DBUILD_DEVTOOLS="asan;ubsan;coverage;format;linting;surrogate"`
+  instruments every target and registers the corresponding checks.
+- **Packaging that works downstream** — `<Project>Config.cmake`, exported
+  targets, CPS, an installation manifest and `find_dependency()` calls derived
+  from `besa_dependency_add()`. Consumers never need BESA.
+- **A manifest for tooling** — `build/besa/manifest.json` describes units,
+  languages, options and features; [cpdocs](https://github.com/ambhora/cpdocs)
+  builds versioned API documentation from it without a second project
+  description.
+
+## Install
+
+```bash
+# as a CMake package
+cmake -S besa -B besa/build && cmake --install besa/build --prefix ~/.local
+
+# or vendored into your repository
+pip install besa && besa vendor      # writes cmake/besa/; then set(besa_DIR cmake/besa)
+```
+
+Requires CMake 4.3+. Tested with GCC 13–16 and Clang 21+.
+
+## Documentation
+
+Full documentation lives in [`docs/`](docs/index.md) and is built with
+[ProperDocs](https://properdocs.org/) (`properdocs serve`):
+
+- [Installation](docs/getting-started/installation.md) ·
+  [Your first project](docs/getting-started/first-project.md) ·
+  [Layout at a glance](docs/getting-started/layout.md)
+- [How a BESA project is configured](docs/guide/lifecycle.md) ·
+  [Libraries and source units](docs/guide/source-units.md) ·
+  [Features](docs/guide/features.md) ·
+  [Feature spaces](docs/guide/feature-spaces.md) ·
+  [Tests](docs/guide/testing.md) ·
+  [Developer tools](docs/guide/devtools.md) ·
+  [Packaging](docs/guide/packaging.md)
+- [Command reference](docs/reference/commands.md) ·
+  [Cache variables](docs/reference/variables.md) ·
+  [The manifest](docs/reference/manifest.md)
+
+## Developing BESA
+
+```bash
+cmake -S . -B build -DBUILD_TESTING=ON && ctest --test-dir build --output-on-failure
+uv run --project dev besa-dev run gcc-16     # the CI container for one compiler
+```
+
+See [Contributing](docs/contributing.md). Licensed under Apache-2.0.
