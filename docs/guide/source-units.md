@@ -59,6 +59,12 @@ beneath it and attaches them to `LIBRARY`:
 - `module/**` (`cpp` only) → `target_sources(... PUBLIC FILE_SET CXX_MODULES BASE_DIRS module ...)`.
 - `mod/**` (`fortran` only) → `PRIVATE` sources.
 
+A `fortran` unit with sources also gives `LIBRARY` a module directory of its
+own, `<build>/besa/fortran/modules/<library>`, unless the project already set
+`Fortran_MODULE_DIRECTORY`. The directory is a `PUBLIC` include directory, so
+targets that link the library can `use` its modules, and its `.mod` files are
+installed to `include/` with the library.
+
 `LIBRARY` must be a writable local library target created earlier — not an
 alias, not an imported target, not an executable. Attaching compiled sources
 to an `INTERFACE` library is an error.

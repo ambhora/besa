@@ -36,7 +36,9 @@ Per target:
 - **Libraries** — `ARCHIVE`/`LIBRARY`/`RUNTIME` artifacts; every
   `INTERFACE_HEADER_SETS` file set to `include/`; every
   `INTERFACE_CXX_MODULE_SETS` file set to `share/<project>/modules/`.
-  Header-only (`INTERFACE`) libraries install their header sets too.
+  Header-only (`INTERFACE`) libraries install their header sets too. A
+  library with a `fortran` unit installs the `.mod` files of its module
+  directory to `include/`.
 - **Executables** — `RUNTIME` to `bin/`.
 
 All installed targets join one export set, `<project>Targets`, with the
