@@ -23,7 +23,8 @@ besa_test_add_directory(
 ```
 
 `NAME` is a directory relative to the current source directory. It is
-scanned **recursively** for files matching `*.t.{c,cc,cpp,cxx,cu}`. For each
+scanned **recursively** for files matching `*.t.{c,cc,cpp,cxx,cu}` or, for
+Fortran, `*.t.{f,F,f90,F90,f95,F95,f03,F03,f08,F08}`. For each
 match BESA creates an executable (not installed), links it `PRIVATE` to
 every target in `TARGET_LIST`, applies the project's warning and devtool
 policies, and registers a CTest test that runs it with `CMDLINE`.
@@ -71,6 +72,10 @@ tests/
 Files that do not match the test pattern — fixtures, data, helpers in the
 companion directory — are otherwise ignored, so the test tree can be
 organized freely.
+
+A Fortran test can keep its helper modules in the companion directory. Every
+test executable writes its `.mod` files to a module directory of its own, so
+two tests may each define a helper module of the same name.
 
 ### Labels and arguments
 

@@ -130,6 +130,16 @@ besa_project_test(NAME layout.multilib.implicit-library-rejected PROJECT library
   LABELS core
 )
 besa_project_test(NAME layout.unusual-sources PROJECT unusual-sources LABELS core)
+
+# The Fortran layout needs a Fortran compiler, which not every compiler image provides.
+include(CheckLanguage)
+check_language(Fortran)
+if(CMAKE_Fortran_COMPILER)
+  besa_project_test(NAME layout.fortran PROJECT fortran
+    ARGS -DCMAKE_Fortran_COMPILER=${CMAKE_Fortran_COMPILER}
+    LABELS core
+  )
+endif()
 besa_project_test(NAME layout.generated PROJECT generated CHECK generated/check-manifest.cmake LABELS core)
 besa_project_test(NAME layout.compile-tests PROJECT compile LABELS core)
 besa_project_test(NAME layout.freeze PROJECT freeze
