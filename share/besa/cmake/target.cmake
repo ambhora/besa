@@ -112,6 +112,31 @@ function(_besa_target_private_fortran_modules TARGET_NAME)
   endif()
 endfunction()
 
+# The modules of a Fortran library are part of its interface: a program that links the library
+# 'use's them. Each library writes its .mod files to a directory of its own, which becomes a public
+# include directory in the build tree; package.cmake installs its .mod files next to the headers.
+# A Fortran_MODULE_DIRECTORY the project set itself is kept and published the same way.
+function(_besa_target_public_fortran_modules TARGET_NAME)
+  get_target_property(_published "${TARGET_NAME}" BESA_INTERNAL_FORTRAN_MODULE_DIRECTORY)
+  if(_published)
+    return()
+  endif()
+  get_target_property(_directory "${TARGET_NAME}" Fortran_MODULE_DIRECTORY)
+  if(NOT _directory)
+    set(_directory "${PROJECT_BINARY_DIR}/besa/fortran/modules/${TARGET_NAME}")
+    set_target_properties("${TARGET_NAME}" PROPERTIES Fortran_MODULE_DIRECTORY "${_directory}")
+  endif()
+  # install(DIRECTORY) needs the directory even when the library defines no module.
+  file(MAKE_DIRECTORY "${_directory}")
+  target_include_directories("${TARGET_NAME}" PUBLIC
+    $<BUILD_INTERFACE:${_directory}>
+    $<INSTALL_INTERFACE:include>
+  )
+  set_target_properties("${TARGET_NAME}" PROPERTIES
+    BESA_INTERNAL_FORTRAN_MODULE_DIRECTORY "${_directory}"
+  )
+endfunction()
+
 function(_besa_register_install_target TARGET_NAME)
   get_property(_targets GLOBAL PROPERTY BESA_INSTALL_TARGETS)
   if(NOT "${TARGET_NAME}" IN_LIST _targets)

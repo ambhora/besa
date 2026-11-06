@@ -80,6 +80,15 @@ function(_besa_package_finalize)
         LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
         RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
       )
+      # Fortran modules are compiler output, not a file set; see _besa_target_public_fortran_modules.
+      get_target_property(_fortran_modules "${_target}" BESA_INTERNAL_FORTRAN_MODULE_DIRECTORY)
+      if(_fortran_modules)
+        install(
+          DIRECTORY "${_fortran_modules}/"
+          DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+          FILES_MATCHING PATTERN "*.mod"
+        )
+      endif()
     endif()
   endforeach()
 

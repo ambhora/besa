@@ -135,7 +135,7 @@ besa_project_test(NAME layout.unusual-sources PROJECT unusual-sources LABELS cor
 include(CheckLanguage)
 check_language(Fortran)
 if(CMAKE_Fortran_COMPILER)
-  besa_project_test(NAME layout.fortran PROJECT fortran
+  besa_project_test(NAME layout.fortran PROJECT fortran CONSUMER fortran-consumer
     ARGS -DCMAKE_Fortran_COMPILER=${CMAKE_Fortran_COMPILER}
     LABELS core
   )
